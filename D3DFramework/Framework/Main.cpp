@@ -1,0 +1,24 @@
+#include "pch.h"
+#include "WinApp.h"
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PSTR cmdLine, int showCmd)
+{
+	// 실시간 메모리 검사를 활성화한다.
+#if defined(DEBUG) | defined(_DEBUG)
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+#endif
+
+	try
+	{
+		WinApp framework(hInstance, 800, 600, L"D3DFramework");
+		if (!framework.Initialize())
+			return 0;
+
+		return framework.Run();
+	}
+	catch (DxException& e)
+	{
+		MessageBox(nullptr, e.ToString().c_str(), L"HR Failed", MB_OK);
+		return 0;
+	}
+}
