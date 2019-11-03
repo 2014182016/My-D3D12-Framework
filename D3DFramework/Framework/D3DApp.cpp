@@ -1,14 +1,12 @@
+#include "pch.h"
 #include "D3DApp.h"
 
+using Microsoft::WRL::ComPtr;
 
 D3DApp::D3DApp(HINSTANCE hInstance, int screenWidth, int screenHeight, std::wstring applicationName)
 	: WinApp(hInstance, screenWidth, screenHeight, applicationName) { }
 
-D3DApp::~D3DApp()
-{
-	if (md3dDevice != nullptr)
-		FlushCommandQueue();
-}
+D3DApp::~D3DApp() { }
 
 bool D3DApp::Get4xMsaaState()const
 {
@@ -21,8 +19,16 @@ void D3DApp::Set4xMsaaState(bool value)
 	{
 		m4xMsaaState = value;
 
-		// 새로운 다중샘플링 셋팅을 위해 SwapChain과 버퍼를 새로 만든다.
-		CreateSwapChain();
+		OnResize(mScreenWidth, mScreenHeight);
+	}
+}
+
+void D3DApp::SetFullscreenState(bool value)
+{
+	if (mFullscreenState != value)
+	{
+		mFullscreenState = value;
+		ThrowIfFailed(mSwapChain->SetFullscreenState(value, nullptr));
 		OnResize(mScreenWidth, mScreenHeight);
 	}
 }
@@ -40,20 +46,18 @@ bool D3DApp::Initialize()
 	return true;
 }
 
-void D3DApp::Tick(float deltaTime)
+void D3DApp::OnDestroy()
 {
-	__super::Tick(deltaTime);
-}
+	if (md3dDevice != nullptr)
+		FlushCommandQueue();
 
-void D3DApp::Render()
-{
-	__super::Render();
+	mSwapChain->SetFullscreenState(false, nullptr);
 }
 
 void D3DApp::CreateRtvAndDsvDescriptorHeaps()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc;
-	rtvHeapDesc.NumDescriptors = SWAP_CHAIN_BUFFER_COUNT;
+	rtvHeapDesc.NumDescriptors = SWAP_CHAIN_BUFFER_COUNT + 1; // msaa를 위한 추가 렌더 타겟
 	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	rtvHeapDesc.NodeMask = 0;
@@ -74,9 +78,14 @@ void D3DApp::OnResize(int screenWidth, int screenHeight)
 {
 	__super::OnResize(screenWidth, screenHeight);
 
+	if (!md3dDevice || !mSwapChain || !mDirectCmdListAlloc)
+		return;
+
+	/*
 	assert(md3dDevice);
 	assert(mSwapChain);
 	assert(mDirectCmdListAlloc);
+	*/
 
 	// 리소스를 변경하기 전에 명령들을 비운다.
 	FlushCommandQueue();
@@ -105,7 +114,6 @@ void D3DApp::OnResize(int screenWidth, int screenHeight)
 		rtvHeapHandle.Offset(1, mRtvDescriptorSize);
 	}
 
-	// Create the depth/stencil buffer and view.
 	D3D12_RESOURCE_DESC depthStencilDesc;
 	depthStencilDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 	depthStencilDesc.Alignment = 0;
@@ -118,6 +126,10 @@ void D3DApp::OnResize(int screenWidth, int screenHeight)
 	depthStencilDesc.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
 	depthStencilDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 	depthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+	dsvDesc.Format = mDepthStencilFormat;
+	dsvDesc.ViewDimension = m4xMsaaState ? D3D12_DSV_DIMENSION_TEXTURE2DMS : D3D12_DSV_DIMENSION_TEXTURE2D;
 
 	// 지우기에 최적화된 값을 설정한다. 최적화된 지우기 값과
 	// 부합하는 지우기 호출은 부합하지 않는 호출보다 빠를 수 있다.
@@ -133,7 +145,7 @@ void D3DApp::OnResize(int screenWidth, int screenHeight)
 		&optClear,
 		IID_PPV_ARGS(mDepthStencilBuffer.GetAddressOf())));
 
-	md3dDevice->CreateDepthStencilView(mDepthStencilBuffer.Get(), nullptr, GetDepthStencilView());
+	md3dDevice->CreateDepthStencilView(mDepthStencilBuffer.Get(), &dsvDesc, GetDepthStencilView());
 
 	// 깊이 버퍼로서 사용하기 위해 상태 이전을 한다.
 	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
@@ -219,6 +231,9 @@ bool D3DApp::InitDirect3D()
 	CreateSwapChain();
 	CreateRtvAndDsvDescriptorHeaps();
 
+	// Alt-Enter를 비활성화한다.
+	mdxgiFactory->MakeWindowAssociation(mhMainWnd, DXGI_MWA_NO_ALT_ENTER);
+
 	return true;
 }
 
@@ -247,23 +262,27 @@ void D3DApp::CreateCommandObjects()
 
 void D3DApp::CreateSwapChain()
 {
+	// SwapChain을 해제하기 전에 Fullscreen모드를 해제해야만 한다.
+	if (mSwapChain)
+		mSwapChain->SetFullscreenState(false, nullptr);
+
 	// SwapChain을 만들기 전에 기존 SwapChain을 해제한다.
 	mSwapChain.Reset();
 
 	DXGI_SWAP_CHAIN_DESC sd;
 	sd.BufferDesc.Width = mScreenWidth;
 	sd.BufferDesc.Height = mScreenHeight;
-	sd.BufferDesc.RefreshRate.Numerator = 60;
-	sd.BufferDesc.RefreshRate.Denominator = 1;
+	sd.BufferDesc.RefreshRate.Numerator = 0; // 사용하지 않음
+	sd.BufferDesc.RefreshRate.Denominator = 0; // 사용하지 않음
 	sd.BufferDesc.Format = mBackBufferFormat;
 	sd.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
 	sd.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
-	sd.SampleDesc.Count = m4xMsaaState ? 4 : 1;
-	sd.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
+	sd.SampleDesc.Count = 1; // SwapChain으로 다중표본화 활성화하지 않음
+	sd.SampleDesc.Quality = 0; // SwapChain으로 다중표본화 활성화하지 않음
 	sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	sd.BufferCount = SWAP_CHAIN_BUFFER_COUNT;
 	sd.OutputWindow = mhMainWnd;
-	sd.Windowed = true;
+	sd.Windowed = !mFullscreenState;
 	sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 
@@ -308,6 +327,14 @@ D3D12_CPU_DESCRIPTOR_HANDLE D3DApp::GetCurrentBackBufferView()const
 	return CD3DX12_CPU_DESCRIPTOR_HANDLE(
 		mRtvHeap->GetCPUDescriptorHandleForHeapStart(),
 		mCurrentBackBuffer,
+		mRtvDescriptorSize);
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE D3DApp::GetMsaaBackBufferView()const
+{
+	return CD3DX12_CPU_DESCRIPTOR_HANDLE(
+		mRtvHeap->GetCPUDescriptorHandleForHeapStart(),
+		SWAP_CHAIN_BUFFER_COUNT,
 		mRtvDescriptorSize);
 }
 
@@ -389,4 +416,38 @@ void D3DApp::LogOutputDisplayModes(IDXGIOutput* output, DXGI_FORMAT format)
 
 		::OutputDebugString(text.c_str());
 	}
+}
+
+void D3DApp::SetGamma(float gamma)
+{
+	// 감마 보정은 풀스크린 모드에서만 사용할 수 있다.
+	if (!mFullscreenState)
+		return;
+
+	IDXGIOutput* output;
+	DXGI_GAMMA_CONTROL_CAPABILITIES gammaCaps;
+	DXGI_GAMMA_CONTROL gammaControl;
+
+	ThrowIfFailed(mSwapChain->GetContainingOutput(&output));
+	ThrowIfFailed(output->GetGammaControlCapabilities(&gammaCaps));
+
+	gammaControl.Scale.Red = 1.0f;
+	gammaControl.Scale.Green = 1.0f;
+	gammaControl.Scale.Blue = 1.0f;
+
+	gammaControl.Offset.Red = 1.0f;
+	gammaControl.Offset.Green = 1.0f;
+	gammaControl.Offset.Blue = 1.0f;
+
+	for (UINT i = 0; i < gammaCaps.NumGammaControlPoints; ++i)
+	{
+		float p0 = gammaCaps.ControlPointPositions[i];
+		float p1 = pow(p0, 1.0f / gamma); // 감마 커브 설정
+
+		gammaControl.GammaCurve[i].Red = p1;
+		gammaControl.GammaCurve[i].Green = p1;
+		gammaControl.GammaCurve[i].Blue = p1;
+	}
+
+	ThrowIfFailed(output->SetGammaControl(&gammaControl));
 }

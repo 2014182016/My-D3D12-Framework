@@ -1,4 +1,6 @@
+#include "pch.h"
 #include "WinApp.h"
+#include "GameTimer.h"
 #include <WindowsX.h>
 
 WinApp* WinApp::mApp = nullptr;
@@ -25,7 +27,7 @@ WinApp::WinApp(HINSTANCE hInstance, int screenWidth, int screenHeight, std::wstr
 	mApp = this;
 }
 
-WinApp::~WinApp()  { }
+WinApp::~WinApp() { }
 
 HINSTANCE WinApp::GetAppInst()const
 {
@@ -135,14 +137,10 @@ LRESULT WinApp::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 				mMaximized = false;
 				OnResize(mScreenWidth, mScreenHeight);
 			}
-			// SetWindosPos나 SetFullscreenState를 부를 때
-			else 
-			{
-				OnResize(mScreenWidth, mScreenHeight);
-			}
 		}
 		return 0;
 	case WM_DESTROY:
+		OnDestroy();
 		PostQuitMessage(0);
 		return 0;
 	case WM_MENUCHAR:
@@ -164,6 +162,7 @@ LRESULT WinApp::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	case WM_KEYUP:
 		if (wParam == VK_ESCAPE)
 		{
+			OnDestroy();
 			PostQuitMessage(0);
 		}
 
@@ -200,12 +199,12 @@ bool WinApp::InitMainWindow()
 
 	// 윈도우 창에서 클라이언트 영역을 계산한다.
 	RECT R = { 0, 0, mScreenWidth, mScreenHeight };
-	AdjustWindowRect(&R, WS_OVERLAPPEDWINDOW, false);
+	AdjustWindowRect(&R, WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME ^ WS_MAXIMIZEBOX, false);
 	int width = R.right - R.left;
 	int height = R.bottom - R.top;
 
 	mhMainWnd = CreateWindow(L"MainWnd", mApplicationName.c_str(),
-		WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, width, height, 0, 0, mhAppInst, 0);
+		WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME ^ WS_MAXIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT, width, height, 0, 0, mhAppInst, 0);
 	if (!mhMainWnd)
 	{
 		MessageBox(0, L"CreateWindow Failed.", 0, 0);
@@ -254,6 +253,14 @@ void WinApp::OnResize(int screenWidth, int screenHeight)
 {
 	mScreenWidth = screenWidth;
 	mScreenHeight = screenHeight;
+
+	// 윈도우 창에서 클라이언트 영역을 계산한다.
+	RECT R = { 0, 0, mScreenWidth, mScreenHeight };
+	AdjustWindowRect(&R, WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME ^ WS_MAXIMIZEBOX, false);
+	int width = R.right - R.left;
+	int height = R.bottom - R.top;
+
+	SetWindowPos(mhMainWnd, HWND_TOP, 0, 0, width, height, SWP_NOMOVE);
 }
 
 void WinApp::OnKeyDown(unsigned int input)

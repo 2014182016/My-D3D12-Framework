@@ -19,30 +19,42 @@
     <Filter Include="헤더 파일\Framework">
       <UniqueIdentifier>{c8602dbf-1124-47ec-823d-3f42bbf1a5cb}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{78bfe099-0c88-4904-8b12-5c52b9a3ca27}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Main.cpp">
-      <Filter>소스 파일\Framework</Filter>
-    </ClCompile>
     <ClCompile Include="Framework\WinApp.cpp">
       <Filter>소스 파일\Framework</Filter>
     </ClCompile>
     <ClCompile Include="Framework\D3DApp.cpp">
       <Filter>소스 파일\Framework</Filter>
     </ClCompile>
-    <ClCompile Include="Framework\DDSTextureLoader.cpp">
-      <Filter>소스 파일\Framework</Filter>
-    </ClCompile>
     <ClCompile Include="Framework\GameTimer.cpp">
-      <Filter>소스 파일\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Framework\GeometryGenerator.cpp">
       <Filter>소스 파일\Framework</Filter>
     </ClCompile>
     <ClCompile Include="Framework\Main.cpp">
       <Filter>소스 파일\Framework</Filter>
     </ClCompile>
     <ClCompile Include="Framework\pch.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Framework\D3DFramework.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Framework\Camera.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Framework\FrameResource.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Framework\DDSTextureLoader.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Framework\GeometryGenerator.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Framework\D3DUtil.cpp">
       <Filter>소스 파일\Framework</Filter>
     </ClCompile>
   </ItemGroup>
@@ -53,20 +65,49 @@
     <ClInclude Include="Framework\D3DApp.h">
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Framework\d3dx12.h">
-      <Filter>헤더 파일\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Framework\DDSTextureLoader.h">
-      <Filter>헤더 파일\Framework</Filter>
-    </ClInclude>
     <ClInclude Include="Framework\GameTimer.h">
-      <Filter>헤더 파일\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Framework\GeometryGenerator.h">
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Framework\pch.h">
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
+    <ClInclude Include="Framework\D3DFramework.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Framework\Camera.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Framework\Global.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Framework\FrameResource.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Framework\UploadBuffer.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Framework\DDSTextureLoader.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Framework\GeometryGenerator.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Framework\D3DUtil.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Shaders\Common.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\Default.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\LightingUtil.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\Billboard.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "WinApp.h"
+#include "D3DFramework.h"
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PSTR cmdLine, int showCmd)
 {
@@ -10,7 +10,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PSTR cmdLine, in
 
 	try
 	{
-		WinApp framework(hInstance, 800, 600, L"D3DFramework");
+		D3DFramework framework(hInstance, 800, 600, L"D3DFramework");
 		if (!framework.Initialize())
 			return 0;
 

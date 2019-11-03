@@ -21,6 +21,8 @@ public:
 	int Run();
 
 	virtual bool Initialize();
+	virtual void OnDestroy() { };
+
 	virtual LRESULT MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 protected:
@@ -50,7 +52,6 @@ protected:
 	bool mMinimized = false; 
 	bool mMaximized = false; 
 	bool mFullscreenState = false;
-	bool mWindowed = true;
 
 	// 키가 눌린 상태를 저장한다.
 	bool mKeys[256];
