@@ -31,13 +31,19 @@
 #include <algorithm>
 #include <array>
 #include <vector>
+#include <forward_list>
 #include <unordered_map>
+#include <map>
 #include <fstream>
 #include <iostream>
 #include <cstdint>
 #include <cassert>
+#include <any>
 #include "d3dx12.h"
 #include "DDSTextureLoader.h"
 #include "GeometryGenerator.h"
+
+#define SWAP_CHAIN_BUFFER_COUNT 2
+#define NUM_FRAME_RESOURCES 3
 
 #endif //PCH_H

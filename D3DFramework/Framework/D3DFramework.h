@@ -2,10 +2,12 @@
 
 #include "D3DApp.h"
 
+#if defined(DEBUG) || defined(_DEBUG)
 #pragma comment(linker, "/entry:WinMainCRTStartup /subsystem:console")
+#endif
 
-class Camera;
-class FrameResource;
+typedef std::unique_ptr<class Object> ObjectPtr;
+typedef std::forward_list<ObjectPtr>::iterator LayerIter;
 
 class D3DFramework : public D3DApp
 {
@@ -19,46 +21,46 @@ public:
 	virtual bool Initialize() override;
 	virtual void OnDestroy() override; 
 
-private:
 	virtual void OnResize(int screenWidth, int screenHeight) override;
 	virtual void Tick(float deltaTime) override;
 	virtual void Render() override;
 
-	virtual void OnMouseDown(WPARAM btnState, int x, int y) override;
-	virtual void OnMouseUp(WPARAM btnState, int x, int y) override;
-	virtual void OnMouseMove(WPARAM btnState, int x, int y) override;
+	virtual void CreateRtvAndDsvDescriptorHeaps();
+	
+public:
+	void ClassifyObjectLayer(std::pair<LayerIter, LayerIter>& layerPair, int i);
+	void ClassifyObjectLayer();
 
-	virtual void OnKeyDown(unsigned int input) override;
-	virtual void OnKeyUp(unsigned int input) override;
+public:
+	inline static D3DFramework* GetApp() { return static_cast<D3DFramework*>(mApp); }
 
-	// 매 프레임마다 Input관련 처리를 하기 위한 함수
-	virtual void OnProcessInput(float deltaTime);
+	inline class Camera* GetCamera() const { return mCamera; }
+
+	inline std::pair<LayerIter, LayerIter>& GetObjectLayer(int layerIndex) { return mLayerPair[layerIndex]; }
+	inline std::forward_list<ObjectPtr>& GetAllObjects() { return mAllObjects; }
+
+	inline bool GetIsWireframe() const { return mIsWireframe; }
+	inline void SetIsWireframe(bool value) { mIsWireframe = value; }
 
 private:
-	virtual void CreateRtvAndDsvDescriptorHeaps();
-
 	void AnimateMaterials(float deltaTime);
 	void UpdateObjectCBs(float deltaTime);
 	void UpdateMaterialBuffer(float deltaTime);
 	void UpdateMainPassCB(float deltaTime);
 
-	void LoadTextures();
 	void BuildRootSignature();
 	void BuildDescriptorHeaps();
 	void BuildShadersAndInputLayout();
-	void BuildShapeGeometry();
-	void BuildBBGeometry();
 	void BuildPSOs();
 	void BuildFrameResources();
-	void BuildMaterials();
 	void BuildRenderItems();
 
-	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
+	void RenderObjects(ID3D12GraphicsCommandList* cmdList, const LayerIter iterBegin, const LayerIter iterEnd);
 
 	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6> GetStaticSamplers();
 
 private:
-	std::array<std::unique_ptr<FrameResource>, NUM_FRAME_RESOURCES> mFrameResources;
+	std::array<std::unique_ptr<class FrameResource>, NUM_FRAME_RESOURCES> mFrameResources;
 	FrameResource* mCurrentFrameResource = nullptr;
 	int mCurrentFrameResourceIndex = 0;
 
@@ -70,25 +72,19 @@ private:
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mInputLayout;
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mBillboardLayout;
 
-	std::unordered_map<std::string, std::unique_ptr<MeshGeometry>> mGeometries;
-	std::unordered_map<std::string, std::unique_ptr<Material>> mMaterials;
-	std::unordered_map<std::string, std::unique_ptr<Texture>> mTextures;
+	// 모든 오브젝트를 담고 있는 포워트 리스트
+	// RenderLayer로 정렬하여야 한다.
+	std::forward_list<ObjectPtr> mAllObjects;
 
-	std::vector<std::unique_ptr<RenderItem>> mAllRitems;
-	std::vector<RenderItem*> mRitemLayer[(int)RenderLayer::Count];
+	// RenderLayer로 분류한 mAllObjects를 각 Layer의 Begin과 End를 담고 있는 Pair 객체
+	std::pair<LayerIter, LayerIter> mLayerPair[(int)RenderLayer::Count];
 
+	PassConstants mMainPassCB;
 	UINT objCBByteSize = 0;
 	UINT passCBByteSize = 0;
 
-	PassConstants mMainPassCB; 
-
-	Camera* mCamera;
-	float mCameraWalkSpeed = 50.0f;
-	float mCameraRotateSpeed = 0.25f;
-
-	POINT mLastMousePos;
-
-	UINT mTextureNum;
+	class Camera* mCamera;
+	class AssetManager* mAssetManager;
 
 	bool mIsWireframe = false;
 };

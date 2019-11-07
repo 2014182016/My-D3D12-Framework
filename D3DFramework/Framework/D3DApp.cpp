@@ -8,10 +8,6 @@ D3DApp::D3DApp(HINSTANCE hInstance, int screenWidth, int screenHeight, std::wstr
 
 D3DApp::~D3DApp() { }
 
-bool D3DApp::Get4xMsaaState()const
-{
-	return m4xMsaaState;
-}
 
 void D3DApp::Set4xMsaaState(bool value)
 {
@@ -52,6 +48,8 @@ void D3DApp::OnDestroy()
 		FlushCommandQueue();
 
 	mSwapChain->SetFullscreenState(false, nullptr);
+
+	__super::OnDestroy();
 }
 
 void D3DApp::CreateRtvAndDsvDescriptorHeaps()
@@ -450,4 +448,12 @@ void D3DApp::SetGamma(float gamma)
 	}
 
 	ThrowIfFailed(output->SetGammaControl(&gammaControl));
+}
+
+void D3DApp::SetBackgroundColor(float r, float g, float b, float a)
+{
+	mBackBufferClearColor.x = r;
+	mBackBufferClearColor.y = g;
+	mBackBufferClearColor.z = b;
+	mBackBufferClearColor.w = a;
 }

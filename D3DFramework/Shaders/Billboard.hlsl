@@ -87,7 +87,7 @@ float4 PS(GeoOut pin) : SV_Target
 	// 이 픽셀에 사용할 Material Data를 가져온다.
 	MaterialData matData = gMaterialData[gMaterialIndex];
 	float4 diffuseAlbedo = matData.mDiffuseAlbedo;
-	float3 fresnelR0 = matData.mFresnelR0;
+	float3 specular = matData.mSpecular;
 	float  roughness = matData.mRoughness;
 	uint diffuseMapIndex = matData.mDiffuseMapIndex;
 	uint normalMapIndex = matData.mNormalMapIndex;
@@ -115,7 +115,7 @@ float4 PS(GeoOut pin) : SV_Target
 	const float shininess = 1.0f - roughness;
 
 	// Lighting을 실시한다.
-	Material mat = { diffuseAlbedo, fresnelR0, shininess };
+	Material mat = { diffuseAlbedo, specular, shininess };
 	float3 shadowFactor = 1.0f;
 	float4 directLight = ComputeLighting(gLights, mat, pin.mPosW,
 		pin.mNormalW, toEyeW, shadowFactor);

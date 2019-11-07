@@ -19,7 +19,7 @@
 struct MaterialData
 {
 	float4   mDiffuseAlbedo;
-	float3   mFresnelR0;
+	float3   mSpecular;
 	float    mRoughness;
 	float4x4 mMatTransform;
 	uint     mDiffuseMapIndex;

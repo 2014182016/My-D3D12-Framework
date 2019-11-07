@@ -14,16 +14,22 @@ public:
 public:
 	virtual bool Initialize();
 	virtual bool InitDirect3D();
-	virtual void OnDestroy() override;
 
-	bool Get4xMsaaState()const;
+	virtual void OnDestroy() override;
+	virtual void OnResize(int screenWidth, int screenHeight) override;
+
+public:
 	void Set4xMsaaState(bool value);
 	void SetFullscreenState(bool value);
-
 	void SetGamma(float gamma);
 
-protected:
-	virtual void OnResize(int screenWidth, int screenHeight) override;
+	inline static D3DApp* GetApp() { return static_cast<D3DApp*>(mApp); }
+
+	inline bool Get4xMsaaState() const { return m4xMsaaState; }
+
+	inline DirectX::XMFLOAT4 GetBackgroundColor() const { return mBackBufferClearColor; }
+	inline void SetBackgroundColor(DirectX::XMFLOAT4 color) { mBackBufferClearColor = color; }
+	void SetBackgroundColor(float r, float g, float b, float a);
 
 protected:
 	void CreateCommandObjects();

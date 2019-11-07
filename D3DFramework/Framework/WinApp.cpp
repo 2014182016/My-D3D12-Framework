@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "WinApp.h"
-#include "GameTimer.h"
+#include "InputManager.h"
 #include <WindowsX.h>
 
 WinApp* WinApp::mApp = nullptr;
@@ -9,11 +9,6 @@ LRESULT CALLBACK
 MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	return WinApp::GetApp()->MsgProc(hwnd, msg, wParam, lParam);
-}
-
-WinApp* WinApp::GetApp()
-{
-	return mApp;
 }
 
 WinApp::WinApp(HINSTANCE hInstance, int screenWidth, int screenHeight, std::wstring applicationName)
@@ -28,21 +23,6 @@ WinApp::WinApp(HINSTANCE hInstance, int screenWidth, int screenHeight, std::wstr
 }
 
 WinApp::~WinApp() { }
-
-HINSTANCE WinApp::GetAppInst()const
-{
-	return mhAppInst;
-}
-
-HWND WinApp::GetMainWnd()const
-{
-	return mhMainWnd;
-}
-
-float WinApp::GetAspectRatio()const
-{
-	return static_cast<float>(mScreenWidth) / mScreenHeight;
-}
 
 
 int WinApp::Run()
@@ -68,6 +48,7 @@ int WinApp::Run()
 			if (!mAppPaused)
 			{
 				CalculateFrameStats();
+				inputManager->Tick(deltaTime);
 				Tick(deltaTime);
 				Render();
 			}
@@ -86,8 +67,7 @@ bool WinApp::Initialize()
 	if (!InitMainWindow())
 		return false;
 
-	for (int i = 0; i < 256; ++i)
-		mKeys[i] = false;
+	inputManager = new InputManager();
 
 	return true;
 }
@@ -141,7 +121,6 @@ LRESULT WinApp::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		return 0;
 	case WM_DESTROY:
 		OnDestroy();
-		PostQuitMessage(0);
 		return 0;
 	case WM_MENUCHAR:
 		// Alt-Enter를 누를 때, 삐- 소리가 나지 않게 한다.
@@ -149,28 +128,21 @@ LRESULT WinApp::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	case WM_LBUTTONDOWN:
 	case WM_MBUTTONDOWN:
 	case WM_RBUTTONDOWN:
-		OnMouseDown(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+		inputManager->OnMouseDown(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
 		return 0;
 	case WM_LBUTTONUP:
 	case WM_MBUTTONUP:
 	case WM_RBUTTONUP:
-		OnMouseUp(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+		inputManager->OnMouseUp(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
 		return 0;
 	case WM_MOUSEMOVE:
-		OnMouseMove(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+		inputManager->OnMouseMove(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
 		return 0;
 	case WM_KEYUP:
-		if (wParam == VK_ESCAPE)
-		{
-			OnDestroy();
-			PostQuitMessage(0);
-		}
-
-		OnKeyUp((unsigned int)wParam);
-
+		inputManager->OnKeyUp((unsigned int)wParam);
 		return 0;
 	case WM_KEYDOWN:
-		OnKeyDown((unsigned int)wParam);
+		inputManager->OnKeyDown((unsigned int)wParam);
 		return 0;
 	}
 
@@ -263,12 +235,7 @@ void WinApp::OnResize(int screenWidth, int screenHeight)
 	SetWindowPos(mhMainWnd, HWND_TOP, 0, 0, width, height, SWP_NOMOVE);
 }
 
-void WinApp::OnKeyDown(unsigned int input)
+void WinApp::OnDestroy()
 {
-	mKeys[input] = true;
-}
-
-void WinApp::OnKeyUp(unsigned int input)
-{
-	mKeys[input] = false;
+	PostQuitMessage(0);
 }

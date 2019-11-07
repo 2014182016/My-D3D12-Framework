@@ -5,6 +5,8 @@
 #include "GameTimer.h"
 #include "Camera.h"
 #include "D3DUtil.h"
+#include "AssetManager.h"
+#include "GameObject.h"
 
 using namespace DirectX;
 using Microsoft::WRL::ComPtr;
@@ -16,6 +18,7 @@ D3DFramework::D3DFramework(HINSTANCE hInstance, int screenWidth, int screenHeigh
 }
 
 D3DFramework::~D3DFramework() { }
+
 
 bool D3DFramework::Initialize()
 {
@@ -30,13 +33,12 @@ bool D3DFramework::Initialize()
 	objCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
 	passCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(PassConstants));
 
-	LoadTextures();
+	mAssetManager = new AssetManager();
+	mAssetManager->Initialize(md3dDevice.Get(), mCommandList.Get());
+
 	BuildRootSignature();
 	BuildDescriptorHeaps();
 	BuildShadersAndInputLayout();
-	BuildShapeGeometry();
-	BuildBBGeometry();
-	BuildMaterials();
 	BuildRenderItems();
 	BuildFrameResources();
 	BuildPSOs();
@@ -49,22 +51,31 @@ bool D3DFramework::Initialize()
 	// 초기화가 끝날 때까지 기다린다.
 	FlushCommandQueue();
 
+	// RenderLayer를 기준으로 Object를 정렬한다.
+	mAllObjects.sort(ObjectLess());
+	ClassifyObjectLayer();
+
+	for (const auto& obj : mAllObjects)
+	{
+		obj->BeginPlay();
+	}
+
 	return true;
 }
 
 void D3DFramework::OnDestroy()
 {
-	__super::OnDestroy();
-
 	delete mCamera;
 	mCamera = 0;
+
+	__super::OnDestroy();
 
 }
 
 void D3DFramework::CreateRtvAndDsvDescriptorHeaps()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc;
-	rtvHeapDesc.NumDescriptors = SWAP_CHAIN_BUFFER_COUNT + 1; // msaa를 위한 추가 렌더 타겟;
+	rtvHeapDesc.NumDescriptors = SWAP_CHAIN_BUFFER_COUNT;
 	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	rtvHeapDesc.NodeMask = 0;
@@ -89,8 +100,6 @@ void D3DFramework::OnResize(int screenWidth, int screenHeight)
 
 void D3DFramework::Tick(float deltaTime)
 {
-	OnProcessInput(deltaTime);
-
 	mCurrentFrameResourceIndex = (mCurrentFrameResourceIndex + 1) % NUM_FRAME_RESOURCES;
 	mCurrentFrameResource = mFrameResources[mCurrentFrameResourceIndex].get();
 
@@ -102,6 +111,11 @@ void D3DFramework::Tick(float deltaTime)
 		ThrowIfFailed(mFence->SetEventOnCompletion(mCurrentFrameResource->mFence, eventHandle));
 		WaitForSingleObject(eventHandle, INFINITE);
 		CloseHandle(eventHandle);
+	}
+
+	for (const auto& obj : mAllObjects)
+	{
+		obj->Tick(deltaTime);
 	}
 
 	AnimateMaterials(deltaTime);
@@ -157,21 +171,25 @@ void D3DFramework::Render()
 	if (mIsWireframe)
 	{
 		mCommandList->SetPipelineState(mPSOs["Wireframe"].Get());
-		DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Wireframe]);
+		RenderObjects(mCommandList.Get(), mAllObjects.begin(), mAllObjects.end());
 	}
 	else
 	{
 		mCommandList->SetPipelineState(mPSOs["Opaque"].Get());
-		DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Opaque]);
+		RenderObjects(mCommandList.Get(), mLayerPair[(int)RenderLayer::Opaque].first, 
+			mLayerPair[(int)RenderLayer::Opaque].second);
 
 		mCommandList->SetPipelineState(mPSOs["AlphaTested"].Get());
-		DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::AlphaTested]);
+		RenderObjects(mCommandList.Get(), mLayerPair[(int)RenderLayer::AlphaTested].first, 
+			mLayerPair[(int)RenderLayer::AlphaTested].second);
 
 		mCommandList->SetPipelineState(mPSOs["Billborad"].Get());
-		DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Billborad]);
+		RenderObjects(mCommandList.Get(), mLayerPair[(int)RenderLayer::Billborad].first, 
+			mLayerPair[(int)RenderLayer::Billborad].second);
 
 		mCommandList->SetPipelineState(mPSOs["Transparent"].Get());
-		DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Transparent]);
+		RenderObjects(mCommandList.Get(), mLayerPair[(int)RenderLayer::Transparent].first,
+			mLayerPair[(int)RenderLayer::Transparent].second);
 	}
 
 	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
@@ -195,74 +213,25 @@ void D3DFramework::Render()
 	mCommandQueue->Signal(mFence.Get(), mCurrentFence);
 }
 
-void D3DFramework::OnMouseDown(WPARAM btnState, int x, int y)
-{
-	mLastMousePos.x = x;
-	mLastMousePos.y = y;
-
-	// 마우스를 보이지 않게 한다.
-	::SetCursor(NULL);
-
-	SetCapture(mhMainWnd);
-}
-
-void D3DFramework::OnMouseUp(WPARAM btnState, int x, int y)
-{
-	ReleaseCapture();
-}
-
-void D3DFramework::OnMouseMove(WPARAM btnState, int x, int y)
-{
-	if ((btnState & MK_LBUTTON) != 0)
-	{
-		float dx = XMConvertToRadians(mCameraRotateSpeed * static_cast<float>(x - mLastMousePos.x));
-		float dy = XMConvertToRadians(mCameraRotateSpeed * static_cast<float>(y - mLastMousePos.y));
-
-		mCamera->RotateY(dx);
-		mCamera->Pitch(dy);
-	}
-
-	mLastMousePos.x = x;
-	mLastMousePos.y = y;
-}
-
-void D3DFramework::OnProcessInput(float deltaTime)
-{
-	if (mKeys['w'] || mKeys['W'])
-		mCamera->Walk(mCameraWalkSpeed * deltaTime);
-
-	if (mKeys['s'] || mKeys['S'])
-		mCamera->Walk(-mCameraWalkSpeed * deltaTime);
-
-	if (mKeys['a'] || mKeys['A'])
-		mCamera->Strafe(-mCameraWalkSpeed * deltaTime);
-
-	if (mKeys['d'] || mKeys['D'])
-		mCamera->Strafe(mCameraWalkSpeed * deltaTime);
-
-	mCamera->UpdateViewMatrix();
-}
-
 void D3DFramework::AnimateMaterials(float deltaTime) { }
 
 void D3DFramework::UpdateObjectCBs(float deltaTime)
 {
 	auto currObjectCB = mCurrentFrameResource->mObjectCB.get();
-	for (auto& e : mAllRitems)
+	for (auto& obj : mAllObjects)
 	{
-		if (e->mNumFramesDirty > 0)
+		GameObject* gameObject = static_cast<GameObject*>(obj.get());
+		if (gameObject->IsUpdate())
 		{
-			XMMATRIX world = XMLoadFloat4x4(&e->mWorld);
-			XMMATRIX texTransform = XMLoadFloat4x4(&e->mTexTransform);
-
 			ObjectConstants objConstants;
-			XMStoreFloat4x4(&objConstants.mWorld, XMMatrixTranspose(world));
-			XMStoreFloat4x4(&objConstants.mTexTransform, XMMatrixTranspose(texTransform));
-			objConstants.mMaterialIndex = e->mMat->mMatCBIndex;
 
-			currObjectCB->CopyData(e->mObjCBIndex, objConstants);
+			XMStoreFloat4x4(&objConstants.mWorld, XMMatrixTranspose(gameObject->GetWorld()));
+			XMStoreFloat4x4(&objConstants.mTexTransform, XMMatrixTranspose(gameObject->GetTexTransform()));
+			objConstants.mMaterialIndex = gameObject->GetMaterial()->mMatCBIndex;
 
-			e->mNumFramesDirty--;
+			currObjectCB->CopyData(gameObject->GetObjectCBIndex(), objConstants);
+
+			gameObject->DecreaseNumFrames();
 		}
 	}
 }
@@ -270,24 +239,25 @@ void D3DFramework::UpdateObjectCBs(float deltaTime)
 void D3DFramework::UpdateMaterialBuffer(float deltaTime)
 {
 	auto currMaterialBuffer = mCurrentFrameResource->mMaterialBuffer.get();
-	for (auto& e : mMaterials)
+	for (const auto& e : mAssetManager->GetMaterials())
 	{
 		Material* mat = e.second.get();
 		if (mat->mNumFramesDirty > 0)
 		{
-			XMMATRIX matTransform = XMLoadFloat4x4(&mat->mMatTransform);
-
 			MaterialData matData;
+
 			matData.mDiffuseAlbedo = mat->mDiffuseAlbedo;
-			matData.mFresnelR0 = mat->mFresnelR0;
+			matData.mSpecular = mat->mSpecular;
 			matData.mRoughness = mat->mRoughness;
-			XMStoreFloat4x4(&matData.mMatTransform, XMMatrixTranspose(matTransform));
 			matData.mDiffuseMapIndex = mat->mDiffuseSrvHeapIndex;
 			matData.mNormalMapIndex = mat->mNormalSrvHeapIndex;
 
+			XMMATRIX transform = XMLoadFloat4x4(&mat->mMatTransform);
+			DirectX::XMStoreFloat4x4(&matData.mMatTransform, XMMatrixTranspose(transform));
+
 			currMaterialBuffer->CopyData(mat->mMatCBIndex, matData);
 
-			mat->mNumFramesDirty--;
+			--mat->mNumFramesDirty;
 		}
 	}
 }
@@ -326,36 +296,6 @@ void D3DFramework::UpdateMainPassCB(float deltaTime)
 	currPassCB->CopyData(0, mMainPassCB);
 }
 
-void D3DFramework::LoadTextures()
-{
-	// 추가할 텍스쳐 이름과 파일의 이름을 함께 저장
-	std::vector<std::pair<std::string, std::wstring>> texNames =
-	{
-		std::make_pair<std::string, std::wstring>("BricksDiffuseMap", L"Textures/Bricks2.dds"),
-		std::make_pair<std::string, std::wstring>("BricksNormalMap", L"Textures/Bricks2_nmap.dds"),
-		std::make_pair<std::string, std::wstring>("TileDiffuseMap", L"Textures/Tile.dds"),
-		std::make_pair<std::string, std::wstring>("TileNormalMap", L"Textures/Tile_nmap.dds"),
-		std::make_pair<std::string, std::wstring>("IceDiffuseMap", L"Textures/Ice.dds"),
-		std::make_pair<std::string, std::wstring>("DefaultNormalMap", L"Textures/Default_nmap.dds"),
-		std::make_pair<std::string, std::wstring>("FenceDuffuseMap", L"Textures/WireFence.dds"),
-		std::make_pair<std::string, std::wstring>("Tree0", L"Textures/Tree01S.dds"),
-	};
-
-	mTextureNum = (UINT)texNames.size();
-
-	for (UINT i = 0; i < mTextureNum; ++i)
-	{
-		auto texMap = std::make_unique<Texture>();
-		texMap->mName = texNames[i].first;
-		texMap->mFilename = texNames[i].second;
-		ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(md3dDevice.Get(),
-			mCommandList.Get(), texMap->mFilename.c_str(),
-			texMap->mResource, texMap->mUploadHeap));
-
-		mTextures[texMap->mName] = std::move(texMap);
-	}
-}
-
 void D3DFramework::BuildRootSignature()
 {
 	// 일반적으로 셰이더 프로그램은 특정 자원들(상수 버퍼, 텍스처, 표본추출기 등)이
@@ -364,7 +304,7 @@ void D3DFramework::BuildRootSignature()
 	CD3DX12_ROOT_PARAMETER slotRootParameter[4];
 
 	CD3DX12_DESCRIPTOR_RANGE texTable;
-	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, mTextureNum, 0, 0);
+	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, (UINT)mAssetManager->GetTextures().size(), 0, 0);
 
 	// 퍼포먼스 TIP: 가장 자주 사용하는 것을 앞에 놓는다.
 	slotRootParameter[0].InitAsConstantBufferView(0); // Object 상수 버퍼
@@ -400,24 +340,12 @@ void D3DFramework::BuildRootSignature()
 void D3DFramework::BuildDescriptorHeaps()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC cbvSrvUavDescriptorHeap = {};
-	cbvSrvUavDescriptorHeap.NumDescriptors = mTextureNum;
+	cbvSrvUavDescriptorHeap.NumDescriptors = (UINT)mAssetManager->GetTextures().size();
 	cbvSrvUavDescriptorHeap.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	cbvSrvUavDescriptorHeap.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&cbvSrvUavDescriptorHeap, IID_PPV_ARGS(&mCbvSrvUavDescriptorHeap)));
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(mCbvSrvUavDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-
-	std::vector<ComPtr<ID3D12Resource>> tex2DList =
-	{
-		mTextures["BricksDiffuseMap"]->mResource,
-		mTextures["BricksNormalMap"]->mResource,
-		mTextures["TileDiffuseMap"]->mResource,
-		mTextures["TileNormalMap"]->mResource,
-		mTextures["IceDiffuseMap"]->mResource,
-		mTextures["DefaultNormalMap"]->mResource,
-		mTextures["FenceDuffuseMap"]->mResource,
-		mTextures["Tree0"]->mResource
-	};
 
 	// 텍스처의 Shader Resource View를 설명하는 구조체
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -427,11 +355,14 @@ void D3DFramework::BuildDescriptorHeaps()
 	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
 
 	// 각 텍스처마다 힙에 Shader Resource View를 생성한다.
-	for (UINT i = 0; i < (UINT)tex2DList.size(); ++i)
+	for (UINT i = 0; i < (UINT)mAssetManager->GetTextures().size(); ++i)
 	{
-		srvDesc.Format = tex2DList[i]->GetDesc().Format;
-		srvDesc.Texture2D.MipLevels = tex2DList[i]->GetDesc().MipLevels;
-		md3dDevice->CreateShaderResourceView(tex2DList[i].Get(), &srvDesc, hDescriptor);
+		// texNames의 인데스와 Material에 사용될 텍스처 인덱스를 맞춰주기 위해 순서대로 View를 생성한다.
+		ID3D12Resource* resource = mAssetManager->GetTextureResource(i);
+
+		srvDesc.Format = resource->GetDesc().Format;
+		srvDesc.Texture2D.MipLevels = resource->GetDesc().MipLevels;
+		md3dDevice->CreateShaderResourceView(resource, &srvDesc, hDescriptor);
 
 		// next descriptor
 		hDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
@@ -474,136 +405,6 @@ void D3DFramework::BuildShadersAndInputLayout()
 	};
 }
 
-void D3DFramework::BuildShapeGeometry()
-{
-	std::vector<GeometryGenerator::MeshData> meshDatas(5);
-	std::vector<SubmeshGeometry> submeshGeomtries;
-
-	GeometryGenerator::CreateBox(meshDatas[0], 1.0f, 1.0f, 1.0f, 3);
-	GeometryGenerator::CreateGrid(meshDatas[1], 20.0f, 30.0f, 60, 40);
-	GeometryGenerator::CreateSphere(meshDatas[2], 0.5f, 20, 20);
-	GeometryGenerator::CreateCylinder(meshDatas[3], 0.5f, 0.3f, 3.0f, 20, 20);
-	GeometryGenerator::CreateQuad(meshDatas[4], 0.0f, 1.0f, 1.0f, 0.0f, 0.0f);
-
-	UINT vertexOffset = 0, indexOffset = 0, totlaVertexCount = 0, totalIndexCount = 0;
-	for (auto& meshData : meshDatas)
-	{
-		SubmeshGeometry submesh;
-		submesh.mIndexCount = (UINT)meshData.Indices32.size();
-		submesh.mStartIndexLocation = indexOffset;
-		submesh.mBaseVertexLocation = vertexOffset;
-		submeshGeomtries.push_back(submesh);
-
-		vertexOffset += (UINT)meshData.Vertices.size();
-		indexOffset += (UINT)meshData.Indices32.size();
-	}
-
-	totlaVertexCount = vertexOffset;
-	totalIndexCount = indexOffset;
-
-	std::vector<Vertex> vertices(totlaVertexCount);
-	std::vector<std::uint16_t> indices;
-
-	UINT k = 0, j = 0;
-	for (auto& meshData : meshDatas)
-	{
-		for (size_t i = 0; i < meshData.Vertices.size(); ++i, ++k)
-		{
-			vertices[k].mPos = meshData.Vertices[i].Position;
-			vertices[k].mNormal = meshData.Vertices[i].Normal;
-			vertices[k].mTexC = meshData.Vertices[i].TexC;
-			vertices[k].mTangentU = meshData.Vertices[i].TangentU;
-		}
-
-		indices.insert(indices.end(), std::begin(meshData.GetIndices16()), std::end(meshData.GetIndices16()));
-	}
-
-	const UINT vbByteSize = totlaVertexCount * sizeof(Vertex);
-	const UINT ibByteSize = totalIndexCount * sizeof(std::uint16_t);
-
-	auto geo = std::make_unique<MeshGeometry>();
-	geo->mName = "BasicShapes";
-
-	ThrowIfFailed(D3DCreateBlob(vbByteSize, &geo->mVertexBufferCPU));
-	CopyMemory(geo->mVertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
-
-	ThrowIfFailed(D3DCreateBlob(ibByteSize, &geo->mIndexBufferCPU));
-	CopyMemory(geo->mIndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
-
-	geo->mVertexBufferGPU = D3DUtil::CreateDefaultBuffer(md3dDevice.Get(),
-		mCommandList.Get(), vertices.data(), vbByteSize, geo->mVertexBufferUploader);
-
-	geo->mIndexBufferGPU = D3DUtil::CreateDefaultBuffer(md3dDevice.Get(),
-		mCommandList.Get(), indices.data(), ibByteSize, geo->mIndexBufferUploader);
-
-	geo->mVertexByteStride = sizeof(Vertex);
-	geo->mVertexBufferByteSize = vbByteSize;
-	geo->mIndexFormat = DXGI_FORMAT_R16_UINT;
-	geo->mIndexBufferByteSize = ibByteSize;
-
-	geo->mDrawArgs["Box"] = submeshGeomtries[0];
-	geo->mDrawArgs["Grid"] = submeshGeomtries[1];
-	geo->mDrawArgs["Sphere"] = submeshGeomtries[2];
-	geo->mDrawArgs["Cylinder"] = submeshGeomtries[3];
-	geo->mDrawArgs["Quad"] = submeshGeomtries[4];
-
-	mGeometries[geo->mName] = std::move(geo);
-}
-
-void D3DFramework::BuildBBGeometry()
-{
-	struct BillboardVertex
-	{
-		XMFLOAT3 mPos;
-		XMFLOAT2 mSize;
-	};
-
-	static const int treeCount = 1;
-	std::array<BillboardVertex, 1> vertices;
-	for (UINT i = 0; i < treeCount; ++i)
-	{
-		float x = 0.0f;
-		float z = 0.0f;
-		float y = 5.0f;
-
-		vertices[i].mPos = XMFLOAT3(x, y, z);
-		vertices[i].mSize = XMFLOAT2(5.0f, 5.0f);
-	}
-
-	std::array<std::uint16_t, 1> indices = { 0 };
-
-	const UINT vbByteSize = (UINT)vertices.size() * sizeof(vertices);
-	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
-
-	auto geo = std::make_unique<MeshGeometry>();
-	geo->mName = "Billboard";
-
-	ThrowIfFailed(D3DCreateBlob(vbByteSize, &geo->mVertexBufferCPU));
-	CopyMemory(geo->mVertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
-
-	ThrowIfFailed(D3DCreateBlob(ibByteSize, &geo->mIndexBufferCPU));
-	CopyMemory(geo->mIndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
-
-	geo->mVertexBufferGPU = D3DUtil::CreateDefaultBuffer(md3dDevice.Get(),
-		mCommandList.Get(), vertices.data(), vbByteSize, geo->mVertexBufferUploader);
-
-	geo->mIndexBufferGPU = D3DUtil::CreateDefaultBuffer(md3dDevice.Get(),
-		mCommandList.Get(), indices.data(), ibByteSize, geo->mIndexBufferUploader);
-
-	geo->mVertexByteStride = sizeof(BillboardVertex);
-	geo->mVertexBufferByteSize = vbByteSize;
-	geo->mIndexFormat = DXGI_FORMAT_R16_UINT;
-	geo->mIndexBufferByteSize = ibByteSize;
-
-	SubmeshGeometry submesh;
-	submesh.mIndexCount = (UINT)indices.size();
-	submesh.mStartIndexLocation = 0;
-	submesh.mBaseVertexLocation = 0;
-
-	geo->mDrawArgs["Point"] = submesh;
-
-	mGeometries["Billboard"] = std::move(geo);
-}
 
 void D3DFramework::BuildPSOs()
 {
@@ -706,184 +507,94 @@ void D3DFramework::BuildPSOs()
 
 void D3DFramework::BuildFrameResources()
 {
+	UINT objectCount = (UINT)std::distance(mAllObjects.begin(), mAllObjects.end());
+
 	for (int i = 0; i < NUM_FRAME_RESOURCES; ++i)
 	{
 		mFrameResources[i] = std::make_unique<FrameResource>(md3dDevice.Get(),
-			1, (UINT)mAllRitems.size(), (UINT)mMaterials.size());
+			1, objectCount, (UINT)mAssetManager->GetMaterials().size());
 	}
-}
-
-void D3DFramework::BuildMaterials()
-{
-	UINT matCBIndex = 0;
-
-	auto bricks0 = std::make_unique<Material>();
-	bricks0->mName = "Bricks0";
-	bricks0->mMatCBIndex = matCBIndex++;
-	bricks0->mDiffuseSrvHeapIndex = 0;
-	bricks0->mNormalSrvHeapIndex = 1;
-	bricks0->mDiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	bricks0->mFresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
-	bricks0->mRoughness = 0.25f;
-
-	auto tile0 = std::make_unique<Material>();
-	tile0->mName = "Tile0";
-	tile0->mMatCBIndex = matCBIndex++;
-	tile0->mDiffuseSrvHeapIndex = 2;
-	tile0->mNormalSrvHeapIndex = 3;
-	tile0->mDiffuseAlbedo = XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f);
-	tile0->mFresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
-	tile0->mRoughness = 0.1f;
-
-	auto mirror0 = std::make_unique<Material>();
-	mirror0->mName = "Mirror0";
-	mirror0->mMatCBIndex = matCBIndex++;
-	mirror0->mDiffuseSrvHeapIndex = 4;
-	mirror0->mNormalSrvHeapIndex = 5;
-	mirror0->mDiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.5f);
-	mirror0->mFresnelR0 = XMFLOAT3(0.08f, 0.08f, 0.08f);
-	mirror0->mRoughness = 0.1f;
-
-	auto wirefence = std::make_unique<Material>();
-	wirefence->mName = "Wirefence";
-	wirefence->mMatCBIndex = matCBIndex++;
-	wirefence->mDiffuseSrvHeapIndex = 6;
-	wirefence->mNormalSrvHeapIndex = 5;
-	wirefence->mDiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	wirefence->mFresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
-	wirefence->mRoughness = 0.25f;
-
-	auto treeSprites = std::make_unique<Material>();
-	treeSprites->mName = "Tree0";
-	treeSprites->mMatCBIndex = matCBIndex++;
-	treeSprites->mDiffuseSrvHeapIndex = 7;
-	treeSprites->mNormalSrvHeapIndex = 5;
-	treeSprites->mDiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	treeSprites->mFresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
-	treeSprites->mRoughness = 0.125f;
-
-
-	mMaterials["Bricks0"] = std::move(bricks0);
-	mMaterials["Tile0"] = std::move(tile0);
-	mMaterials["Mirror0"] = std::move(mirror0);
-	mMaterials["Wirefence"] = std::move(wirefence);
-	mMaterials["Tree0"] = std::move(treeSprites);
 }
 
 void D3DFramework::BuildRenderItems()
 {
-	UINT objCBIndex = 0;
+	std::unique_ptr<GameObject> object;
 
-	auto boxRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&boxRitem->mWorld, XMMatrixScaling(2.0f, 2.0f, 2.0f)*XMMatrixTranslation(0.0f, 1.1f, 0.0f));
-	XMStoreFloat4x4(&boxRitem->mTexTransform, XMMatrixScaling(1.0f, 0.5f, 1.0f));
-	boxRitem->mObjCBIndex = objCBIndex++;
-	boxRitem->mMat = mMaterials["Wirefence"].get();
-	boxRitem->mGeo = mGeometries["BasicShapes"].get();
-	boxRitem->mPrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	boxRitem->mSubmesh = boxRitem->mGeo->mDrawArgs["Box"];
-	mRitemLayer[(int)RenderLayer::AlphaTested].push_back(boxRitem.get());
-	mRitemLayer[(int)RenderLayer::Wireframe].push_back(boxRitem.get());
-	mAllRitems.push_back(std::move(boxRitem));
+	object = std::make_unique<GameObject>("Box");
+	object->SetPosition(0.0f, 1.0f, 0.0f);
+	object->SetScale(2.0f, 2.0f, 2.0f);
+	object->SetMaterial(mAssetManager->FindMaterial("Wirefence"));
+	object->SetMesh(mAssetManager->FindMesh("Box"));
+	object->SetLayer(RenderLayer::AlphaTested);
+	mAllObjects.push_front(std::move(object));
 
-	auto gridRitem = std::make_unique<RenderItem>();
-	gridRitem->mWorld = D3DUtil::Identity4x4f();
-	XMStoreFloat4x4(&gridRitem->mTexTransform, XMMatrixScaling(8.0f, 8.0f, 1.0f));
-	gridRitem->mObjCBIndex = objCBIndex++;
-	gridRitem->mMat = mMaterials["Tile0"].get();
-	gridRitem->mGeo = mGeometries["BasicShapes"].get();
-	gridRitem->mPrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	gridRitem->mSubmesh = gridRitem->mGeo->mDrawArgs["Grid"];
-	mRitemLayer[(int)RenderLayer::Opaque].push_back(gridRitem.get());
-	mRitemLayer[(int)RenderLayer::Wireframe].push_back(gridRitem.get());
-	mAllRitems.push_back(std::move(gridRitem));
+	object = std::make_unique<GameObject>("Floor");
+	object->SetMaterial(mAssetManager->FindMaterial("Tile0"));
+	object->SetMesh(mAssetManager->FindMesh("Grid"));
+	object->SetLayer(RenderLayer::Opaque);
+	mAllObjects.push_front(std::move(object));
 
-	XMMATRIX brickTexTransform = XMMatrixScaling(1.5f, 2.0f, 1.0f);
 	for (int i = 0; i < 5; ++i)
 	{
-		auto leftCylRitem = std::make_unique<RenderItem>();
-		auto rightCylRitem = std::make_unique<RenderItem>();
-		auto leftSphereRitem = std::make_unique<RenderItem>();
-		auto rightSphereRitem = std::make_unique<RenderItem>();
+		object = std::make_unique<GameObject>("ColumnLeft" + std::to_string(i));
+		object->SetPosition(-5.0f, 1.5f, -10.0f + i * 5.0f);
+		object->SetMaterial(mAssetManager->FindMaterial("Brick0"));
+		object->SetMesh(mAssetManager->FindMesh("Cylinder"));
+		object->SetLayer(RenderLayer::Opaque);
+		mAllObjects.push_front(std::move(object));
 
-		XMMATRIX leftCylWorld = XMMatrixTranslation(-5.0f, 1.5f, -10.0f + i * 5.0f);
-		XMMATRIX rightCylWorld = XMMatrixTranslation(+5.0f, 1.5f, -10.0f + i * 5.0f);
-		XMMATRIX leftSphereWorld = XMMatrixTranslation(-5.0f, 3.5f, -10.0f + i * 5.0f);
-		XMMATRIX rightSphereWorld = XMMatrixTranslation(+5.0f, 3.5f, -10.0f + i * 5.0f);
+		object = std::make_unique<GameObject>("ColumnRight" + std::to_string(i));
+		object->SetPosition(5.0f, 1.5f, -10.0f + i * 5.0f);
+		object->SetMaterial(mAssetManager->FindMaterial("Brick0"));
+		object->SetMesh(mAssetManager->FindMesh("Cylinder"));
+		object->SetLayer(RenderLayer::Opaque);
+		mAllObjects.push_front(std::move(object));
 
-		XMStoreFloat4x4(&leftCylRitem->mWorld, rightCylWorld);
-		XMStoreFloat4x4(&leftCylRitem->mTexTransform, brickTexTransform);
-		leftCylRitem->mObjCBIndex = objCBIndex++;
-		leftCylRitem->mMat = mMaterials["Bricks0"].get();
-		leftCylRitem->mGeo = mGeometries["BasicShapes"].get();
-		leftCylRitem->mPrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		leftCylRitem->mSubmesh = leftCylRitem->mGeo->mDrawArgs["Cylinder"];
+		object = std::make_unique<GameObject>("SphereLeft" + std::to_string(i));
+		object->SetPosition(-5.0f, 3.5f, -10.0f + i * 5.0f);
+		object->SetMaterial(mAssetManager->FindMaterial("Mirror0"));
+		object->SetMesh(mAssetManager->FindMesh("Sphere"));
+		object->SetLayer(RenderLayer::Transparent);
+		mAllObjects.push_front(std::move(object));
 
-		XMStoreFloat4x4(&rightCylRitem->mWorld, leftCylWorld);
-		XMStoreFloat4x4(&rightCylRitem->mTexTransform, brickTexTransform);
-		rightCylRitem->mObjCBIndex = objCBIndex++;
-		rightCylRitem->mMat = mMaterials["Bricks0"].get();
-		rightCylRitem->mGeo = mGeometries["BasicShapes"].get();
-		rightCylRitem->mPrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		rightCylRitem->mSubmesh = rightCylRitem->mGeo->mDrawArgs["Cylinder"];
-
-		XMStoreFloat4x4(&leftSphereRitem->mWorld, leftSphereWorld);
-		leftSphereRitem->mTexTransform = D3DUtil::Identity4x4f();
-		leftSphereRitem->mObjCBIndex = objCBIndex++;
-		leftSphereRitem->mMat = mMaterials["Mirror0"].get();
-		leftSphereRitem->mGeo = mGeometries["BasicShapes"].get();
-		leftSphereRitem->mPrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		leftSphereRitem->mSubmesh = leftSphereRitem->mGeo->mDrawArgs["Sphere"];
-
-		XMStoreFloat4x4(&rightSphereRitem->mWorld, rightSphereWorld);
-		rightSphereRitem->mTexTransform = D3DUtil::Identity4x4f();
-		rightSphereRitem->mObjCBIndex = objCBIndex++;
-		rightSphereRitem->mMat = mMaterials["Mirror0"].get();
-		rightSphereRitem->mGeo = mGeometries["BasicShapes"].get();
-		rightSphereRitem->mPrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		rightSphereRitem->mSubmesh = rightSphereRitem->mGeo->mDrawArgs["Sphere"];
-
-		mRitemLayer[(int)RenderLayer::Opaque].push_back(leftCylRitem.get());
-		mRitemLayer[(int)RenderLayer::Opaque].push_back(rightCylRitem.get());
-		mRitemLayer[(int)RenderLayer::Transparent].push_back(leftSphereRitem.get());
-		mRitemLayer[(int)RenderLayer::Transparent].push_back(rightSphereRitem.get());
-		mRitemLayer[(int)RenderLayer::Wireframe].push_back(leftCylRitem.get());
-		mRitemLayer[(int)RenderLayer::Wireframe].push_back(rightCylRitem.get());
-		mRitemLayer[(int)RenderLayer::Wireframe].push_back(leftSphereRitem.get());
-		mRitemLayer[(int)RenderLayer::Wireframe].push_back(rightSphereRitem.get());
-
-		mAllRitems.push_back(std::move(leftCylRitem));
-		mAllRitems.push_back(std::move(rightCylRitem));
-		mAllRitems.push_back(std::move(leftSphereRitem));
-		mAllRitems.push_back(std::move(rightSphereRitem));
+		object = std::make_unique<GameObject>("SphereRight" + std::to_string(i));
+		object->SetPosition(5.0f, 3.5f, -10.0f + i * 5.0f);
+		object->SetMaterial(mAssetManager->FindMaterial("Mirror0"));
+		object->SetMesh(mAssetManager->FindMesh("Sphere"));
+		object->SetLayer(RenderLayer::Transparent);
+		mAllObjects.push_front(std::move(object));
 	}
-
-	auto treeSpritesRitem = std::make_unique<RenderItem>();
-	treeSpritesRitem->mWorld = D3DUtil::Identity4x4f();
-	treeSpritesRitem->mObjCBIndex = objCBIndex++;
-	treeSpritesRitem->mMat = mMaterials["Tree0"].get();
-	treeSpritesRitem->mGeo = mGeometries["Billboard"].get();
-	treeSpritesRitem->mPrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_POINTLIST;
-	treeSpritesRitem->mSubmesh = treeSpritesRitem->mGeo->mDrawArgs["Point"];
-	mRitemLayer[(int)RenderLayer::Billborad].push_back(treeSpritesRitem.get());
-	mAllRitems.push_back(std::move(treeSpritesRitem));
 }
 
-void D3DFramework::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
+void D3DFramework::ClassifyObjectLayer()
+{
+	for (int i = 0; i < (int)RenderLayer::Count; ++i)
+	{
+		ClassifyObjectLayer(mLayerPair[i], i);
+	}
+}
+
+void D3DFramework::ClassifyObjectLayer(std::pair<LayerIter, LayerIter>& layerPair, int i)
+{
+	// 각 Layer의 Begin과 End를 알아낸다.
+	//auto layerIter = std::equal_range(mAllObjects.begin(), mAllObjects.end(), i, ObjectLess());
+	auto layerIterBegin = std::lower_bound(mAllObjects.begin(), mAllObjects.end(), i, ObjectLess());
+	auto layerIterEnd = std::upper_bound(mAllObjects.begin(), mAllObjects.end(), i, ObjectLess());
+	layerPair = std::make_pair(layerIterBegin, layerIterEnd);
+}
+
+void D3DFramework::RenderObjects(ID3D12GraphicsCommandList* cmdList, LayerIter iterBegin, LayerIter iterEnd)
 {
 	auto objectCB = mCurrentFrameResource->mObjectCB->GetResource();
-	for (size_t i = 0; i < ritems.size(); ++i)
+	for (; iterBegin != iterEnd; ++iterBegin)
 	{
-		auto ri = ritems[i];
+		const GameObject* gameObject = static_cast<GameObject*>(iterBegin->get());
 
-		cmdList->IASetVertexBuffers(0, 1, &ri->mGeo->GetVertexBufferView());
-		cmdList->IASetIndexBuffer(&ri->mGeo->GetIndexBufferView());
-		cmdList->IASetPrimitiveTopology(ri->mPrimitiveType);
-
-		D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = objectCB->GetGPUVirtualAddress() + ri->mObjCBIndex*objCBByteSize;
+		D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = objectCB->GetGPUVirtualAddress() + gameObject->GetObjectCBIndex() * objCBByteSize;
 		cmdList->SetGraphicsRootConstantBufferView(0, objCBAddress);
 
-		cmdList->DrawIndexedInstanced(ri->mSubmesh.mIndexCount, 1, ri->mSubmesh.mStartIndexLocation, ri->mSubmesh.mBaseVertexLocation, 0);
+		if (gameObject->GetMesh() != nullptr)
+			gameObject->GetMesh()->Render(cmdList);
 	}
 }
 
@@ -949,21 +660,4 @@ std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6> D3DFramework::GetStaticSamplers
 		linearWrap, linearClamp,
 		anisotropicWrap, anisotropicClamp
 	};
-}
-
-void D3DFramework::OnKeyDown(unsigned int input)
-{
-	__super::OnKeyDown(input);
-
-}
-
-void D3DFramework::OnKeyUp(unsigned int input)
-{
-	__super::OnKeyUp(input);
-
-	if (input == VK_F1)
-		mIsWireframe = !mIsWireframe;
-	else if (input == VK_F4)
-		SetFullscreenState(!mFullscreenState);
-	
 }
