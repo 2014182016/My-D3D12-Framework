@@ -1,78 +1,60 @@
 #pragma once
 
 #include "pch.h"
-#include "Global.h"
+#include "Base.h"
+#include "Enums.h"
 
-class Object
+class Object : public Base
 {
 public:
 	Object(std::string name);
 	virtual ~Object();
 
 public:
-	// 이름을 기반으로 같은지 확인
-	virtual bool operator==(const Object& rhs);
-	virtual bool operator==(const std::string& str);
-
-public:
 	virtual void BeginPlay() { }
-	virtual void Tick(float deltaTime) { }
-	virtual void Destroy();
+	virtual void Tick(float deltaTime);
+	virtual void Destroy() { };
 
-	// Object를 설명하는 문자열을 리턴하는 함수
-	virtual std::string ToString() const;
+	// 물체가 움직일 때, 업데이트 해야할 것을 오버라이딩하여 작성한다.
+	virtual void WorldUpdate();
 
 public:
+	void Move(float x, float y, float z);
 	void MoveStrafe(float distance);
 	void MoveUp(float distance);
 	void MoveForward(float distance);
 
 	void Rotate(float pitch, float yaw, float roll);
-	void Rotate(DirectX::XMFLOAT3 *pxmf3Axis, float fAngle);
+	void Rotate(DirectX::XMFLOAT3* axis, float angle);
 
 public:
 	DirectX::XMMATRIX GetWorld() const;
 	inline DirectX::XMFLOAT4X4 GetWorld4x4f() const { return mWorld; }
 
-	DirectX::XMFLOAT3 GetPosition() const { return DirectX::XMFLOAT3(mWorld._41, mWorld._42, mWorld._43); }
+	inline DirectX::XMFLOAT3 GetPosition() const { return mPosition; }
+	inline DirectX::XMFLOAT3 GetRotation() const { return mRotation; }
+	inline DirectX::XMFLOAT3 GetScale() const { return mScale; }
+
 	DirectX::XMFLOAT3 GetLook() const;
 	DirectX::XMFLOAT3 GetUp() const;
 	DirectX::XMFLOAT3 GetRight() const;
 
-	void SetPosition(float x, float y, float z);
+	void SetPosition(float posX, float posY, float posZ);
+	inline void SetPosition(DirectX::XMFLOAT3 pos) { mPosition = pos; }
+	void SetRotation(float rotX, float rotY, float rotZ);
+	inline void SetRotation(DirectX::XMFLOAT3 rotation) { mRotation = rotation; }
 	void SetScale(float scaleX, float scaleY, float scaleZ);
-
-	inline std::string GetName() const { return mName; }
-	inline RenderLayer GetLayer() const { return mLayer; }
-
-	inline int GetLayerToInt() const { return (int)mLayer; }
-	inline void SetLayer(RenderLayer layer) { mLayer = layer; }
+	inline void SetScale(DirectX::XMFLOAT3 scale) { mScale = scale; }
 
 protected:
 	// 세계 공간을 기준으로 물체의 지역 공간을 서술하는 세계 행렬
 	// 이 행렬은 세계 공간 안에서의 물체의 위치, 방향, 크기를 결정한다.
-	DirectX::XMFLOAT4X4 mWorld = D3DUtil::Identity4x4f();
+	// 하나의 월드 행렬을 조합할 때, Scale * Rotation * Translation 순서로 적용된다.
+	DirectX::XMFLOAT4X4 mWorld = DirectX::Identity4x4f();
 
-private:
-	std::string mName;
-	RenderLayer mLayer = RenderLayer::NotRender;
-};
+	DirectX::XMFLOAT3 mPosition = { 0.0f, 0.0f, 0.0f };
+	DirectX::XMFLOAT3 mRotation = { 0.0f, 0.0f, 0.0f };
+	DirectX::XMFLOAT3 mScale = { 1.0f, 1.0f, 1.0f };
 
-// Object와 RenderLayer를 Less 형식으로 비교하기 위한 함수 객체
-struct ObjectLess
-{
-	bool operator()(const std::unique_ptr<Object>& obj1, const std::unique_ptr<Object>& obj2) const
-	{
-		return obj1.get()->GetLayerToInt() < obj2.get()->GetLayerToInt();
-	}
-
-	bool operator()(const int& i, const std::unique_ptr<Object>& obj) const
-	{
-		return obj.get()->GetLayerToInt() > i;
-	}
-
-	bool operator()(const std::unique_ptr<Object>& obj, const int& i) const
-	{
-		return obj.get()->GetLayerToInt() < i;
-	}
+	bool mIsWorldUpdate = true;
 };

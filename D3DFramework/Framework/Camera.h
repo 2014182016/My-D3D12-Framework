@@ -6,13 +6,27 @@
 #define CAMERA_H
 
 #include "pch.h"
-#include "D3DUtil.h"
 
 class Camera
 {
 public:
 	Camera();
 	~Camera();
+
+public:
+	// fovY는 Degree 기준
+	void SetLens(float fovY, float aspect, float zn, float zf);
+
+	void LookAt(DirectX::FXMVECTOR pos, DirectX::FXMVECTOR target, DirectX::FXMVECTOR worldUp);
+	void LookAt(const DirectX::XMFLOAT3& pos, const DirectX::XMFLOAT3& target, const DirectX::XMFLOAT3& up);
+
+	void Strafe(float d);
+	void Walk(float d);
+
+	void Pitch(float angle);
+	void RotateY(float angle);
+
+	void UpdateViewMatrix();
 
 public:
 	DirectX::XMVECTOR GetPosition()const;
@@ -44,20 +58,7 @@ public:
 	float GetFarWindowWidth()const;
 	float GetFarWindowHeight()const;
 
-public:
-	// fovY는 Degree 기준
-	void SetLens(float fovY, float aspect, float zn, float zf);
-
-	void LookAt(DirectX::FXMVECTOR pos, DirectX::FXMVECTOR target, DirectX::FXMVECTOR worldUp);
-	void LookAt(const DirectX::XMFLOAT3& pos, const DirectX::XMFLOAT3& target, const DirectX::XMFLOAT3& up);
-
-	void Strafe(float d);
-	void Walk(float d);
-
-	void Pitch(float angle);
-	void RotateY(float angle);
-
-	void UpdateViewMatrix();
+	DirectX::BoundingFrustum GetWorldCameraBounding() const;
 
 private:
 	DirectX::XMFLOAT3 mPosition = { 0.0f, 0.0f, 0.0f };
@@ -65,8 +66,8 @@ private:
 	DirectX::XMFLOAT3 mUp = { 0.0f, 1.0f, 0.0f };
 	DirectX::XMFLOAT3 mLook = { 0.0f, 0.0f, 1.0f };
 
-	DirectX::XMFLOAT4X4 mView = D3DUtil::Identity4x4f();
-	DirectX::XMFLOAT4X4 mProj = D3DUtil::Identity4x4f();
+	DirectX::XMFLOAT4X4 mView = DirectX::Identity4x4f();
+	DirectX::XMFLOAT4X4 mProj = DirectX::Identity4x4f();
 
 	float mNearZ = 0.0f;
 	float mFarZ = 0.0f;
@@ -76,6 +77,8 @@ private:
 	float mFarWindowHeight = 0.0f;
 
 	bool mViewDirty = true;
+
+	DirectX::BoundingFrustum mCamFrustum;
 };
 
 #endif // CAMERA_H

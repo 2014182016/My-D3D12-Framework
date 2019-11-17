@@ -25,17 +25,6 @@ void PrintDebugString(const char* format, ...)
 class D3DUtil
 {
 public:
-	static DirectX::XMFLOAT4X4 Identity4x4f()
-	{
-		static DirectX::XMFLOAT4X4 I(
-			1.0f, 0.0f, 0.0f, 0.0f,
-			0.0f, 1.0f, 0.0f, 0.0f,
-			0.0f, 0.0f, 1.0f, 0.0f,
-			0.0f, 0.0f, 0.0f, 1.0f);
-
-		return I;
-	}
-
 	static UINT CalcConstantBufferByteSize(UINT byteSize)
 	{
 		// 상수 버퍼의 크기는 반드시 최소 하드웨어 할당 크기(흔히 256바이트)의 배수이어야 한다.

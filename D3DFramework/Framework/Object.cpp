@@ -1,44 +1,22 @@
 #include "pch.h"
 #include "Object.h"
-#include "D3DFramework.h"
 
 using namespace DirectX;
 
-Object::Object(std::string name) : mName(name) { }
+Object::Object(std::string name) : Base(name) { }
 
 Object::~Object() { }
 
-bool Object::operator==(const Object& rhs)
+void Object::Tick(float deltaTime)
 {
-	int result = mName.compare(rhs.mName);
+	if (mIsWorldUpdate)
+	{
+		WorldUpdate();
 
-	if (result == 0)
-		return true;
-	return false;
+		mIsWorldUpdate = false;
+	}
 }
 
-bool Object::operator==(const std::string& str)
-{
-	if (mName.compare(str) == 0)
-		return true;
-	return false;
-}
-
-void Object::Destroy()
-{
-	std::forward_list<ObjectPtr>& allObjects = D3DFramework::GetApp()->GetAllObjects();
-
-	const Object* myObjPtr = this;
-	allObjects.remove_if([&myObjPtr](const ObjectPtr& obj1) -> bool {
-		return obj1.get() == myObjPtr; });
-
-	D3DFramework::GetApp()->ClassifyObjectLayer();
-}
-
-std::string Object::ToString() const
-{
-	return mName;
-}
 
 XMMATRIX Object::GetWorld() const
 {
@@ -76,19 +54,41 @@ XMFLOAT3 Object::GetLook() const
 	return look;
 }
 
-void Object::SetPosition(float x, float y, float z)
+void Object::SetPosition(float posX, float posY, float posZ)
 {
-	mWorld._41 = x;
-	mWorld._42 = y;
-	mWorld._43 = z;
+	mPosition.x = posX;
+	mPosition.y = posY;
+	mPosition.z = posZ;
+
+	mIsWorldUpdate = true;
+}
+
+void Object::SetRotation(float rotX, float rotY, float rotZ)
+{
+	mPosition.x = rotX;
+	mRotation.y = rotY;
+	mRotation.z = rotZ;
+
+	mIsWorldUpdate = true;
 }
 
 void Object::SetScale(float scaleX, float scaleY, float scaleZ)
 {
-	XMMATRIX world = XMMatrixScaling(scaleX, scaleY, scaleZ);
-	XMStoreFloat4x4(&mWorld, world);
+	mScale.x = scaleX;
+	mScale.y = scaleY;
+	mScale.z = scaleZ;
+
+	mIsWorldUpdate = true;
 }
 
+void Object::Move(float x, float y, float z)
+{
+	mPosition.x += x;
+	mPosition.y += y;
+	mPosition.z += z;
+
+	mIsWorldUpdate = true;
+}
 
 //게임 객체를 로컬 x-축 방향으로 이동한다. 
 void Object::MoveStrafe(float distance) {
@@ -98,7 +98,9 @@ void Object::MoveStrafe(float distance) {
 
 	XMFLOAT3 position;
 	XMStoreFloat3(&position, vecPosition);
-	SetPosition(position.x, position.y, position.z);
+	SetPosition(position);
+
+	mIsWorldUpdate = true;
 }
 
 //게임 객체를 로컬 y-축 방향으로 이동한다.
@@ -109,7 +111,9 @@ void Object::MoveUp(float distance) {
 
 	XMFLOAT3 position;
 	XMStoreFloat3(&position, vecPosition);
-	SetPosition(position.x, position.y, position.z);
+	SetPosition(position);
+
+	mIsWorldUpdate = true;
 }
 
 //게임 객체를 로컬 z-축 방향으로 이동한다. 
@@ -120,19 +124,35 @@ void Object::MoveForward(float distance) {
 
 	XMFLOAT3 position;
 	XMStoreFloat3(&position, vecPosition);
-	SetPosition(position.x, position.y, position.z);
+	SetPosition(position);
+
+	mIsWorldUpdate = true;
 }
 
 //게임 객체를 주어진 각도로 회전한다. 
-void Object::Rotate(float pitch, float yaw, float rool) {
-	XMMATRIX rotate = XMMatrixRotationRollPitchYaw(XMConvertToRadians(pitch),
-		XMConvertToRadians(yaw), XMConvertToRadians(rool));
-	XMMATRIX world = XMMatrixMultiply(XMLoadFloat4x4(&mWorld), rotate);
+void Object::Rotate(float pitch, float yaw, float roll)
+{
+	mRotation.x += XMConvertToRadians(pitch);
+	mRotation.y += XMConvertToRadians(yaw);
+	mRotation.z += XMConvertToRadians(roll);
+
+	mIsWorldUpdate = true;
+}
+
+void Object::Rotate(XMFLOAT3* axis, float angle)
+{
+	XMMATRIX rotation = XMMatrixRotationAxis(XMLoadFloat3(axis), XMConvertToRadians(angle));
+	XMMATRIX world = XMMatrixMultiply(rotation, XMLoadFloat4x4(&mWorld));
 	XMStoreFloat4x4(&mWorld, world);
 }
 
-void Object::Rotate(XMFLOAT3* axis, float angle) {
-	XMMATRIX rotate = XMMatrixRotationAxis(XMLoadFloat3(axis), XMConvertToRadians(angle));
-	XMMATRIX world = XMMatrixMultiply(XMLoadFloat4x4(&mWorld), rotate);
+void Object::WorldUpdate()
+{
+	XMMATRIX translation = XMMatrixTranslation(mPosition.x, mPosition.y, mPosition.z);
+	XMMATRIX rotation = XMMatrixRotationRollPitchYaw(mRotation.x, mRotation.y, mRotation.z);
+	XMMATRIX scailing = XMMatrixScaling(mScale.x, mScale.y, mScale.z);
+
+	// S * R * T순으로 곱하여 world에 대입한다.
+	XMMATRIX world = XMMatrixMultiply(scailing, XMMatrixMultiply(rotation, translation));
 	XMStoreFloat4x4(&mWorld, world);
 }

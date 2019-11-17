@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "D3DApp.h"
+#include "D3DUtil.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -11,22 +12,17 @@ D3DApp::~D3DApp() { }
 
 void D3DApp::Set4xMsaaState(bool value)
 {
-	if (m4xMsaaState != value)
-	{
-		m4xMsaaState = value;
+	mOptions.set((int)Option::Msaa, value);
 
-		OnResize(mScreenWidth, mScreenHeight);
-	}
+	OnResize(mScreenWidth, mScreenHeight);
 }
 
 void D3DApp::SetFullscreenState(bool value)
 {
-	if (mFullscreenState != value)
-	{
-		mFullscreenState = value;
-		ThrowIfFailed(mSwapChain->SetFullscreenState(value, nullptr));
-		OnResize(mScreenWidth, mScreenHeight);
-	}
+	mOptions.set((int)Option::Fullscreen, value);
+
+	ThrowIfFailed(mSwapChain->SetFullscreenState(value, nullptr));
+	OnResize(mScreenWidth, mScreenHeight);
 }
 
 bool D3DApp::Initialize()
@@ -44,12 +40,12 @@ bool D3DApp::Initialize()
 
 void D3DApp::OnDestroy()
 {
+	__super::OnDestroy();
+
 	if (md3dDevice != nullptr)
 		FlushCommandQueue();
 
 	mSwapChain->SetFullscreenState(false, nullptr);
-
-	__super::OnDestroy();
 }
 
 void D3DApp::CreateRtvAndDsvDescriptorHeaps()
@@ -120,14 +116,14 @@ void D3DApp::OnResize(int screenWidth, int screenHeight)
 	depthStencilDesc.DepthOrArraySize = 1;
 	depthStencilDesc.MipLevels = 1;
 	depthStencilDesc.Format = mDepthStencilFormat;
-	depthStencilDesc.SampleDesc.Count = m4xMsaaState ? 4 : 1;
-	depthStencilDesc.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
+	depthStencilDesc.SampleDesc.Count = GetOptionEnabled(Option::Msaa) ? 4 : 1;
+	depthStencilDesc.SampleDesc.Quality = GetOptionEnabled(Option::Msaa) ? (m4xMsaaQuality - 1) : 0;
 	depthStencilDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 	depthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
 	dsvDesc.Format = mDepthStencilFormat;
-	dsvDesc.ViewDimension = m4xMsaaState ? D3D12_DSV_DIMENSION_TEXTURE2DMS : D3D12_DSV_DIMENSION_TEXTURE2D;
+	dsvDesc.ViewDimension = GetOptionEnabled(Option::Fullscreen) ? D3D12_DSV_DIMENSION_TEXTURE2DMS : D3D12_DSV_DIMENSION_TEXTURE2D;
 
 	// 지우기에 최적화된 값을 설정한다. 최적화된 지우기 값과
 	// 부합하는 지우기 호출은 부합하지 않는 호출보다 빠를 수 있다.
@@ -280,7 +276,7 @@ void D3DApp::CreateSwapChain()
 	sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	sd.BufferCount = SWAP_CHAIN_BUFFER_COUNT;
 	sd.OutputWindow = mhMainWnd;
-	sd.Windowed = !mFullscreenState;
+	sd.Windowed = !GetOptionEnabled(Option::Fullscreen);
 	sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 
@@ -419,7 +415,7 @@ void D3DApp::LogOutputDisplayModes(IDXGIOutput* output, DXGI_FORMAT format)
 void D3DApp::SetGamma(float gamma)
 {
 	// 감마 보정은 풀스크린 모드에서만 사용할 수 있다.
-	if (!mFullscreenState)
+	if (!GetOptionEnabled(Option::Fullscreen))
 		return;
 
 	IDXGIOutput* output;
@@ -456,4 +452,19 @@ void D3DApp::SetBackgroundColor(float r, float g, float b, float a)
 	mBackBufferClearColor.y = g;
 	mBackBufferClearColor.z = b;
 	mBackBufferClearColor.w = a;
+}
+
+void D3DApp::ApplyOption(Option option)
+{
+	bool optionState = mOptions.test((int)option);
+
+	switch (option)
+	{
+		case Option::Fullscreen:
+			SetFullscreenState(optionState);
+			break;
+		case Option::Msaa:
+			Set4xMsaaState(optionState);
+			break;
+	}
 }

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "pch.h"
-#include "Global.h"
+#include "Structures.h"
 
 template<typename T>
 class UploadBuffer;

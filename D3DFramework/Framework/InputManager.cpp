@@ -59,11 +59,11 @@ void InputManager::OnKeyUp(unsigned int input)
 	mKeys[input] = false;
 
 	if (input == VK_F1)
-		mApp->SetIsWireframe(!mApp->GetIsWireframe());
+		mApp->SwitchOptionEnabled(Option::Wireframe);
+	else if (input == VK_F2)
+		mApp->SwitchOptionEnabled(Option::Debug);
 	else if (input == VK_F4)
-		mApp->SetFullscreenState(!mApp->GetFullscreenState());
-	else if (input == VK_ESCAPE)
-		mApp->OnDestroy();
+		mApp->SwitchOptionEnabled(Option::Fullscreen);
 }
 
 void InputManager::Tick(float deltaTime) 

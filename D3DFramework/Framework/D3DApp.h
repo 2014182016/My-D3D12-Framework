@@ -1,7 +1,6 @@
 #pragma once
 
 #include "WinApp.h"
-#include "Global.h"
 
 class D3DApp : public WinApp
 {
@@ -17,6 +16,7 @@ public:
 
 	virtual void OnDestroy() override;
 	virtual void OnResize(int screenWidth, int screenHeight) override;
+	virtual void ApplyOption(Option option);
 
 public:
 	void Set4xMsaaState(bool value);
@@ -24,8 +24,6 @@ public:
 	void SetGamma(float gamma);
 
 	inline static D3DApp* GetApp() { return static_cast<D3DApp*>(mApp); }
-
-	inline bool Get4xMsaaState() const { return m4xMsaaState; }
 
 	inline DirectX::XMFLOAT4 GetBackgroundColor() const { return mBackBufferClearColor; }
 	inline void SetBackgroundColor(DirectX::XMFLOAT4 color) { mBackBufferClearColor = color; }
@@ -49,7 +47,6 @@ protected:
 	void LogOutputDisplayModes(IDXGIOutput* output, DXGI_FORMAT format);
 
 protected:
-	bool m4xMsaaState = false;
 	UINT m4xMsaaQuality = 0;
 
 	Microsoft::WRL::ComPtr<IDXGIFactory4> mdxgiFactory;
@@ -80,6 +77,6 @@ protected:
 	D3D_DRIVER_TYPE md3dDriverType = D3D_DRIVER_TYPE_HARDWARE;
 	DXGI_FORMAT mBackBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 	DXGI_FORMAT mDepthStencilFormat = DXGI_FORMAT_D32_FLOAT; // 스텐실 버퍼 사용 안함
-	DirectX::XMFLOAT4 mBackBufferClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+	DirectX::XMFLOAT4 mBackBufferClearColor = (DirectX::XMFLOAT4)DirectX::Colors::LightSteelBlue;
 };
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "pch.h"
-#include "GameTimer.h"
+#include "Enums.h"
 
 class WinApp
 {
@@ -13,7 +13,7 @@ public:
 
 public:
 	virtual bool Initialize();
-	virtual void OnDestroy();
+	virtual void OnDestroy() { };
 
 	virtual LRESULT MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -24,6 +24,7 @@ protected:
 	virtual void OnResize(int screenWidth, int screenHeight);
 	virtual void Tick(float deltaTime) { };
 	virtual void Render() { };
+	virtual void ApplyOption(Option option) { };
 
 public:
 	inline static WinApp* GetApp() { return mApp; }
@@ -32,7 +33,10 @@ public:
 	inline HINSTANCE GetAppInst() const { return mhAppInst; }
 	inline HWND GetMainWnd() const { return mhMainWnd; }
 
-	inline bool GetFullscreenState() const { return mFullscreenState; }
+	inline bool GetOptionEnabled(Option option) const { return mOptions.test((int)option); }
+	void SwitchOptionEnabled(Option option);
+	void SetOptionEnabled(Option option, bool value);
+	
 
 private:
 	bool InitMainWindow();
@@ -46,7 +50,6 @@ protected:
 	bool mAppPaused = false;
 	bool mMinimized = false;
 	bool mMaximized = false;
-	bool mFullscreenState = false;
 
 	HINSTANCE mhAppInst = nullptr; 
 	HWND mhMainWnd = nullptr; 
@@ -56,8 +59,11 @@ protected:
 	int mScreenWidth = 800;
 	int mScreenHeight = 600;
 
-	GameTimer mTimer;
-	class InputManager* inputManager;
+	// option들의 bool값을 관리하는 컨테이너
+	std::bitset<6> mOptions;
+
+	std::unique_ptr<class GameTimer> mGameTimer;
+	std::unique_ptr<class InputManager> mInputManager;
 };
 
 static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);

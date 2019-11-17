@@ -7,6 +7,11 @@
 #include "D3DUtil.h"
 #include "AssetManager.h"
 #include "GameObject.h"
+#include "Material.h"
+#include "MeshGeometry.h"
+#include "DirectionalLight.h"
+#include "PointLight.h"
+#include "SpotLight.h"
 
 using namespace DirectX;
 using Microsoft::WRL::ComPtr;
@@ -14,7 +19,8 @@ using Microsoft::WRL::ComPtr;
 D3DFramework::D3DFramework(HINSTANCE hInstance, int screenWidth, int screenHeight, std::wstring applicationName)
 	: D3DApp(hInstance, screenWidth, screenHeight, applicationName) 
 {
-	mCamera = new Camera();
+	mCamera = std::make_unique<Camera>();
+	mAssetManager = std::make_unique<AssetManager>();
 }
 
 D3DFramework::~D3DFramework() { }
@@ -29,17 +35,16 @@ bool D3DFramework::Initialize()
 	ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), nullptr));
 
 	mCamera->SetPosition(0.0f, 2.0f, -15.0f);
+	mAssetManager->Initialize(md3dDevice.Get(), mCommandList.Get());
 
 	objCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
 	passCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(PassConstants));
 
-	mAssetManager = new AssetManager();
-	mAssetManager->Initialize(md3dDevice.Get(), mCommandList.Get());
-
 	BuildRootSignature();
 	BuildDescriptorHeaps();
 	BuildShadersAndInputLayout();
-	BuildRenderItems();
+	BuildObjects();
+	BuildLights();
 	BuildFrameResources();
 	BuildPSOs();
 
@@ -51,10 +56,6 @@ bool D3DFramework::Initialize()
 	// 초기화가 끝날 때까지 기다린다.
 	FlushCommandQueue();
 
-	// RenderLayer를 기준으로 Object를 정렬한다.
-	mAllObjects.sort(ObjectLess());
-	ClassifyObjectLayer();
-
 	for (const auto& obj : mAllObjects)
 	{
 		obj->BeginPlay();
@@ -65,11 +66,7 @@ bool D3DFramework::Initialize()
 
 void D3DFramework::OnDestroy()
 {
-	delete mCamera;
-	mCamera = 0;
-
 	__super::OnDestroy();
-
 }
 
 void D3DFramework::CreateRtvAndDsvDescriptorHeaps()
@@ -115,13 +112,20 @@ void D3DFramework::Tick(float deltaTime)
 
 	for (const auto& obj : mAllObjects)
 	{
-		obj->Tick(deltaTime);
+		if (obj)
+		{
+			obj->Tick(deltaTime);
+		}
+		else
+		{
+			mAllObjects.remove(obj);
+		}
 	}
 
-	AnimateMaterials(deltaTime);
-	UpdateObjectCBs(deltaTime);
 	UpdateMaterialBuffer(deltaTime);
 	UpdateMainPassCB(deltaTime);
+
+	mWorldCamFrustum = mCamera->GetWorldCameraBounding();
 }
 
 void D3DFramework::Render()
@@ -159,7 +163,7 @@ void D3DFramework::Render()
 	auto passCB = mCurrentFrameResource->mPassCB->GetResource();
 	mCommandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
 
-	// 이 장면에서 사영되는 모든 머터리얼을 묶는다. 구조적 버퍼는
+	// 이 장면에서 사용되는 모든 머터리얼을 묶는다. 구조적 버퍼는
 	// 힙을 생략하고 그냥 하나의 루트 서술자로 묶을 수 있다.
 	auto matBuffer = mCurrentFrameResource->mMaterialBuffer->GetResource();
 	mCommandList->SetGraphicsRootShaderResourceView(2, matBuffer->GetGPUVirtualAddress());
@@ -168,28 +172,38 @@ void D3DFramework::Render()
 	// 테이블에 몇 개의 서술자가 있는지는 Root Signature에 설정되어 있다.
 	mCommandList->SetGraphicsRootDescriptorTable(3, mCbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
-	if (mIsWireframe)
+	if (GetOptionEnabled(Option::Wireframe))
 	{
+		UINT objectCBIndex = 0;
+
 		mCommandList->SetPipelineState(mPSOs["Wireframe"].Get());
-		RenderObjects(mCommandList.Get(), mAllObjects.begin(), mAllObjects.end());
+		for(const auto& list : mGameObjects)
+			RenderGameObjects(mCommandList.Get(), list, objectCBIndex);
 	}
 	else
 	{
+		UINT objectCBIndex = 0;
+
 		mCommandList->SetPipelineState(mPSOs["Opaque"].Get());
-		RenderObjects(mCommandList.Get(), mLayerPair[(int)RenderLayer::Opaque].first, 
-			mLayerPair[(int)RenderLayer::Opaque].second);
+		RenderGameObjects(mCommandList.Get(), mGameObjects[(int)RenderLayer::Opaque], objectCBIndex);
 
 		mCommandList->SetPipelineState(mPSOs["AlphaTested"].Get());
-		RenderObjects(mCommandList.Get(), mLayerPair[(int)RenderLayer::AlphaTested].first, 
-			mLayerPair[(int)RenderLayer::AlphaTested].second);
+		RenderGameObjects(mCommandList.Get(), mGameObjects[(int)RenderLayer::AlphaTested], objectCBIndex);
 
 		mCommandList->SetPipelineState(mPSOs["Billborad"].Get());
-		RenderObjects(mCommandList.Get(), mLayerPair[(int)RenderLayer::Billborad].first, 
-			mLayerPair[(int)RenderLayer::Billborad].second);
+		RenderGameObjects(mCommandList.Get(), mGameObjects[(int)RenderLayer::Billborad], objectCBIndex);
 
 		mCommandList->SetPipelineState(mPSOs["Transparent"].Get());
-		RenderObjects(mCommandList.Get(), mLayerPair[(int)RenderLayer::Transparent].first,
-			mLayerPair[(int)RenderLayer::Transparent].second);
+		RenderGameObjects(mCommandList.Get(), mGameObjects[(int)RenderLayer::Transparent], objectCBIndex);
+	}
+
+	if (GetOptionEnabled(Option::Debug))
+	{
+		UINT objectCBIndex = 0;
+
+		mCommandList->SetPipelineState(mPSOs["Debug"].Get());
+		for (const auto& list : mGameObjects)
+			RenderDebug(mCommandList.Get(), list, objectCBIndex);
 	}
 
 	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
@@ -213,51 +227,26 @@ void D3DFramework::Render()
 	mCommandQueue->Signal(mFence.Get(), mCurrentFence);
 }
 
-void D3DFramework::AnimateMaterials(float deltaTime) { }
-
-void D3DFramework::UpdateObjectCBs(float deltaTime)
-{
-	auto currObjectCB = mCurrentFrameResource->mObjectCB.get();
-	for (auto& obj : mAllObjects)
-	{
-		GameObject* gameObject = static_cast<GameObject*>(obj.get());
-		if (gameObject->IsUpdate())
-		{
-			ObjectConstants objConstants;
-
-			XMStoreFloat4x4(&objConstants.mWorld, XMMatrixTranspose(gameObject->GetWorld()));
-			XMStoreFloat4x4(&objConstants.mTexTransform, XMMatrixTranspose(gameObject->GetTexTransform()));
-			objConstants.mMaterialIndex = gameObject->GetMaterial()->mMatCBIndex;
-
-			currObjectCB->CopyData(gameObject->GetObjectCBIndex(), objConstants);
-
-			gameObject->DecreaseNumFrames();
-		}
-	}
-}
-
 void D3DFramework::UpdateMaterialBuffer(float deltaTime)
 {
 	auto currMaterialBuffer = mCurrentFrameResource->mMaterialBuffer.get();
 	for (const auto& e : mAssetManager->GetMaterials())
 	{
 		Material* mat = e.second.get();
-		if (mat->mNumFramesDirty > 0)
+		if (mat->IsUpdate())
 		{
 			MaterialData matData;
 
-			matData.mDiffuseAlbedo = mat->mDiffuseAlbedo;
-			matData.mSpecular = mat->mSpecular;
-			matData.mRoughness = mat->mRoughness;
-			matData.mDiffuseMapIndex = mat->mDiffuseSrvHeapIndex;
-			matData.mNormalMapIndex = mat->mNormalSrvHeapIndex;
+			matData.mDiffuseAlbedo = mat->GetDiffuse();
+			matData.mSpecular = mat->GetSpecular();
+			matData.mRoughness = mat->GetRoughness();
+			matData.mDiffuseMapIndex = mat->GetDiffuseIndex();
+			matData.mNormalMapIndex = mat->GetNormalIndex();
+			DirectX::XMStoreFloat4x4(&matData.mMatTransform, XMMatrixTranspose(mat->GetMaterialTransform()));
 
-			XMMATRIX transform = XMLoadFloat4x4(&mat->mMatTransform);
-			DirectX::XMStoreFloat4x4(&matData.mMatTransform, XMMatrixTranspose(transform));
+			currMaterialBuffer->CopyData(mat->GetMaterialIndex(), matData);
 
-			currMaterialBuffer->CopyData(mat->mMatCBIndex, matData);
-
-			--mat->mNumFramesDirty;
+			mat->DecreaseNumFrames();
 		}
 	}
 }
@@ -283,14 +272,26 @@ void D3DFramework::UpdateMainPassCB(float deltaTime)
 	mMainPassCB.mInvRenderTargetSize = XMFLOAT2(1.0f / mScreenWidth, 1.0f / mScreenHeight);
 	mMainPassCB.mNearZ = 1.0f;
 	mMainPassCB.mFarZ = 1000.0f;
-	mMainPassCB.mTotalTime = mTimer.GetTotalTime();
-	mMainPassCB.mDeltaTime = mTimer.GetDeltaTime();
+	mMainPassCB.mTotalTime = mGameTimer->GetTotalTime();
+	mMainPassCB.mDeltaTime = mGameTimer->GetDeltaTime();
 	mMainPassCB.mAmbientLight = { 0.05f, 0.05f, 0.05f, 1.0f };
 	mMainPassCB.mFogColor = { 0.7f, 0.7f, 0.7f, 1.0f };
 	mMainPassCB.mFogStart = 5.0f;
 	mMainPassCB.mFogRange = 10.0f;
-	mMainPassCB.mLights[0].mDirection = { 0.57735f, -0.57735f, 0.57735f };
-	mMainPassCB.mLights[0].mStrength = { 0.8f, 0.8f, 0.8f };
+	mMainPassCB.mFogEnabled = GetOptionEnabled(Option::Fog);
+
+	int k = 0;
+	for (const auto& light : mLights)
+	{
+		if (light->IsUpdate())
+		{
+			LightConstants lightConstatns;
+			light->GetLightConstants(lightConstatns);
+			mMainPassCB.mLights[k] = lightConstatns;
+			light->DecreaseNumFrames();
+		}
+		++k;
+	}
 
 	auto currPassCB = mCurrentFrameResource->mPassCB.get();
 	currPassCB->CopyData(0, mMainPassCB);
@@ -378,30 +379,43 @@ void D3DFramework::BuildShadersAndInputLayout()
 	const D3D_SHADER_MACRO alphaTestDefines[] =
 	{
 		"ALPHA_TEST", "1",
-		//"FOG", "1",
 		NULL, NULL
 	};
 
 	mShaders["StandardVS"] = D3DUtil::CompileShader(L"Shaders\\Default.hlsl", nullptr, "VS", "vs_5_1");
-	mShaders["OpaquePS"] = D3DUtil::CompileShader(L"Shaders\\Default.hlsl", alphaTestDefines, "PS", "ps_5_1");
+	mShaders["OpaquePS"] = D3DUtil::CompileShader(L"Shaders\\Default.hlsl", nullptr, "PS", "ps_5_1");
+
+	mShaders["WireframeVS"] = D3DUtil::CompileShader(L"Shaders\\Wireframe.hlsl", nullptr, "VS", "vs_5_1");
+	mShaders["WireframePS"] = D3DUtil::CompileShader(L"Shaders\\Wireframe.hlsl", nullptr, "PS", "ps_5_1");
+
+	mShaders["DebugVS"] = D3DUtil::CompileShader(L"Shaders\\Debug.hlsl", nullptr, "VS", "vs_5_1");
+	mShaders["DebugPS"] = D3DUtil::CompileShader(L"Shaders\\Debug.hlsl", nullptr, "PS", "ps_5_1");
+
 	mShaders["AlphaTestedPS"] = D3DUtil::CompileShader(L"Shaders\\Default.hlsl", alphaTestDefines, "PS", "ps_5_1");
 
 	mShaders["BillboardVS"] = D3DUtil::CompileShader(L"Shaders\\Billboard.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["BillboardGS"] = D3DUtil::CompileShader(L"Shaders\\Billboard.hlsl", nullptr, "GS", "gs_5_1");
 	mShaders["BillboardPS"] = D3DUtil::CompileShader(L"Shaders\\Billboard.hlsl", alphaTestDefines, "PS", "ps_5_1");
 
-	mInputLayout =
+	mDefaultLayout =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 32, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 36, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 44, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 	};
 
 	mBillboardLayout =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		{ "SIZE", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	};
+
+	mDebugLayout =
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 	};
 }
 
@@ -417,7 +431,7 @@ void D3DFramework::BuildPSOs()
 	// PSO for opaque objects.
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaquePsoDesc;
 	ZeroMemory(&opaquePsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
-	opaquePsoDesc.InputLayout = { mInputLayout.data(), (UINT)mInputLayout.size() };
+	opaquePsoDesc.InputLayout = { mDefaultLayout.data(), (UINT)mDefaultLayout.size() };
 	opaquePsoDesc.pRootSignature = mRootSignature.Get();
 	opaquePsoDesc.VS =
 	{
@@ -444,8 +458,34 @@ void D3DFramework::BuildPSOs()
 
 	// PSO for Wireframe 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaqueWireframePsoDesc = opaquePsoDesc;
+	opaqueWireframePsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["WireframeVS"]->GetBufferPointer()),
+		mShaders["WireframeVS"]->GetBufferSize()
+	};
+	opaqueWireframePsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["WireframePS"]->GetBufferPointer()),
+		mShaders["WireframePS"]->GetBufferSize()
+	};
 	opaqueWireframePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
+	opaqueWireframePsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaqueWireframePsoDesc, IID_PPV_ARGS(&mPSOs["Wireframe"])));
+
+	// PSO for Debug
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC debugPsoDesc = opaqueWireframePsoDesc;
+	debugPsoDesc.InputLayout = { mDebugLayout.data(), (UINT)mDebugLayout.size() };
+	debugPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["DebugVS"]->GetBufferPointer()),
+		mShaders["DebugVS"]->GetBufferSize()
+	};
+	debugPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["DebugPS"]->GetBufferPointer()),
+		mShaders["DebugPS"]->GetBufferSize()
+	};
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&debugPsoDesc, IID_PPV_ARGS(&mPSOs["Debug"])));
 
 
 	// PSO for Transparent
@@ -500,14 +540,16 @@ void D3DFramework::BuildPSOs()
 	billboardPsoDesc.InputLayout = { mBillboardLayout.data(), (UINT)mBillboardLayout.size() };
 	billboardPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	// MSAA가 활성화되어 있다면 하드웨어는 알파 값을 이용해서 MSAA에 알파 값을 포괄하여 샘플링한다.
-	billboardPsoDesc.BlendState.AlphaToCoverageEnable = m4xMsaaState;
+	billboardPsoDesc.BlendState.AlphaToCoverageEnable = GetOptionEnabled(Option::Msaa);
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&billboardPsoDesc, IID_PPV_ARGS(&mPSOs["Billborad"])));
 
 }
 
 void D3DFramework::BuildFrameResources()
 {
-	UINT objectCount = (UINT)std::distance(mAllObjects.begin(), mAllObjects.end());
+	UINT objectCount = 0;
+	for(const auto& list : mGameObjects)
+		objectCount += (UINT)std::distance(list.begin(), list.end());
 
 	for (int i = 0; i < NUM_FRAME_RESOURCES; ++i)
 	{
@@ -516,23 +558,27 @@ void D3DFramework::BuildFrameResources()
 	}
 }
 
-void D3DFramework::BuildRenderItems()
+void D3DFramework::BuildObjects()
 {
 	std::unique_ptr<GameObject> object;
 
-	object = std::make_unique<GameObject>("Box");
+	object = std::make_unique<GameObject>("Box0");
 	object->SetPosition(0.0f, 1.0f, 0.0f);
-	object->SetScale(2.0f, 2.0f, 2.0f);
+	object->SetScale(100.0f, 100.0f, 100.0f);
+	object->Rotate(45.0f, 45.0f, 45.0f);
 	object->SetMaterial(mAssetManager->FindMaterial("Wirefence"));
-	object->SetMesh(mAssetManager->FindMesh("Box"));
-	object->SetLayer(RenderLayer::AlphaTested);
-	mAllObjects.push_front(std::move(object));
+	object->SetMesh(mAssetManager->FindMesh("Box_OBB"));
+	object->SetRenderLayer(RenderLayer::AlphaTested);
+	mAllObjects.push_front(object.get());
+	mGameObjects[(int)object->GetRenderLayer()].push_front(std::move(object));
 
-	object = std::make_unique<GameObject>("Floor");
+	object = std::make_unique<GameObject>("Floor0");
+	object->SetScale(20.0f, 0.1f, 30.0f);
 	object->SetMaterial(mAssetManager->FindMaterial("Tile0"));
-	object->SetMesh(mAssetManager->FindMesh("Grid"));
-	object->SetLayer(RenderLayer::Opaque);
-	mAllObjects.push_front(std::move(object));
+	object->SetMesh(mAssetManager->FindMesh("Box_AABB"));
+	object->SetRenderLayer(RenderLayer::Opaque);
+	mAllObjects.push_front(object.get());
+	mGameObjects[(int)object->GetRenderLayer()].push_front(std::move(object));
 
 	for (int i = 0; i < 5; ++i)
 	{
@@ -540,61 +586,173 @@ void D3DFramework::BuildRenderItems()
 		object->SetPosition(-5.0f, 1.5f, -10.0f + i * 5.0f);
 		object->SetMaterial(mAssetManager->FindMaterial("Brick0"));
 		object->SetMesh(mAssetManager->FindMesh("Cylinder"));
-		object->SetLayer(RenderLayer::Opaque);
-		mAllObjects.push_front(std::move(object));
+		object->SetRenderLayer(RenderLayer::Opaque);
+		mAllObjects.push_front(object.get());
+		mGameObjects[(int)object->GetRenderLayer()].push_front(std::move(object));
 
 		object = std::make_unique<GameObject>("ColumnRight" + std::to_string(i));
 		object->SetPosition(5.0f, 1.5f, -10.0f + i * 5.0f);
 		object->SetMaterial(mAssetManager->FindMaterial("Brick0"));
 		object->SetMesh(mAssetManager->FindMesh("Cylinder"));
-		object->SetLayer(RenderLayer::Opaque);
-		mAllObjects.push_front(std::move(object));
+		object->SetRenderLayer(RenderLayer::Opaque);
+		mAllObjects.push_front(object.get());
+		mGameObjects[(int)object->GetRenderLayer()].push_front(std::move(object));
 
 		object = std::make_unique<GameObject>("SphereLeft" + std::to_string(i));
 		object->SetPosition(-5.0f, 3.5f, -10.0f + i * 5.0f);
 		object->SetMaterial(mAssetManager->FindMaterial("Mirror0"));
 		object->SetMesh(mAssetManager->FindMesh("Sphere"));
-		object->SetLayer(RenderLayer::Transparent);
-		mAllObjects.push_front(std::move(object));
+		object->SetRenderLayer(RenderLayer::Transparent);
+		mAllObjects.push_front(object.get());
+		mGameObjects[(int)object->GetRenderLayer()].push_front(std::move(object));
 
 		object = std::make_unique<GameObject>("SphereRight" + std::to_string(i));
 		object->SetPosition(5.0f, 3.5f, -10.0f + i * 5.0f);
 		object->SetMaterial(mAssetManager->FindMaterial("Mirror0"));
 		object->SetMesh(mAssetManager->FindMesh("Sphere"));
-		object->SetLayer(RenderLayer::Transparent);
-		mAllObjects.push_front(std::move(object));
+		object->SetRenderLayer(RenderLayer::Transparent);
+		mAllObjects.push_front(object.get());
+		mGameObjects[(int)object->GetRenderLayer()].push_front(std::move(object));
+
 	}
 }
 
-void D3DFramework::ClassifyObjectLayer()
+void D3DFramework::BuildLights()
 {
-	for (int i = 0; i < (int)RenderLayer::Count; ++i)
-	{
-		ClassifyObjectLayer(mLayerPair[i], i);
-	}
+	std::unique_ptr<Light> light;
+
+	light = std::make_unique<DirectionalLight>("DirectionalLight");
+	light->SetStrength(0.8f, 0.8f, 0.8f);
+	light->Rotate(45.0f, -45.0f, 0.0f);
+	mAllObjects.push_front(light.get());
+	mLights.push_front(std::move(light));
 }
 
-void D3DFramework::ClassifyObjectLayer(std::pair<LayerIter, LayerIter>& layerPair, int i)
+void D3DFramework::RenderGameObjects(ID3D12GraphicsCommandList* cmdList, 
+	const std::forward_list<std::unique_ptr<class GameObject>>& gameObjects, UINT& startObjectIndex) const
 {
-	// 각 Layer의 Begin과 End를 알아낸다.
-	//auto layerIter = std::equal_range(mAllObjects.begin(), mAllObjects.end(), i, ObjectLess());
-	auto layerIterBegin = std::lower_bound(mAllObjects.begin(), mAllObjects.end(), i, ObjectLess());
-	auto layerIterEnd = std::upper_bound(mAllObjects.begin(), mAllObjects.end(), i, ObjectLess());
-	layerPair = std::make_pair(layerIterBegin, layerIterEnd);
-}
+	auto currObjectCB = mCurrentFrameResource->mObjectCB.get();
+	UINT& objectCBIndex = startObjectIndex;
 
-void D3DFramework::RenderObjects(ID3D12GraphicsCommandList* cmdList, LayerIter iterBegin, LayerIter iterEnd)
-{
-	auto objectCB = mCurrentFrameResource->mObjectCB->GetResource();
-	for (; iterBegin != iterEnd; ++iterBegin)
+	for (const auto& obj : gameObjects)
 	{
-		const GameObject* gameObject = static_cast<GameObject*>(iterBegin->get());
+		if (obj->GetMesh() == nullptr || !obj->GetIsVisible())
+			continue;
 
-		D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = objectCB->GetGPUVirtualAddress() + gameObject->GetObjectCBIndex() * objCBByteSize;
+		// 카메라 프러스텀 내에 있다면 그린다.
+		bool isInCamFrustum = false;
+		switch (obj->GetMesh()->GetCollisionType())
+		{
+		case CollisionType::AABB:
+		{
+			const BoundingBox& aabb = std::any_cast<BoundingBox>(obj->GetCollisionBounding());
+			if(mWorldCamFrustum.Contains(aabb) != DirectX::DISJOINT)
+				isInCamFrustum = true;
+			break;
+		}
+		case CollisionType::OBB:
+		{
+			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(obj->GetCollisionBounding());
+			if (mWorldCamFrustum.Contains(obb) != DirectX::DISJOINT)
+				isInCamFrustum = true;
+			break;
+		}
+		case CollisionType::Sphere:
+		{
+			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(obj->GetCollisionBounding());
+			if (mWorldCamFrustum.Contains(sphere) != DirectX::DISJOINT)
+				isInCamFrustum = true;
+			break;
+		}
+		}
+
+		if (!isInCamFrustum)
+			continue;
+
+		// 오브젝트의 상수 버퍼를 업데이트한다.
+		ObjectConstants objConstants;
+		XMStoreFloat4x4(&objConstants.mWorld, XMMatrixTranspose(obj->GetWorld()));
+		objConstants.mMaterialIndex = obj->GetMaterial()->GetMaterialIndex();
+
+		if (GetOptionEnabled(Option::Debug))
+		{
+			auto boundingWorld = obj->GetBoundingWorld();
+			if(boundingWorld.has_value())
+				XMStoreFloat4x4(&objConstants.mBoundingWorld, XMMatrixTranspose(boundingWorld.value()));
+		}
+
+		currObjectCB->CopyData(objectCBIndex, objConstants);
+
+		D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = currObjectCB->GetResource()->GetGPUVirtualAddress() + objectCBIndex * objCBByteSize;
 		cmdList->SetGraphicsRootConstantBufferView(0, objCBAddress);
 
-		if (gameObject->GetMesh() != nullptr)
-			gameObject->GetMesh()->Render(cmdList);
+		obj->GetMesh()->Render(cmdList);
+
+		++objectCBIndex;
+	}
+}
+
+void D3DFramework::RenderDebug(ID3D12GraphicsCommandList* cmdList, 
+	const std::forward_list<std::unique_ptr<class GameObject>>& gameObjects, UINT& startObjectIndex) const
+{
+	auto currObjectCB = mCurrentFrameResource->mObjectCB.get();
+	UINT& objectCBIndex = startObjectIndex;
+	for (const auto& obj : gameObjects)
+	{
+		if (obj->GetMesh() == nullptr)
+			continue;
+
+		auto boundingWorld = obj->GetBoundingWorld();
+		if (!boundingWorld.has_value())
+			continue;
+
+		// 카메라 프러스텀 내에 있다면 그린다.
+		bool isInCamFrustum = false;
+		switch (obj->GetMesh()->GetCollisionType())
+		{
+		case CollisionType::AABB:
+		{
+			const BoundingBox& aabb = std::any_cast<BoundingBox>(obj->GetCollisionBounding());
+			if (mWorldCamFrustum.Contains(aabb) != DirectX::DISJOINT)
+				isInCamFrustum = true;
+			break;
+		}
+		case CollisionType::OBB:
+		{
+			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(obj->GetCollisionBounding());
+			if (mWorldCamFrustum.Contains(obb) != DirectX::DISJOINT)
+				isInCamFrustum = true;
+			break;
+		}
+		case CollisionType::Sphere:
+		{
+			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(obj->GetCollisionBounding());
+			if (mWorldCamFrustum.Contains(sphere) != DirectX::DISJOINT)
+				isInCamFrustum = true;
+			break;
+		}
+		}
+
+		if (!isInCamFrustum)
+			continue;
+
+		D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = currObjectCB->GetResource()->GetGPUVirtualAddress() + objectCBIndex * objCBByteSize;
+		cmdList->SetGraphicsRootConstantBufferView(0, objCBAddress);
+
+		switch (obj->GetMesh()->GetCollisionType())
+		{
+		case CollisionType::AABB:
+			mAssetManager->FindMesh("Debug_Box")->Render(cmdList);
+			break;
+		case CollisionType::OBB:
+			mAssetManager->FindMesh("Debug_Box")->Render(cmdList);
+			break;
+		case CollisionType::Sphere:
+			mAssetManager->FindMesh("Debug_Sphere")->Render(cmdList);
+			break;
+		}
+
+		++objectCBIndex;
 	}
 }
 

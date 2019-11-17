@@ -4,7 +4,11 @@
 // Contains API for shader lighting.
 //***************************************************************************************
 
-#define MaxLights 16
+#define MAX_LIGHT 1
+
+#define DIRECTIONAL_LIGHT 0
+#define POINT_LIGHT 1
+#define SPOT_LIGHT 2
 
 struct Light
 {
@@ -14,6 +18,10 @@ struct Light
     float mFalloffEnd;   // point/spot light only
     float3 mPosition;    // point light only
     float mSpotPower;    // spot light only
+	bool mEnabled;
+	bool mSelected;
+	uint mType;
+	float mPadding;
 };
 
 struct Material
@@ -129,34 +137,33 @@ float3 ComputeSpotLight(Light light, Material mat, float3 pos, float3 normal, fl
     return BlinnPhong(lightStrength, lightVec, normal, toEye, mat);
 }
 
-float4 ComputeLighting(Light light[MaxLights], Material mat,
+float4 ComputeLighting(Light lights[MAX_LIGHT], Material mat,
                        float3 pos, float3 normal, float3 toEye,
                        float3 shadowFactor)
 {
     float3 result = 0.0f;
 
-    int i = 0;
+	for (uint i = 0; i < MAX_LIGHT; ++i)
+	{
+		if (!lights[i].mEnabled)
+			continue;
 
-#if (NUM_DIR_LIGHTS > 0)
-    for(i = 0; i < NUM_DIR_LIGHTS; ++i)
-    {
-        result += shadowFactor[i] * ComputeDirectionalLight(light[i], mat, normal, toEye);
-    }
-#endif
+		if (lights[i].mType != DIRECTIONAL_LIGHT && length(lights[i].mPosition - pos) > lights[i].mFalloffEnd)
+			continue;
 
-#if (NUM_POINT_LIGHTS > 0)
-    for(i = NUM_DIR_LIGHTS; i < NUM_DIR_LIGHTS+NUM_POINT_LIGHTS; ++i)
-    {
-        result += ComputePointLight(light[i], mat, pos, normal, toEye);
-    }
-#endif
-
-#if (NUM_SPOT_LIGHTS > 0)
-    for(i = NUM_DIR_LIGHTS + NUM_POINT_LIGHTS; i < NUM_DIR_LIGHTS + NUM_POINT_LIGHTS + NUM_SPOT_LIGHTS; ++i)
-    {
-        result += ComputeSpotLight(light[i], mat, pos, normal, toEye);
-    }
-#endif 
+		switch (lights[i].mType)
+		{
+		case DIRECTIONAL_LIGHT:
+			result += shadowFactor[i] * ComputeDirectionalLight(lights[i], mat, normal, toEye);
+			break;
+		case POINT_LIGHT:
+			result += ComputePointLight(lights[i], mat, pos, normal, toEye);
+			break;
+		case SPOT_LIGHT:
+			result += ComputeSpotLight(lights[i], mat, pos, normal, toEye);
+			break;
+		}
+	}
 
     return float4(result, 0.0f);
 }

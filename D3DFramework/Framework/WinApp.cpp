@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "WinApp.h"
 #include "InputManager.h"
+#include "GameTimer.h"
 #include <WindowsX.h>
 
 WinApp* WinApp::mApp = nullptr;
@@ -20,16 +21,23 @@ WinApp::WinApp(HINSTANCE hInstance, int screenWidth, int screenHeight, std::wstr
 	// 오직 하나의 App만이 존재한다.
 	assert(mApp == nullptr);
 	mApp = this;
+
+	mGameTimer = std::make_unique<GameTimer>();
+	mInputManager = std::make_unique<InputManager>();
+	mOptions.reset();
 }
 
-WinApp::~WinApp() { }
+WinApp::~WinApp() 
+{ 
+	mApp = nullptr;
+}
 
 
 int WinApp::Run()
 {
 	MSG msg = { 0 };
 
-	mTimer.Reset();
+	mGameTimer->Reset();
 
 	while (msg.message != WM_QUIT)
 	{
@@ -42,13 +50,13 @@ int WinApp::Run()
 		// 아니면 게임을 진행한다.
 		else
 		{
-			mTimer.Tick();
-			float deltaTime = mTimer.GetDeltaTime();
+			mGameTimer->Tick();
+			float deltaTime = mGameTimer->GetDeltaTime();
 
 			if (!mAppPaused)
 			{
 				CalculateFrameStats();
-				inputManager->Tick(deltaTime);
+				mInputManager->Tick(deltaTime);
 				Tick(deltaTime);
 				Render();
 			}
@@ -59,6 +67,8 @@ int WinApp::Run()
 		}
 	}
 
+	OnDestroy();
+
 	return (int)msg.wParam;
 }
 
@@ -66,8 +76,6 @@ bool WinApp::Initialize()
 {
 	if (!InitMainWindow())
 		return false;
-
-	inputManager = new InputManager();
 
 	return true;
 }
@@ -81,12 +89,12 @@ LRESULT WinApp::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		if (LOWORD(wParam) == WA_INACTIVE)
 		{
 			mAppPaused = true;
-			mTimer.Stop();
+			mGameTimer->Stop();
 		}
 		else
 		{
 			mAppPaused = false;
-			mTimer.Start();
+			mGameTimer->Start();
 		}
 		return 0;
 	case WM_SIZE:
@@ -120,7 +128,7 @@ LRESULT WinApp::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		}
 		return 0;
 	case WM_DESTROY:
-		OnDestroy();
+		PostQuitMessage(0);
 		return 0;
 	case WM_MENUCHAR:
 		// Alt-Enter를 누를 때, 삐- 소리가 나지 않게 한다.
@@ -128,21 +136,26 @@ LRESULT WinApp::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	case WM_LBUTTONDOWN:
 	case WM_MBUTTONDOWN:
 	case WM_RBUTTONDOWN:
-		inputManager->OnMouseDown(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+		if(mInputManager.get())
+			mInputManager->OnMouseDown(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
 		return 0;
 	case WM_LBUTTONUP:
 	case WM_MBUTTONUP:
 	case WM_RBUTTONUP:
-		inputManager->OnMouseUp(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+		if (mInputManager.get())
+			mInputManager->OnMouseUp(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
 		return 0;
 	case WM_MOUSEMOVE:
-		inputManager->OnMouseMove(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+		if (mInputManager.get())
+			mInputManager->OnMouseMove(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
 		return 0;
 	case WM_KEYUP:
-		inputManager->OnKeyUp((unsigned int)wParam);
+		if (mInputManager.get())
+			mInputManager->OnKeyUp((unsigned int)wParam);
 		return 0;
 	case WM_KEYDOWN:
-		inputManager->OnKeyDown((unsigned int)wParam);
+		if (mInputManager.get())
+			mInputManager->OnKeyDown((unsigned int)wParam);
 		return 0;
 	}
 
@@ -201,7 +214,7 @@ void WinApp::CalculateFrameStats()
 	frameCnt++;
 
 	// 1초가 넘어가면 계산한다.
-	if ((mTimer.GetTotalTime() - timeElapsed) >= 1.0f)
+	if ((mGameTimer->GetTotalTime() - timeElapsed) >= 1.0f)
 	{
 		float fps = (float)frameCnt; // fps = frameCnt / 1
 		float mspf = 1000.0f / fps;
@@ -235,7 +248,16 @@ void WinApp::OnResize(int screenWidth, int screenHeight)
 	SetWindowPos(mhMainWnd, HWND_TOP, 0, 0, width, height, SWP_NOMOVE);
 }
 
-void WinApp::OnDestroy()
+void WinApp::SetOptionEnabled(Option option, bool value)
 {
-	PostQuitMessage(0);
+	mOptions.set((int)option, value); 
+
+	ApplyOption(option);
+}
+
+void WinApp::SwitchOptionEnabled(Option option)
+{
+	mOptions.flip((int)option);
+
+	ApplyOption(option);
 }

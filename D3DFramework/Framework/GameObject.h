@@ -1,47 +1,40 @@
 #pragma once
 
 #include "Object.h"
-#include "Global.h"
-
 
 class GameObject : public Object
 {
 public:
 	GameObject(std::string name);
 	virtual ~GameObject();
-
-public:
-	bool IsUpdate() const;
-	void UpdateNumFrames();
-	void DecreaseNumFrames();
 	
 public:
-	DirectX::XMMATRIX GetTexTransform() const;
-	inline DirectX::XMFLOAT4X4 GetTexTransform4x4f() const { return mTexTransform; }
+	virtual void Destroy() override;
+	virtual void WorldUpdate() override;
 
-	inline int GetObjectCBIndex() const { return mObjCBIndex; }
+public:
+	inline class Material* GetMaterial() const { return mMaterial; }
+	inline void SetMaterial(class Material* mat) { mMaterial = mat; }
+	inline class MeshGeometry* GetMesh() const { return mMesh; }
+	inline void SetMesh(class MeshGeometry* mesh) { mMesh = mesh; }
 
-	inline Material* GetMaterial() const { return mMaterial; }
-	inline void SetMaterial(Material* mat) { mMaterial = mat; }
-	inline MeshGeometry* GetMesh() const { return mMesh; }
-	inline void SetMesh(MeshGeometry* mesh) { mMesh = mesh; }
+	inline RenderLayer GetRenderLayer() const { return mRenderLayer; }
+	inline void SetRenderLayer(RenderLayer layer) { mRenderLayer = layer; }
+
+	inline void SetVisible(bool value) { mIsVisible = value; }
+	inline bool GetIsVisible() const { return mIsVisible; }
+
+	inline const std::any& GetCollisionBounding() const { return mWorldBounding; }
+	std::optional<DirectX::XMMATRIX> GetBoundingWorld() const;
 
 protected:
-	struct Material* mMaterial = nullptr;
-	struct MeshGeometry* mMesh = nullptr;
+	class Material* mMaterial = nullptr;
+	class MeshGeometry* mMesh = nullptr;
 
-	// 텍스처의 이동, 회전, 크기를 지정한다.
-	DirectX::XMFLOAT4X4 mTexTransform = D3DUtil::Identity4x4f();
+	std::any mWorldBounding = nullptr;
 
 private:
-	// 머터리얼을 생성할 때마다 삽입할 상수 버퍼에서의 인덱스
-	static int mCurrentIndex;
-	// 이 게임 오브젝트의 물체 상수 버퍼에 해당하는 GPU 상수 버퍼의 색인
-	int mObjCBIndex = -1;
+	RenderLayer mRenderLayer = RenderLayer::Opaque;
 
-	// 재질이 변해서 해당 상수 버퍼를 갱신해야 하는지의 여부를 나타내는 더러움 플래그
-	// FrameResource마다 물체의 상수 버퍼가 있으므로, FrameResouce마다 갱신을 적용해야 한다.
-	// 따라서, 물체의 자료를 수정할 때에는 반드시 mNumFramesDiry = NUM_FRAME_RESOURCES을
-	// 적용해야 한다.
-	int mNumFramesDirty = NUM_FRAME_RESOURCES;
+	bool mIsVisible = true;
 };

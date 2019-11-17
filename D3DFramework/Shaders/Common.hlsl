@@ -2,18 +2,6 @@
 // Common.hlsl by Frank Luna (C) 2015 All Rights Reserved.
 //***************************************************************************************
 
-#ifndef NUM_DIR_LIGHTS
-#define NUM_DIR_LIGHTS 1
-#endif
-
-#ifndef NUM_POINT_LIGHTS
-#define NUM_POINT_LIGHTS 0
-#endif
-
-#ifndef NUM_SPOT_LIGHTS
-#define NUM_SPOT_LIGHTS 0
-#endif
-
 #include "LightingUtil.hlsl"
 
 struct MaterialData
@@ -45,7 +33,7 @@ SamplerState gsamAnisotropicClamp : register(s5);
 cbuffer cbPerObject : register(b0)
 {
     float4x4 gWorld;
-	float4x4 gTexTransform;
+	float4x4 gBoundingWorld;
 	uint gMaterialIndex;
 	uint gObjPad0;
 	uint gObjPad1;
@@ -72,14 +60,11 @@ cbuffer cbPass : register(b1)
 	float4 gFogColor;
 	float gFogStart;
 	float gFogRange;
-	float2 cbPerObjectPad2;
+	bool gFogEnabled;
+	float gPadding0;
 
-    // [0, NUM_DIR_LIGHTS) - Directional Light
-    // [NUM_DIR_LIGHTS, NUM_DIR_LIGHTS+NUM_POINT_LIGHTS) - Point Light
-    // [NUM_DIR_LIGHTS+NUM_POINT_LIGHTS, NUM_DIR_LIGHTS+NUM_POINT_LIGHT+NUM_SPOT_LIGHTS) - Spot Light
-    Light gLights[MaxLights];
+	Light gLights;
 };
-
 
 // 법선 맵 표본을 World Space로 변환한다.
 float3 NormalSampleToWorldSpace(float3 normalMapSample, float3 unitNormalW, float3 tangentW)

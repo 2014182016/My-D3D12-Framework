@@ -8,14 +8,14 @@ struct VertexIn
 {
 	float3 mPosL     : POSITION;
     float3 mNormalL  : NORMAL;
-	float2 mTexC     : TEXCOORD;
 	float3 mTangentU : TANGENT;
+	float2 mTexC     : TEXCOORD;
 };
 
 struct VertexOut
 {
 	float4 mPosH     : SV_POSITION;
-    float3 mPosW     : POSITION1;
+    float3 mPosW     : POSITION;
     float3 mNormalW  : NORMAL;
 	float3 mTangentW : TANGENT;
 	float2 mTexC     : TEXCOORD;
@@ -32,17 +32,16 @@ VertexOut VS(VertexIn vin)
     float4 posW = mul(float4(vin.mPosL, 1.0f), gWorld);
     vout.mPosW = posW.xyz;
 
+	// 동차 절단 공간으로 변환한다.
+	vout.mPosH = mul(posW, gViewProj);
+
 	// World Matrix에 비균등 비례가 없다고 가정하고 Normal을 변환한다.
 	// 비균등 비례가 있다면 역전치 행렬을 사용해야 한다.
     vout.mNormalW = mul(vin.mNormalL, (float3x3)gWorld);
 	vout.mTangentW = mul(vin.mTangentU, (float3x3)gWorld);
-
-	// 동차 절단 공간으로 변환한다.
-    vout.mPosH = mul(posW, gViewProj);
 	
 	// 출력 정점 특성들은 이후 삼각형을 따라 보간된다.
-	float4 texC = mul(float4(vin.mTexC, 0.0f, 1.0f), gTexTransform);
-	vout.mTexC = mul(texC, matData.mMatTransform).xy;
+	vout.mTexC = mul(float4(vin.mTexC, 0.0f, 1.0f), matData.mMatTransform).xy;
 	
     return vout;
 }
@@ -97,13 +96,14 @@ float4 PS(VertexOut pin) : SV_Target
     Material mat = { diffuseAlbedo, specular, shininess };
     float4 directLight = ComputeLighting(gLights, mat, pin.mPosW,
         bumpedNormalW, toEyeW, shadowFactor);
-    float4 litColor = ambient + directLight;
+	float4 litColor = ambient + directLight;
 
-#ifdef FOG
-	// 거리에 따라 안개 색상을 선형 감쇠로 계산한다.
-	float fogAmount = saturate((distToEye - gFogStart) / gFogRange);
-	litColor = lerp(litColor, gFogColor, fogAmount);
-#endif
+	if (gFogEnabled)
+	{
+		// 거리에 따라 안개 색상을 선형 감쇠로 계산한다.
+		float fogAmount = saturate((distToEye - gFogStart) / gFogRange);
+		litColor = lerp(litColor, gFogColor, fogAmount);
+	}
 	
     // 분산 재질에서 알파를 가져온다.
     litColor.a = diffuseAlbedo.a;

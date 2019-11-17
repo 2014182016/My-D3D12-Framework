@@ -27,6 +27,7 @@
 #include <DirectXColors.h>
 #include <DirectXCollision.h>
 #include <string>
+#include <string_view>
 #include <memory>
 #include <algorithm>
 #include <array>
@@ -34,16 +35,48 @@
 #include <forward_list>
 #include <unordered_map>
 #include <map>
+#include <bitset>
 #include <fstream>
 #include <iostream>
 #include <cstdint>
 #include <cassert>
 #include <any>
+#include <optional>
 #include "d3dx12.h"
 #include "DDSTextureLoader.h"
 #include "GeometryGenerator.h"
 
 #define SWAP_CHAIN_BUFFER_COUNT 2
 #define NUM_FRAME_RESOURCES 3
+
+namespace DirectX
+{
+	static DirectX::XMFLOAT4X4 Identity4x4f()
+	{
+		static DirectX::XMFLOAT4X4 I(
+			1.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, 1.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, 1.0f, 0.0f,
+			0.0f, 0.0f, 0.0f, 1.0f);
+
+		return I;
+	}
+
+	static std::ostream& operator<<(std::ostream& os, const DirectX::XMFLOAT3& xmf)
+	{
+		os << xmf.x << " " << xmf.y << " " << xmf.z << std::endl;
+		return os;
+	}
+
+	static std::ostream& operator<<(std::ostream& os, const DirectX::XMFLOAT4X4& xmf4x4f)
+	{
+		os << xmf4x4f._11 << " " << xmf4x4f._12 << " " << xmf4x4f._13 << " " << xmf4x4f._14 << std::endl;
+		os << xmf4x4f._21 << " " << xmf4x4f._22 << " " << xmf4x4f._23 << " " << xmf4x4f._24 << std::endl;
+		os << xmf4x4f._31 << " " << xmf4x4f._32 << " " << xmf4x4f._33 << " " << xmf4x4f._34 << std::endl;
+		os << xmf4x4f._41 << " " << xmf4x4f._42 << " " << xmf4x4f._43 << " " << xmf4x4f._44 << std::endl;
+		return os;
+	}
+}
+
 
 #endif //PCH_H
