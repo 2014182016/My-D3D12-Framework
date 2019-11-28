@@ -6,14 +6,13 @@
 
 struct VertexIn
 {
-	float3 mPosL : POSITION;
+	float3 mPos : POSITION;
 	float4 mColor: COLOR;
-	uint instanceID : SV_InstanceID;
 };
 
 struct VertexOut
 {
-	float4 mPosH : SV_POSITION;
+	float4 mPos : SV_POSITION;
 	float4 mColor: COLOR;
 };
 
@@ -21,9 +20,8 @@ VertexOut VS(VertexIn vin)
 {
 	VertexOut vout = (VertexOut)0.0f;
 
-	float4 posW = mul(float4(vin.mPosL, 1.0f), gDebugData[vin.instanceID + gDebugInstanceIndex].gBoundingWorld);
-	vout.mPosH = mul(posW, gViewProj);
-
+	float4 posW = mul(float4(vin.mPos, 1.0f), gIdentity);
+	vout.mPos = mul(posW, gViewProj);
 	vout.mColor = vin.mColor;
 
 	return vout;

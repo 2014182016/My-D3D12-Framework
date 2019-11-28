@@ -28,12 +28,20 @@ public:
 	// vertex와 index관련되는 정보들이 함수에 인자에 들어간다.
 	void BuildMesh(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 		void* vertices, std::uint16_t* indices, UINT vertexCount, UINT indexCount, UINT vertexStride, UINT indexStride);
+	void BuildVertices(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+		void* vertices, UINT vertexCount, UINT vertexStride);
+	void BuildIndices(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+		std::uint16_t* indices, UINT indexCount, UINT indexStride);
 	void BuildCollisionBound(DirectX::XMFLOAT3* posPtr, size_t vertexCount, size_t stride,  CollisionType type);
 
-	void Render(ID3D12GraphicsCommandList* commandList) const;
+	void Render(ID3D12GraphicsCommandList* commandList, UINT instanceCount = 1, bool isIndexed = true) const;
 
 	// GPU로의 업로드가 끝난 후에 이 메모리를 해제한다.
 	void DisposeUploaders();
+
+	void SetCollisionBoundingAsAABB(DirectX::XMFLOAT3 extents);
+	void SetCollisionBoundingAsOBB(DirectX::XMFLOAT3 extents);
+	void SetCollisionBoundingAsSphere(float radius);
 
 public:
 	inline D3D12_VERTEX_BUFFER_VIEW GetVertexBufferView() const { return mVertexBufferView; }
@@ -43,10 +51,6 @@ public:
 
 	inline CollisionType GetCollisionType() const { return mCollisionType; }
 	inline std::any GetCollisionBounding() const { return mCollisionBounding; }
-
-	void SetCollisionBoundingAsAABB(DirectX::XMFLOAT3 extents);
-	void SetCollisionBoundingAsOBB(DirectX::XMFLOAT3 extents);
-	void SetCollisionBoundingAsSphere(float radius);
 
 protected:
 	// 메쉬의 타입에 따라 어떤 바운딩이 생길지 모르니 any타입으로 선언해둔다.
@@ -71,8 +75,8 @@ private:
 	D3D12_VERTEX_BUFFER_VIEW mVertexBufferView;
 	D3D12_INDEX_BUFFER_VIEW mIndexBufferView;
 
-	// DrawIndexedInstanced에서 그려질 인덱스의 개수
 	UINT mIndexCount = 0;
+	UINT mVertexCount = 0;
 
 	D3D12_PRIMITIVE_TOPOLOGY mPrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 

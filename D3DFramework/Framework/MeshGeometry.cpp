@@ -12,30 +12,41 @@ MeshGeometry::~MeshGeometry() { }
 void MeshGeometry::BuildMesh(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 	void* vertices, std::uint16_t* indices, UINT vertexCount, UINT indexCount, UINT vertexStride, UINT indexStride)
 {
-	// 버텍스 버퍼와 인덱스 버퍼를 업로드 버퍼에 저장한다.
+	BuildVertices(device, commandList, vertices, vertexCount, vertexStride);
+	BuildIndices(device, commandList, indices, indexCount, indexStride);
+}
+
+void MeshGeometry::BuildVertices(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+	void* vertices, UINT vertexCount, UINT vertexStride)
+{
 	const UINT vbByteSize = vertexCount * vertexStride;
-	const UINT ibByteSize = indexCount * indexStride;
 
 	ThrowIfFailed(D3DCreateBlob(vbByteSize, &mVertexBufferCPU));
 	CopyMemory(mVertexBufferCPU->GetBufferPointer(), vertices, vbByteSize);
 
-	ThrowIfFailed(D3DCreateBlob(ibByteSize, &mIndexBufferCPU));
-	CopyMemory(mIndexBufferCPU->GetBufferPointer(), indices, ibByteSize);
-
 	mVertexBufferGPU = D3DUtil::CreateDefaultBuffer(device, commandList,
 		vertices, vbByteSize, mVertexBufferUploader);
-
-	mIndexBufferGPU = D3DUtil::CreateDefaultBuffer(device, commandList,
-		indices, ibByteSize, mIndexBufferUploader);
 
 	mVertexBufferView.BufferLocation = mVertexBufferGPU->GetGPUVirtualAddress();
 	mVertexBufferView.StrideInBytes = vertexStride;
 	mVertexBufferView.SizeInBytes = vbByteSize;
+	mVertexCount = vertexCount;
+}
+
+void MeshGeometry::BuildIndices(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+	std::uint16_t* indices, UINT indexCount, UINT indexStride)
+{
+	const UINT ibByteSize = indexCount * indexStride;
+
+	ThrowIfFailed(D3DCreateBlob(ibByteSize, &mIndexBufferCPU));
+	CopyMemory(mIndexBufferCPU->GetBufferPointer(), indices, ibByteSize);
+
+	mIndexBufferGPU = D3DUtil::CreateDefaultBuffer(device, commandList,
+		indices, ibByteSize, mIndexBufferUploader);
 
 	mIndexBufferView.BufferLocation = mIndexBufferGPU->GetGPUVirtualAddress();
 	mIndexBufferView.Format = DXGI_FORMAT_R16_UINT;
 	mIndexBufferView.SizeInBytes = ibByteSize;
-
 	mIndexCount = indexCount;
 }
 
@@ -69,13 +80,20 @@ void MeshGeometry::BuildCollisionBound(XMFLOAT3* points, size_t vertexCount, siz
 	}
 }
 
-void MeshGeometry::Render(ID3D12GraphicsCommandList* commandList) const
+void MeshGeometry::Render(ID3D12GraphicsCommandList* commandList, UINT instanceCount, bool isIndexed) const
 {
 	commandList->IASetPrimitiveTopology(mPrimitiveType);
 	commandList->IASetVertexBuffers(0, 1, &mVertexBufferView);
-	commandList->IASetIndexBuffer(&mIndexBufferView);
 
-	commandList->DrawIndexedInstanced(mIndexCount, 1, 0, 0, 0);
+	if (isIndexed)
+	{
+		commandList->IASetIndexBuffer(&mIndexBufferView);
+		commandList->DrawIndexedInstanced(mIndexCount, instanceCount, 0, 0, 0);
+	}
+	else
+	{
+		commandList->DrawInstanced(mVertexCount, instanceCount, 0, 0);
+	}
 }
 
 void MeshGeometry::DisposeUploaders()

@@ -7,6 +7,11 @@ Object::Object(std::string name) : Base(name) { }
 
 Object::~Object() { }
 
+void Object::Destroy()
+{
+	mIsDestroyed = true;
+}
+
 void Object::Tick(float deltaTime)
 {
 	if (mIsWorldUpdate)
@@ -88,6 +93,11 @@ void Object::Move(float x, float y, float z)
 	mPosition.z += z;
 
 	mIsWorldUpdate = true;
+}
+
+void Object::Move(DirectX::XMFLOAT3 distance)
+{
+	Move(distance.x, distance.y, distance.z);
 }
 
 //게임 객체를 로컬 x-축 방향으로 이동한다. 

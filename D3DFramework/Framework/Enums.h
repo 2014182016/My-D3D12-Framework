@@ -6,12 +6,15 @@
 
 enum class Option : int
 {
-	Debug = 0,
+	Debug_Collision = 0,
+	Debug_OctTree,
+	Debug_Light,
 	Wireframe,
 	Fullscreen,
 	Fog,
 	Lighting,
-	Msaa
+	Msaa,
+	Count,
 };
 
 enum class CollisionType : int
@@ -38,6 +41,20 @@ enum class RenderLayer : int
 	Billborad,
 	Transparent,
 	Count,
+};
+
+enum class DebugType : int
+{
+	Debug_CollisionBox = 0,
+	Debug_CollisionSphere,
+	Debug_OctTree,
+	Debug_Light,
+	Count,
+	AABB = 0,
+	OBB = 0,
+	Sphere = 1,
+	OctTree = 2,
+	Light = 3,
 };
 
 #endif // ENUMS_H

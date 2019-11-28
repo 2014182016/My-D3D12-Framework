@@ -12,6 +12,10 @@
 #include "DirectionalLight.h"
 #include "PointLight.h"
 #include "SpotLight.h"
+#include "Timer.hpp"
+#include "Octree.h"
+#include "D3DDebug.h"
+#include "MovingObject.h"
 
 using namespace DirectX;
 using Microsoft::WRL::ComPtr;
@@ -35,7 +39,10 @@ bool D3DFramework::Initialize()
 	ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), nullptr));
 
 	mCamera->SetPosition(0.0f, 2.0f, -15.0f);
+
 	mAssetManager->Initialize(md3dDevice.Get(), mCommandList.Get());
+
+	mDebug = std::make_unique<D3DDebug>();
 
 	objCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
 	passCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(PassConstants));
@@ -59,7 +66,18 @@ bool D3DFramework::Initialize()
 	for (const auto& obj : mAllObjects)
 	{
 		obj->BeginPlay();
+		obj->WorldUpdate();
 	}
+
+	std::cout << "OctTree Build..." << std::endl;
+	BoundingBox octreeAABB = BoundingBox(XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(100.0f, 100.0f, 100.0f));
+	std::list<std::shared_ptr<GameObject>> gameObjects;
+	for (const auto& list : mGameObjects)
+		for (const auto& obj : list)
+			gameObjects.emplace_front(obj);
+	mOctreeRoot = std::make_unique<Octree>(octreeAABB, gameObjects);
+	mOctreeRoot->BuildTree();
+	std::cout << "OctTree End!" << std::endl << std::endl;
 
 	return true;
 }
@@ -110,17 +128,29 @@ void D3DFramework::Tick(float deltaTime)
 		CloseHandle(eventHandle);
 	}
 
-	for (const auto& obj : mAllObjects)
+	mOctreeRoot->Update(deltaTime);
+
+	for(auto iter = mAllObjects.begin(); iter != mAllObjects.end(); ++iter)
 	{
-		if (obj)
+		if ((*iter)->GetIsDestroyesd())
 		{
-			obj->Tick(deltaTime);
+			mAllObjects.erase(iter--);
 		}
 		else
 		{
-			mAllObjects.remove(obj);
+			(*iter)->Tick(deltaTime);
 		}
 	}
+
+	for(auto& list : mGameObjects)
+		for (auto iter = list.begin(); iter != list.end(); ++iter)
+		{
+			if ((*iter)->GetIsDestroyesd())
+			{
+				list.erase(iter--);
+				continue;
+			}
+		}
 
 	UpdateMaterialBuffer(deltaTime);
 	UpdateMainPassCB(deltaTime);
@@ -160,12 +190,12 @@ void D3DFramework::Render()
 	mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
 
 	// 이 장면에 사용되는 Pass 상수 버퍼를 묶는다.
-	auto passCB = mCurrentFrameResource->mPassCB->GetResource();
+	auto passCB = mCurrentFrameResource->mPassPool->GetBuffer()->GetResource();
 	mCommandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
 
 	// 이 장면에서 사용되는 모든 머터리얼을 묶는다. 구조적 버퍼는
 	// 힙을 생략하고 그냥 하나의 루트 서술자로 묶을 수 있다.
-	auto matBuffer = mCurrentFrameResource->mMaterialBuffer->GetResource();
+	auto matBuffer = mCurrentFrameResource->mMaterialBufferPool->GetBuffer()->GetResource();
 	mCommandList->SetGraphicsRootShaderResourceView(2, matBuffer->GetGPUVirtualAddress());
 
 	// 이 장면에 사용되는 모든 텍스처를 묶는다. 테이블의 첫 서술자만 묶으면
@@ -197,14 +227,47 @@ void D3DFramework::Render()
 		RenderGameObjects(mCommandList.Get(), mGameObjects[(int)RenderLayer::Transparent], objectCBIndex);
 	}
 
-	if (GetOptionEnabled(Option::Debug))
+#if defined(DEBUG) || defined(_DEBUG)
+	if (GetOptionEnabled(Option::Debug_Collision) ||
+		GetOptionEnabled(Option::Debug_OctTree) ||
+		GetOptionEnabled(Option::Debug_Light))
 	{
-		UINT objectCBIndex = 0;
-
+		mDebug->Reset();
 		mCommandList->SetPipelineState(mPSOs["Debug"].Get());
-		for (const auto& list : mGameObjects)
-			RenderDebug(mCommandList.Get(), list, objectCBIndex);
+
+		if (GetOptionEnabled(Option::Debug_Collision))
+		{
+			DebugCollision(mCommandList.Get());
+		}
+		if (GetOptionEnabled(Option::Debug_OctTree))
+		{
+			DebugOctTree(mCommandList.Get());
+		}
+		if (GetOptionEnabled(Option::Debug_Light))
+		{
+			DebugLight(mCommandList.Get());
+		}
+
+		// 디버그를 업데이트하기 위한 버퍼가 초과됐다며 Resize한다.
+		auto debugPool = mCurrentFrameResource->mDebugPool.get();
+		UINT debugWorldCount = mDebug->GetAllDebugDataCount();
+		UINT debugBufferCount = debugPool->GetBufferCount();
+		if (debugWorldCount > debugBufferCount)
+			debugPool->Resize(debugWorldCount * 2);
+
+		// 디버그하기 위한 데이터를 업데이트한다.
+		for (int i = 0; i < (int)DebugType::Count; ++i)
+			mDebug->Update(mCommandList.Get(), debugPool, i);
+		auto debugCBAddressStart = debugPool->GetBuffer()->GetResource()->GetGPUVirtualAddress();
+		mCommandList->SetGraphicsRootShaderResourceView(4, debugCBAddressStart);
+
+		auto instancePool = mCurrentFrameResource->mInstancePool.get();
+		mDebug->RenderDebug(mCommandList.Get(), instancePool);
 	}
+
+	mCommandList->SetPipelineState(mPSOs["Line"].Get());
+	mDebug->RenderLine(mCommandList.Get(), mGameTimer->GetDeltaTime());
+#endif
 
 	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
@@ -229,7 +292,7 @@ void D3DFramework::Render()
 
 void D3DFramework::UpdateMaterialBuffer(float deltaTime)
 {
-	auto currMaterialBuffer = mCurrentFrameResource->mMaterialBuffer.get();
+	auto currMaterialBuffer = mCurrentFrameResource->mMaterialBufferPool->GetBuffer();
 	for (const auto& e : mAssetManager->GetMaterials())
 	{
 		Material* mat = e.second.get();
@@ -293,8 +356,8 @@ void D3DFramework::UpdateMainPassCB(float deltaTime)
 		++k;
 	}
 
-	auto currPassCB = mCurrentFrameResource->mPassCB.get();
-	currPassCB->CopyData(0, mMainPassCB);
+	auto passCB = mCurrentFrameResource->mPassPool->GetBuffer();
+	passCB->CopyData(0, mMainPassCB);
 }
 
 void D3DFramework::BuildRootSignature()
@@ -302,7 +365,7 @@ void D3DFramework::BuildRootSignature()
 	// 일반적으로 셰이더 프로그램은 특정 자원들(상수 버퍼, 텍스처, 표본추출기 등)이
 	// 입력된다고 기대한다. 루트 서명은 셰이더 프로그램이 기대하는 자원들을 정의한다.
 
-	CD3DX12_ROOT_PARAMETER slotRootParameter[4];
+	std::array<CD3DX12_ROOT_PARAMETER, 6> slotRootParameter;
 
 	CD3DX12_DESCRIPTOR_RANGE texTable;
 	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, (UINT)mAssetManager->GetTextures().size(), 0, 0);
@@ -312,10 +375,12 @@ void D3DFramework::BuildRootSignature()
 	slotRootParameter[1].InitAsConstantBufferView(1); // Pass 상수 버퍼
 	slotRootParameter[2].InitAsShaderResourceView(0, 1); // Materials
 	slotRootParameter[3].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL); // Textures
+	slotRootParameter[4].InitAsShaderResourceView(1, 1); // Debug
+	slotRootParameter[5].InitAsConstantBufferView(2); // Instance
 
 	auto staticSamplers = GetStaticSamplers();
 
-	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(4, slotRootParameter,
+	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc((UINT)slotRootParameter.size(), slotRootParameter.data(),
 		(UINT)staticSamplers.size(), staticSamplers.data(),
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
@@ -390,6 +455,9 @@ void D3DFramework::BuildShadersAndInputLayout()
 
 	mShaders["DebugVS"] = D3DUtil::CompileShader(L"Shaders\\Debug.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["DebugPS"] = D3DUtil::CompileShader(L"Shaders\\Debug.hlsl", nullptr, "PS", "ps_5_1");
+
+	mShaders["LineVS"] = D3DUtil::CompileShader(L"Shaders\\Line.hlsl", nullptr, "VS", "vs_5_1");
+	mShaders["LinePS"] = D3DUtil::CompileShader(L"Shaders\\Line.hlsl", nullptr, "PS", "ps_5_1");
 
 	mShaders["AlphaTestedPS"] = D3DUtil::CompileShader(L"Shaders\\Default.hlsl", alphaTestDefines, "PS", "ps_5_1");
 
@@ -485,7 +553,22 @@ void D3DFramework::BuildPSOs()
 		reinterpret_cast<BYTE*>(mShaders["DebugPS"]->GetBufferPointer()),
 		mShaders["DebugPS"]->GetBufferSize()
 	};
+	debugPsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&debugPsoDesc, IID_PPV_ARGS(&mPSOs["Debug"])));
+
+	// PSO for Line
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC linePsoDesc = debugPsoDesc;
+	linePsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["LineVS"]->GetBufferPointer()),
+		mShaders["LineVS"]->GetBufferSize()
+	};
+	linePsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["LinePS"]->GetBufferPointer()),
+		mShaders["LinePS"]->GetBufferSize()
+	};
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&linePsoDesc, IID_PPV_ARGS(&mPSOs["Line"])));
 
 
 	// PSO for Transparent
@@ -560,78 +643,76 @@ void D3DFramework::BuildFrameResources()
 
 void D3DFramework::BuildObjects()
 {
-	std::unique_ptr<GameObject> object;
+	std::shared_ptr<GameObject> object;
 
-	object = std::make_unique<GameObject>("Box0");
-	object->SetPosition(0.0f, 1.0f, 0.0f);
-	object->SetScale(100.0f, 100.0f, 100.0f);
-	object->Rotate(45.0f, 45.0f, 45.0f);
-	object->SetMaterial(mAssetManager->FindMaterial("Wirefence"));
-	object->SetMesh(mAssetManager->FindMesh("Box_OBB"));
-	object->SetRenderLayer(RenderLayer::AlphaTested);
-	mAllObjects.push_front(object.get());
-	mGameObjects[(int)object->GetRenderLayer()].push_front(std::move(object));
-
-	object = std::make_unique<GameObject>("Floor0");
+	object = std::make_shared<GameObject>("Floor0");
 	object->SetScale(20.0f, 0.1f, 30.0f);
 	object->SetMaterial(mAssetManager->FindMaterial("Tile0"));
 	object->SetMesh(mAssetManager->FindMesh("Box_AABB"));
 	object->SetRenderLayer(RenderLayer::Opaque);
-	mAllObjects.push_front(object.get());
-	mGameObjects[(int)object->GetRenderLayer()].push_front(std::move(object));
+	mAllObjects.emplace_back(object);
+	mGameObjects[(int)object->GetRenderLayer()].emplace_back(object);
+
+	object = std::make_shared<MovingObject>("MovingObject0");
+	object->SetPosition(5.0f, 50.0f, 5.0f);
+	object->SetMaterial(mAssetManager->FindMaterial("Default"));
+	object->SetMesh(mAssetManager->FindMesh("Box_AABB"));
+	object->SetPhysics(true);
+	object->SetMass(10.0f);
+	mAllObjects.emplace_back(object);
+	mGameObjects[(int)object->GetRenderLayer()].emplace_back(object);
 
 	for (int i = 0; i < 5; ++i)
 	{
-		object = std::make_unique<GameObject>("ColumnLeft" + std::to_string(i));
+		object = std::make_shared<GameObject>("ColumnLeft" + std::to_string(i));
 		object->SetPosition(-5.0f, 1.5f, -10.0f + i * 5.0f);
 		object->SetMaterial(mAssetManager->FindMaterial("Brick0"));
 		object->SetMesh(mAssetManager->FindMesh("Cylinder"));
 		object->SetRenderLayer(RenderLayer::Opaque);
-		mAllObjects.push_front(object.get());
-		mGameObjects[(int)object->GetRenderLayer()].push_front(std::move(object));
+		mAllObjects.emplace_back(object);
+		mGameObjects[(int)object->GetRenderLayer()].emplace_back(object);
 
-		object = std::make_unique<GameObject>("ColumnRight" + std::to_string(i));
+		object = std::make_shared<GameObject>("ColumnRight" + std::to_string(i));
 		object->SetPosition(5.0f, 1.5f, -10.0f + i * 5.0f);
 		object->SetMaterial(mAssetManager->FindMaterial("Brick0"));
 		object->SetMesh(mAssetManager->FindMesh("Cylinder"));
 		object->SetRenderLayer(RenderLayer::Opaque);
-		mAllObjects.push_front(object.get());
-		mGameObjects[(int)object->GetRenderLayer()].push_front(std::move(object));
+		mAllObjects.emplace_back(object);
+		mGameObjects[(int)object->GetRenderLayer()].emplace_back(object);
 
-		object = std::make_unique<GameObject>("SphereLeft" + std::to_string(i));
+		object = std::make_shared<GameObject>("SphereLeft" + std::to_string(i));
 		object->SetPosition(-5.0f, 3.5f, -10.0f + i * 5.0f);
 		object->SetMaterial(mAssetManager->FindMaterial("Mirror0"));
 		object->SetMesh(mAssetManager->FindMesh("Sphere"));
 		object->SetRenderLayer(RenderLayer::Transparent);
-		mAllObjects.push_front(object.get());
-		mGameObjects[(int)object->GetRenderLayer()].push_front(std::move(object));
+		mAllObjects.emplace_back(object);
+		mGameObjects[(int)object->GetRenderLayer()].emplace_back(object);
 
-		object = std::make_unique<GameObject>("SphereRight" + std::to_string(i));
+		object = std::make_shared<GameObject>("SphereRight" + std::to_string(i));
 		object->SetPosition(5.0f, 3.5f, -10.0f + i * 5.0f);
 		object->SetMaterial(mAssetManager->FindMaterial("Mirror0"));
 		object->SetMesh(mAssetManager->FindMesh("Sphere"));
 		object->SetRenderLayer(RenderLayer::Transparent);
-		mAllObjects.push_front(object.get());
-		mGameObjects[(int)object->GetRenderLayer()].push_front(std::move(object));
-
+		mAllObjects.emplace_back(object);
+		mGameObjects[(int)object->GetRenderLayer()].emplace_back(object);
 	}
 }
 
 void D3DFramework::BuildLights()
 {
-	std::unique_ptr<Light> light;
+	std::shared_ptr<Light> light;
 
-	light = std::make_unique<DirectionalLight>("DirectionalLight");
+	light = std::make_shared<DirectionalLight>("DirectionalLight");
 	light->SetStrength(0.8f, 0.8f, 0.8f);
 	light->Rotate(45.0f, -45.0f, 0.0f);
-	mAllObjects.push_front(light.get());
-	mLights.push_front(std::move(light));
+	mAllObjects.emplace_back(light);
+	mLights.emplace_back(light);
 }
 
 void D3DFramework::RenderGameObjects(ID3D12GraphicsCommandList* cmdList, 
-	const std::forward_list<std::unique_ptr<class GameObject>>& gameObjects, UINT& startObjectIndex) const
+	const std::list<std::shared_ptr<GameObject>>& gameObjects, UINT& startObjectIndex) const
 {
-	auto currObjectCB = mCurrentFrameResource->mObjectCB.get();
+	auto currObjectCB = mCurrentFrameResource->mObjectPool->GetBuffer();
 	UINT& objectCBIndex = startObjectIndex;
 
 	for (const auto& obj : gameObjects)
@@ -639,34 +720,9 @@ void D3DFramework::RenderGameObjects(ID3D12GraphicsCommandList* cmdList,
 		if (obj->GetMesh() == nullptr || !obj->GetIsVisible())
 			continue;
 
+		bool isInFrustum = obj->IsInFrustum(mWorldCamFrustum);
 		// 카메라 프러스텀 내에 있다면 그린다.
-		bool isInCamFrustum = false;
-		switch (obj->GetMesh()->GetCollisionType())
-		{
-		case CollisionType::AABB:
-		{
-			const BoundingBox& aabb = std::any_cast<BoundingBox>(obj->GetCollisionBounding());
-			if(mWorldCamFrustum.Contains(aabb) != DirectX::DISJOINT)
-				isInCamFrustum = true;
-			break;
-		}
-		case CollisionType::OBB:
-		{
-			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(obj->GetCollisionBounding());
-			if (mWorldCamFrustum.Contains(obb) != DirectX::DISJOINT)
-				isInCamFrustum = true;
-			break;
-		}
-		case CollisionType::Sphere:
-		{
-			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(obj->GetCollisionBounding());
-			if (mWorldCamFrustum.Contains(sphere) != DirectX::DISJOINT)
-				isInCamFrustum = true;
-			break;
-		}
-		}
-
-		if (!isInCamFrustum)
+		if (!isInFrustum)
 			continue;
 
 		// 오브젝트의 상수 버퍼를 업데이트한다.
@@ -674,16 +730,9 @@ void D3DFramework::RenderGameObjects(ID3D12GraphicsCommandList* cmdList,
 		XMStoreFloat4x4(&objConstants.mWorld, XMMatrixTranspose(obj->GetWorld()));
 		objConstants.mMaterialIndex = obj->GetMaterial()->GetMaterialIndex();
 
-		if (GetOptionEnabled(Option::Debug))
-		{
-			auto boundingWorld = obj->GetBoundingWorld();
-			if(boundingWorld.has_value())
-				XMStoreFloat4x4(&objConstants.mBoundingWorld, XMMatrixTranspose(boundingWorld.value()));
-		}
-
 		currObjectCB->CopyData(objectCBIndex, objConstants);
-
-		D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = currObjectCB->GetResource()->GetGPUVirtualAddress() + objectCBIndex * objCBByteSize;
+		auto objCBAddressStart = currObjectCB->GetResource()->GetGPUVirtualAddress();
+		D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = objCBAddressStart + objectCBIndex * objCBByteSize;
 		cmdList->SetGraphicsRootConstantBufferView(0, objCBAddress);
 
 		obj->GetMesh()->Render(cmdList);
@@ -692,67 +741,57 @@ void D3DFramework::RenderGameObjects(ID3D12GraphicsCommandList* cmdList,
 	}
 }
 
-void D3DFramework::RenderDebug(ID3D12GraphicsCommandList* cmdList, 
-	const std::forward_list<std::unique_ptr<class GameObject>>& gameObjects, UINT& startObjectIndex) const
+void D3DFramework::DebugCollision(ID3D12GraphicsCommandList* cmdList)
 {
-	auto currObjectCB = mCurrentFrameResource->mObjectCB.get();
-	UINT& objectCBIndex = startObjectIndex;
-	for (const auto& obj : gameObjects)
+	auto debugPool = mCurrentFrameResource->mDebugPool.get();
+
+	// GameObject를 디버깅하기 위한 데이터를 저장한다.
+	for (const auto& list : mGameObjects)
 	{
-		if (obj->GetMesh() == nullptr)
-			continue;
-
-		auto boundingWorld = obj->GetBoundingWorld();
-		if (!boundingWorld.has_value())
-			continue;
-
-		// 카메라 프러스텀 내에 있다면 그린다.
-		bool isInCamFrustum = false;
-		switch (obj->GetMesh()->GetCollisionType())
+		for (const auto& obj : list)
 		{
-		case CollisionType::AABB:
-		{
-			const BoundingBox& aabb = std::any_cast<BoundingBox>(obj->GetCollisionBounding());
-			if (mWorldCamFrustum.Contains(aabb) != DirectX::DISJOINT)
-				isInCamFrustum = true;
-			break;
-		}
-		case CollisionType::OBB:
-		{
-			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(obj->GetCollisionBounding());
-			if (mWorldCamFrustum.Contains(obb) != DirectX::DISJOINT)
-				isInCamFrustum = true;
-			break;
-		}
-		case CollisionType::Sphere:
-		{
-			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(obj->GetCollisionBounding());
-			if (mWorldCamFrustum.Contains(sphere) != DirectX::DISJOINT)
-				isInCamFrustum = true;
-			break;
-		}
-		}
+			auto boundingWorld = obj->GetBoundingWorld();
+			if (!boundingWorld.has_value())
+				continue;
 
-		if (!isInCamFrustum)
-			continue;
-
-		D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = currObjectCB->GetResource()->GetGPUVirtualAddress() + objectCBIndex * objCBByteSize;
-		cmdList->SetGraphicsRootConstantBufferView(0, objCBAddress);
-
-		switch (obj->GetMesh()->GetCollisionType())
-		{
-		case CollisionType::AABB:
-			mAssetManager->FindMesh("Debug_Box")->Render(cmdList);
-			break;
-		case CollisionType::OBB:
-			mAssetManager->FindMesh("Debug_Box")->Render(cmdList);
-			break;
-		case CollisionType::Sphere:
-			mAssetManager->FindMesh("Debug_Sphere")->Render(cmdList);
-			break;
+			bool isInFrustum = obj->IsInFrustum(mWorldCamFrustum);
+			if (isInFrustum)
+			{
+				XMFLOAT4X4 boundingWorld4x4f;
+				XMStoreFloat4x4(&boundingWorld4x4f, XMMatrixTranspose(boundingWorld.value()));
+				mDebug->AddDebugData(DebugData(boundingWorld4x4f), obj->GetCollisionType());
+			}
 		}
+	}
+}
 
-		++objectCBIndex;
+void D3DFramework::DebugOctTree(ID3D12GraphicsCommandList* cmdList)
+{
+	auto debugPool = mCurrentFrameResource->mDebugPool.get();
+
+	// OctTree를 디버깅하기 위한 데이터를 저장한다.
+	std::vector<DirectX::XMFLOAT4X4> worlds;
+	mOctreeRoot->GetBoundingWorlds(worlds);
+	for (const auto& world : worlds)
+		mDebug->AddDebugData(std::move(world), DebugType::OctTree);
+}
+
+void D3DFramework::DebugLight(ID3D12GraphicsCommandList* cmdList)
+{
+	auto debugPool = mCurrentFrameResource->mDebugPool.get();
+
+	// Light를 디버깅하기 위한 데이터를 저장한다.
+	for (const auto& light : mLights)
+	{
+		XMFLOAT3 pos = light->GetPosition();
+		XMFLOAT3 rot = light->GetRotation();
+		XMMATRIX translation = XMMatrixTranslation(pos.x, pos.y, pos.z);
+		XMMATRIX rotation = XMMatrixRotationRollPitchYaw(rot.x, rot.y, rot.z);
+		XMMATRIX worldMat = XMMatrixMultiply(rotation, translation);
+		XMFLOAT4X4 world;
+		XMStoreFloat4x4(&world, XMMatrixTranspose(worldMat));
+
+		mDebug->AddDebugData(std::move(world), DebugType::Light);
 	}
 }
 
@@ -818,4 +857,87 @@ std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6> D3DFramework::GetStaticSamplers
 		linearWrap, linearClamp,
 		anisotropicWrap, anisotropicClamp
 	};
+}
+
+GameObject* D3DFramework::Picking(int screenX, int screenY, float distance) const
+{
+	XMFLOAT4X4 proj = mCamera->GetProj4x4f();
+
+	// Picking Ray를 뷰 공간으로 계산한다.
+	// Compute picking ray in view space.
+	float vx = (2.0f * screenX / mScreenWidth - 1.0f) / proj(0, 0);
+	float vy = (-2.0f * screenY / mScreenHeight + 1.0f) / proj(1, 1);
+
+	XMVECTOR rayOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+	XMVECTOR rayDir = XMVectorSet(vx, vy, 1.0f, 0.0f);
+
+	XMMATRIX view = mCamera->GetView();
+	XMMATRIX invView = XMMatrixInverse(&XMMatrixDeterminant(view), view);
+
+	// Picking Ray를 월드 공간으로 변환한다.
+	rayOrigin = XMVector3TransformCoord(rayOrigin, invView);
+	rayDir = XMVector3TransformNormal(rayDir, invView);
+	rayDir = XMVector3Normalize(rayDir);
+
+#if defined(DEBUG) || defined(_DEBUG)
+	XMVECTOR rayEnd = rayOrigin + rayDir * distance;
+	XMFLOAT3 xmf3RayOrigin, xmf3RayEnd;
+	XMStoreFloat3(&xmf3RayOrigin, rayOrigin);
+	XMStoreFloat3(&xmf3RayEnd, rayEnd);
+	mDebug->DrawLine(xmf3RayOrigin, xmf3RayEnd);
+#endif
+	
+	bool nearestHit = false;
+	float nearestDist = FLT_MAX;
+	GameObject* hitObj = nullptr;
+
+	// Picking Ray로 충돌을 검사한다.
+	for(const auto& list : mGameObjects)
+		for (const auto& obj : list)
+		{
+			bool isHit = false;
+			float hitDist = FLT_MAX;
+
+			switch (obj->GetCollisionType())
+			{
+			case CollisionType::AABB: 
+			{
+				const BoundingBox& aabb = std::any_cast<BoundingBox>(obj->GetCollisionBounding());
+				isHit = aabb.Intersects(rayOrigin, rayDir, hitDist);
+				break;
+			}
+			case CollisionType::OBB: 
+			{
+				const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(obj->GetCollisionBounding());
+				isHit = obb.Intersects(rayOrigin, rayDir, hitDist);
+				break;
+			}
+			case CollisionType::Sphere: 
+			{
+				const BoundingSphere& sphere = std::any_cast<BoundingSphere>(obj->GetCollisionBounding());
+				isHit = sphere.Intersects(rayOrigin, rayDir, hitDist);
+				break;
+			}
+			}
+
+			if (isHit)
+			{
+				// 충돌된 Game Object들 중 가장 가까운 객체가 선택된 객체이다.
+				if (nearestDist > hitDist)
+				{
+					nearestDist = hitDist;
+					hitObj = obj.get();
+					nearestHit = true;
+				}
+			}
+		}
+
+#if defined(DEBUG) || defined(_DEBUG)
+	if (nearestHit)
+	{
+		std::cout << "Picking : " << hitObj->ToString() << std::endl;
+	}
+#endif
+
+	return hitObj;
 }

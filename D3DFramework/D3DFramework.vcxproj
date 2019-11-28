@@ -23,13 +23,13 @@
     <ClCompile Include="Framework\Base.cpp" />
     <ClCompile Include="Framework\Camera.cpp" />
     <ClCompile Include="Framework\D3DApp.cpp" />
+    <ClCompile Include="Framework\D3DDebug.cpp" />
     <ClCompile Include="Framework\D3DFramework.cpp" />
     <ClCompile Include="Framework\D3DUtil.cpp" />
     <ClCompile Include="Framework\DDSTextureLoader.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Framework\DirectionalLight.cpp" />
-    <ClCompile Include="Framework\FrameResource.cpp" />
     <ClCompile Include="Framework\GameObject.cpp" />
     <ClCompile Include="Framework\GameTimer.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
@@ -42,7 +42,9 @@
     <ClCompile Include="Framework\Main.cpp" />
     <ClCompile Include="Framework\Material.cpp" />
     <ClCompile Include="Framework\MeshGeometry.cpp" />
+    <ClCompile Include="Framework\MovingObject.cpp" />
     <ClCompile Include="Framework\Object.cpp" />
+    <ClCompile Include="Framework\Octree.cpp" />
     <ClCompile Include="Framework\pch.cpp" />
     <ClCompile Include="Framework\PointLight.cpp" />
     <ClCompile Include="Framework\SpotLight.cpp" />
@@ -53,8 +55,10 @@
   <ItemGroup>
     <ClInclude Include="Framework\AssetManager.h" />
     <ClInclude Include="Framework\Base.h" />
+    <ClInclude Include="Framework\BufferMemoryPool.hpp" />
     <ClInclude Include="Framework\Camera.h" />
     <ClInclude Include="Framework\D3DApp.h" />
+    <ClInclude Include="Framework\D3DDebug.h" />
     <ClInclude Include="Framework\D3DFramework.h" />
     <ClInclude Include="Framework\D3DUtil.h" />
     <ClInclude Include="Framework\DDSTextureLoader.h" />
@@ -68,11 +72,14 @@
     <ClInclude Include="Framework\Light.h" />
     <ClInclude Include="Framework\Material.h" />
     <ClInclude Include="Framework\MeshGeometry.h" />
+    <ClInclude Include="Framework\MovingObject.h" />
     <ClInclude Include="Framework\Object.h" />
+    <ClInclude Include="Framework\Octree.h" />
     <ClInclude Include="Framework\pch.h" />
     <ClInclude Include="Framework\Structures.h" />
     <ClInclude Include="Framework\PointLight.h" />
     <ClInclude Include="Framework\SpotLight.h" />
+    <ClInclude Include="Framework\Timer.hpp" />
     <ClInclude Include="Framework\UploadBuffer.h" />
     <ClInclude Include="Framework\WinApp.h" />
   </ItemGroup>
@@ -93,6 +100,17 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Shaders\Line.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="Shaders\Debug.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>

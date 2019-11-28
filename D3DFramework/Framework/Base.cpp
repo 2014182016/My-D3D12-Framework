@@ -1,17 +1,13 @@
 #include "pch.h"
 #include "Base.h"
 
-Base::Base(std::string name) : mName(name) { }
+Base::Base(std::string name) : mName(name) { mUID = currUID++; }
 
 Base::~Base() { }
 
 bool Base::operator==(const Base& rhs)
 {
-	int result = mName.compare(rhs.mName);
-
-	if (result == 0)
-		return true;
-	return false;
+	return mUID == rhs.GetUID();
 }
 
 bool Base::operator==(const std::string& str)
@@ -23,7 +19,9 @@ bool Base::operator==(const std::string& str)
 
 std::string Base::ToString() const
 {
-	return mName;
+	std::string blank = " ";
+
+	return std::to_string(mUID) + blank + mName;
 }
 
 bool Base::IsUpdate() const

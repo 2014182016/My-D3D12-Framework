@@ -27,14 +27,16 @@
 #include <DirectXColors.h>
 #include <DirectXCollision.h>
 #include <string>
-#include <string_view>
 #include <memory>
 #include <algorithm>
+#include <functional>
+#include <thread>
 #include <array>
 #include <vector>
+#include <list>
 #include <forward_list>
 #include <unordered_map>
-#include <map>
+#include <queue>
 #include <bitset>
 #include <fstream>
 #include <iostream>
@@ -42,6 +44,7 @@
 #include <cassert>
 #include <any>
 #include <optional>
+#include <float.h>
 #include "d3dx12.h"
 #include "DDSTextureLoader.h"
 #include "GeometryGenerator.h"

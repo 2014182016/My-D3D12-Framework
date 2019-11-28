@@ -27,11 +27,12 @@ public:
 	virtual void CreateRtvAndDsvDescriptorHeaps();
 
 public:
+	class GameObject* Picking(int screenX, int screenY, float distance = 1000.0f) const;
+
+public:
 	inline static D3DFramework* GetApp() { return static_cast<D3DFramework*>(mApp); }
-
 	inline class Camera* GetCamera() const { return mCamera.get(); }
-
-	inline std::forward_list<std::unique_ptr<class GameObject>>& GetGameObjects(int layerIndex) { return mGameObjects.at(layerIndex); }
+	inline std::list<std::shared_ptr<class GameObject>>& GetGameObjects(int layerIndex) { return mGameObjects.at(layerIndex); }
 
 private:
 	void UpdateMaterialBuffer(float deltaTime);
@@ -46,14 +47,16 @@ private:
 	void BuildLights();
 
 	void RenderGameObjects(ID3D12GraphicsCommandList* cmdList, 
-		const std::forward_list<std::unique_ptr<class GameObject>>& gameObjects, UINT& startObjectIndex) const;
-	void RenderDebug(ID3D12GraphicsCommandList* cmdList, 
-		const std::forward_list<std::unique_ptr<class GameObject>>& gameObjects, UINT& startObjectIndex) const;
+		const std::list<std::shared_ptr<class GameObject>>& gameObjects, UINT& startObjectIndex) const;
+
+	void DebugCollision(ID3D12GraphicsCommandList* cmdList);
+	void DebugOctTree(ID3D12GraphicsCommandList* cmdList);
+	void DebugLight(ID3D12GraphicsCommandList* cmdList);
 
 	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6> GetStaticSamplers();
 
 private:
-	std::array<std::unique_ptr<class FrameResource>, NUM_FRAME_RESOURCES> mFrameResources;
+	std::array<std::unique_ptr<struct FrameResource>, NUM_FRAME_RESOURCES> mFrameResources;
 	FrameResource* mCurrentFrameResource = nullptr;
 	int mCurrentFrameResourceIndex = 0;
 
@@ -67,10 +70,10 @@ private:
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mDebugLayout;
 
 	// 모든 오브젝트를 담고 있는 포워트 리스트
-	std::forward_list<class Object*> mAllObjects;
+	std::list<std::shared_ptr<class Object>> mAllObjects;
 
-	std::array<std::forward_list<std::unique_ptr<class GameObject>>, (int)RenderLayer::Count> mGameObjects;
-	std::forward_list<std::unique_ptr<class Light>> mLights;
+	std::array<std::list<std::shared_ptr<class GameObject>>, (int)RenderLayer::Count> mGameObjects;
+	std::list<std::shared_ptr<class Light>> mLights;
 
 	PassConstants mMainPassCB;
 	UINT objCBByteSize = 0;
@@ -80,4 +83,6 @@ private:
 
 	std::unique_ptr<class Camera> mCamera;
 	std::unique_ptr<class AssetManager> mAssetManager;
+	std::unique_ptr<class Octree> mOctreeRoot;
+	std::unique_ptr<class D3DDebug> mDebug;
 };

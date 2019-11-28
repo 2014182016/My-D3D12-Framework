@@ -13,13 +13,14 @@ public:
 public:
 	virtual void BeginPlay() { }
 	virtual void Tick(float deltaTime);
-	virtual void Destroy() { };
+	virtual void Destroy();
 
 	// 물체가 움직일 때, 업데이트 해야할 것을 오버라이딩하여 작성한다.
 	virtual void WorldUpdate();
 
 public:
 	void Move(float x, float y, float z);
+	void Move(DirectX::XMFLOAT3 distance);
 	void MoveStrafe(float distance);
 	void MoveUp(float distance);
 	void MoveForward(float distance);
@@ -46,6 +47,14 @@ public:
 	void SetScale(float scaleX, float scaleY, float scaleZ);
 	inline void SetScale(DirectX::XMFLOAT3 scale) { mScale = scale; }
 
+	inline bool GetIsDestroyesd() const { return mIsDestroyed; }
+	inline bool GetIsMovable() const { return mIsMovable; }
+	inline void SetMovable(bool value) { mIsMovable = value; }
+
+	// 오브젝트가 실질적으로 움직였는지 여부를 알아낸다.
+	// 단, Tick함수가 불리기 이전에 불러야 유효하다.
+	inline bool GetIsWorldUpdate() const { return mIsWorldUpdate; }
+
 protected:
 	// 세계 공간을 기준으로 물체의 지역 공간을 서술하는 세계 행렬
 	// 이 행렬은 세계 공간 안에서의 물체의 위치, 방향, 크기를 결정한다.
@@ -57,4 +66,6 @@ protected:
 	DirectX::XMFLOAT3 mScale = { 1.0f, 1.0f, 1.0f };
 
 	bool mIsWorldUpdate = true;
+	bool mIsMovable = false;
+	bool mIsDestroyed = false;
 };

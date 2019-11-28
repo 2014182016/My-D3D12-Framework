@@ -9,7 +9,13 @@
 using namespace DirectX;
 using TexName = std::pair<std::string, std::wstring>;
 
-AssetManager::AssetManager() { }
+AssetManager* AssetManager::mInstance = nullptr;
+
+AssetManager::AssetManager()
+{
+	assert(!mInstance);
+	mInstance = this;
+}
 
 AssetManager::~AssetManager() { }
 
@@ -158,28 +164,6 @@ void AssetManager::BuildGeometry(ID3D12Device* device, ID3D12GraphicsCommandList
 		(UINT)vertices.size(), (UINT)meshData.GetIndices16().size(), (UINT)sizeof(Vertex), (UINT)sizeof(std::uint16_t));
 	mMeshes[mesh->GetName()] = std::move(mesh);
 	vertices.clear();
-	indices.clear();
-
-	std::vector<DebugVertex> debugVertices;
-
-	meshData = GeometryGenerator::CreateBox(1.0f, 1.0f, 1.0f, 2);
-	mesh = std::make_unique<MeshGeometry>("Debug_Box");
-	for (const auto& ver : meshData.Vertices)
-		debugVertices.emplace_back(ver.Position, (XMFLOAT4)Colors::Red);
-	mesh->BuildMesh(device, commandList, debugVertices.data(), meshData.GetIndices16().data(),
-		(UINT)debugVertices.size(), (UINT)meshData.GetIndices16().size(), (UINT)sizeof(DebugVertex), (UINT)sizeof(std::uint16_t));
-	mMeshes[mesh->GetName()] = std::move(mesh);
-	debugVertices.clear();
-	indices.clear();
-
-	meshData = GeometryGenerator::CreateSphere(1.0f, 10, 10);
-	mesh = std::make_unique<MeshGeometry>("Debug_Sphere");
-	for (const auto& ver : meshData.Vertices)
-		debugVertices.emplace_back(ver.Position, (XMFLOAT4)Colors::Red);
-	mesh->BuildMesh(device, commandList, debugVertices.data(), meshData.GetIndices16().data(),
-		(UINT)debugVertices.size(), (UINT)meshData.GetIndices16().size(), (UINT)sizeof(DebugVertex), (UINT)sizeof(std::uint16_t));
-	mMeshes[mesh->GetName()] = std::move(mesh);
-	debugVertices.clear();
 	indices.clear();
 }
 

@@ -45,9 +45,6 @@
     <ClCompile Include="Framework\Camera.cpp">
       <Filter>소스 파일\Framework</Filter>
     </ClCompile>
-    <ClCompile Include="Framework\FrameResource.cpp">
-      <Filter>소스 파일\Framework</Filter>
-    </ClCompile>
     <ClCompile Include="Framework\DDSTextureLoader.cpp">
       <Filter>소스 파일\Framework</Filter>
     </ClCompile>
@@ -88,6 +85,15 @@
       <Filter>소스 파일\Framework</Filter>
     </ClCompile>
     <ClCompile Include="Framework\MeshGeometry.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Framework\D3DDebug.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Framework\Octree.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Framework\MovingObject.cpp">
       <Filter>소스 파일\Framework</Filter>
     </ClCompile>
   </ItemGroup>
@@ -164,6 +170,21 @@
     <ClInclude Include="Framework\SpotLight.h">
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
+    <ClInclude Include="Framework\Timer.hpp">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Framework\BufferMemoryPool.hpp">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Framework\D3DDebug.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Framework\Octree.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Framework\MovingObject.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\Common.hlsl">
@@ -182,6 +203,9 @@
       <Filter>Shaders</Filter>
     </FxCompile>
     <FxCompile Include="Shaders\Debug.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\Line.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>

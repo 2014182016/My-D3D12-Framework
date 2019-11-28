@@ -18,6 +18,10 @@ public:
 
 	virtual void Tick(float deltaTime);
 
+public:
+	inline bool GetIsKeyDown(unsigned int input) const { return mKeys[input]; }
+	inline POINT GetLastMoustPos() const { return mLastMousePos; }
+
 private:
 	bool mKeys[256];
 	POINT mLastMousePos;

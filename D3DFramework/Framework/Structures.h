@@ -6,14 +6,41 @@
 
 #define MAX_LIGHT 1
 
+struct Texture
+{
+	std::string mName;
+	std::wstring mFilename;
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> mResource = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> mUploadHeap = nullptr;
+};
+
 struct ObjectConstants
 {
 	DirectX::XMFLOAT4X4 mWorld = DirectX::Identity4x4f();
-	DirectX::XMFLOAT4X4 mBoundingWorld = DirectX::Identity4x4f();
 	UINT mMaterialIndex;
 	UINT mObjPad0;
 	UINT mObjPad1;
 	UINT mObjPad2;
+};
+
+struct InstanceConstants
+{
+	// 인스턴싱하기 위한 시작 인스턴스 인덱스
+	// 한 버퍼에 인스턴싱하기 위한 오브젝트 데이터를 모아놓고
+	// mInstanceIndex에서부터 각 오브젝트를 인스턴싱으로 그리기 위해 사용된다.
+	UINT mInstanceIndex = 0;
+	UINT mDebugInstanceIndex = 0;
+	UINT mInstPad1;
+	UINT mInstPad2;
+};
+
+struct DebugData
+{
+	DebugData() = default;
+	DebugData(DirectX::XMFLOAT4X4 boundingWorld) : mBoundingWorld(boundingWorld) { }
+
+	DirectX::XMFLOAT4X4 mBoundingWorld = DirectX::Identity4x4f();
 };
 
 struct LightConstants
@@ -38,6 +65,7 @@ struct PassConstants
 	DirectX::XMFLOAT4X4 mInvProj = DirectX::Identity4x4f();
 	DirectX::XMFLOAT4X4 mViewProj = DirectX::Identity4x4f();
 	DirectX::XMFLOAT4X4 mInvViewProj = DirectX::Identity4x4f();
+	DirectX::XMFLOAT4X4 mIdentity = DirectX::Identity4x4f();
 	DirectX::XMFLOAT3 mEyePosW = { 0.0f, 0.0f, 0.0f };
 	float mcbPerObjectPad1 = 0.0f;
 	DirectX::XMFLOAT2 mRenderTargetSize = { 0.0f, 0.0f };
@@ -82,7 +110,7 @@ struct MaterialData
 
 struct Vertex
 {
-	Vertex() { }
+	Vertex() = default;
 	Vertex(DirectX::XMFLOAT3 pos, DirectX::XMFLOAT3 normal, DirectX::XMFLOAT3 tangent, DirectX::XMFLOAT2 tex, 
 		const DirectX::XMVECTORF32 color = DirectX::Colors::White)
 		: mPos(pos), mNormal(normal), mTangentU(tangent), mTexC(tex), mColor(color) { }
@@ -96,7 +124,7 @@ struct Vertex
 
 struct BillboardVertex
 {
-	BillboardVertex() { }
+	BillboardVertex() = default;
 	BillboardVertex(DirectX::XMFLOAT3 pos, DirectX::XMFLOAT2 size) : mPos(pos), mSize(size) { }
 
 	DirectX::XMFLOAT3 mPos;
@@ -105,7 +133,7 @@ struct BillboardVertex
 
 struct DebugVertex
 {
-	DebugVertex() { }
+	DebugVertex() = default;
 	DebugVertex(DirectX::XMFLOAT3 pos, DirectX::XMFLOAT4 color) : mPosition(pos), mColor(color) { }
 	DirectX::XMFLOAT3 mPosition;
 	DirectX::XMFLOAT4 mColor;

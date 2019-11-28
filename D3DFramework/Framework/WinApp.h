@@ -60,7 +60,7 @@ protected:
 	int mScreenHeight = 600;
 
 	// option들의 bool값을 관리하는 컨테이너
-	std::bitset<6> mOptions;
+	std::bitset<(int)Option::Count> mOptions;
 
 	std::unique_ptr<class GameTimer> mGameTimer;
 	std::unique_ptr<class InputManager> mInputManager;

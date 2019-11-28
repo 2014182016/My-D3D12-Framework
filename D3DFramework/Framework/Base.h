@@ -23,9 +23,12 @@ public:
 
 public:
 	inline std::string GetName() const { return mName; }
+	inline long GetUID() const { return mUID; }
 
 private:
+	static inline long currUID = 0;
 	std::string mName;
+	long mUID;
 
 	// 재질이 변해서 해당 상수 버퍼를 갱신해야 하는지의 여부를 나타내는 더러움 플래그
 	// FrameResource마다 물체의 상수 버퍼가 있으므로, FrameResouce마다 갱신을 적용해야 한다.

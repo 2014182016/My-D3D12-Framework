@@ -16,13 +16,20 @@ InputManager::~InputManager() { }
 
 void InputManager::OnMouseDown(WPARAM btnState, int x, int y) 
 {
-	mLastMousePos.x = x;
-	mLastMousePos.y = y;
+	if ((btnState & MK_LBUTTON) != 0)
+	{
+		mLastMousePos.x = x;
+		mLastMousePos.y = y;
 
-	// 마우스를 보이지 않게 한다.
-	::SetCursor(NULL);
+		// 마우스를 보이지 않게 한다.
+		::SetCursor(NULL);
 
-	SetCapture(mApp->GetMainWnd());
+		SetCapture(mApp->GetMainWnd());
+	}
+	else if ((btnState & MK_RBUTTON) != 0)
+	{
+		D3DFramework::GetApp()->Picking(x, y);
+	}
 }
 
 void InputManager::OnMouseUp(WPARAM btnState, int x, int y) 
@@ -61,8 +68,12 @@ void InputManager::OnKeyUp(unsigned int input)
 	if (input == VK_F1)
 		mApp->SwitchOptionEnabled(Option::Wireframe);
 	else if (input == VK_F2)
-		mApp->SwitchOptionEnabled(Option::Debug);
+		mApp->SwitchOptionEnabled(Option::Debug_Collision);
+	else if (input == VK_F3)
+		mApp->SwitchOptionEnabled(Option::Debug_OctTree);
 	else if (input == VK_F4)
+		mApp->SwitchOptionEnabled(Option::Debug_Light);
+	else if (input == VK_F5)
 		mApp->SwitchOptionEnabled(Option::Fullscreen);
 }
 
