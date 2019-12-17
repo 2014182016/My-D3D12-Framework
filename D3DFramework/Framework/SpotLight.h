@@ -1,16 +1,15 @@
 #pragma once
 
-#include "pch.h"
 #include "Light.h"
 
 class SpotLight : public Light
 {
 public:
-	SpotLight(std::string name);
+	SpotLight(std::string&& name);
 	virtual ~SpotLight();
 
 public:
-	virtual void GetLightConstants(struct LightConstants& lightConstants) override;
+	virtual void SetLightData(struct LightData& lightData, const DirectX::BoundingSphere& sceneBounding) override;
 
 public:
 	inline float GetFalloffStart() const { return mFalloffStart; }
@@ -21,7 +20,7 @@ public:
 	inline void SetSpotPower(float spotPower) { mSpotPower = spotPower; }
 
 protected:
-	float mFalloffStart;
-	float mFalloffEnd;
-	float mSpotPower;
+	float mFalloffStart = 1.0f;
+	float mFalloffEnd = 10.0f;
+	float mSpotPower = 1.0f;
 };

@@ -22,6 +22,7 @@
     <ClCompile Include="Framework\AssetManager.cpp" />
     <ClCompile Include="Framework\Base.cpp" />
     <ClCompile Include="Framework\Camera.cpp" />
+    <ClCompile Include="Framework\CubeRenderTarget.cpp" />
     <ClCompile Include="Framework\D3DApp.cpp" />
     <ClCompile Include="Framework\D3DDebug.cpp" />
     <ClCompile Include="Framework\D3DFramework.cpp" />
@@ -42,11 +43,13 @@
     <ClCompile Include="Framework\Main.cpp" />
     <ClCompile Include="Framework\Material.cpp" />
     <ClCompile Include="Framework\MeshGeometry.cpp" />
+    <ClCompile Include="Framework\MovingDirectionalLight.cpp" />
     <ClCompile Include="Framework\MovingObject.cpp" />
     <ClCompile Include="Framework\Object.cpp" />
     <ClCompile Include="Framework\Octree.cpp" />
     <ClCompile Include="Framework\pch.cpp" />
     <ClCompile Include="Framework\PointLight.cpp" />
+    <ClCompile Include="Framework\ShadowMap.cpp" />
     <ClCompile Include="Framework\SpotLight.cpp" />
     <ClCompile Include="Framework\WinApp.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -57,6 +60,7 @@
     <ClInclude Include="Framework\Base.h" />
     <ClInclude Include="Framework\BufferMemoryPool.hpp" />
     <ClInclude Include="Framework\Camera.h" />
+    <ClInclude Include="Framework\CubeRenderTarget.h" />
     <ClInclude Include="Framework\D3DApp.h" />
     <ClInclude Include="Framework\D3DDebug.h" />
     <ClInclude Include="Framework\D3DFramework.h" />
@@ -72,10 +76,12 @@
     <ClInclude Include="Framework\Light.h" />
     <ClInclude Include="Framework\Material.h" />
     <ClInclude Include="Framework\MeshGeometry.h" />
+    <ClInclude Include="Framework\MovingDirectionalLight.h" />
     <ClInclude Include="Framework\MovingObject.h" />
     <ClInclude Include="Framework\Object.h" />
     <ClInclude Include="Framework\Octree.h" />
     <ClInclude Include="Framework\pch.h" />
+    <ClInclude Include="Framework\ShadowMap.h" />
     <ClInclude Include="Framework\Structures.h" />
     <ClInclude Include="Framework\PointLight.h" />
     <ClInclude Include="Framework\SpotLight.h" />
@@ -112,7 +118,7 @@
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </FxCompile>
-    <FxCompile Include="Shaders\Debug.hlsl">
+    <FxCompile Include="Shaders\CollisionDebug.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
@@ -132,6 +138,39 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Shaders\Shadow.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Shaders\Sky.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Shaders\TextureDebug.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="Shaders\Wireframe.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
@@ -231,7 +270,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalOptions>/await /std:c++latest %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>

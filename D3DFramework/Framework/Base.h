@@ -5,7 +5,7 @@
 class Base
 {
 public:
-	Base(std::string name);
+	Base(std::string&& name);
 	virtual ~Base();
 
 public:
@@ -17,6 +17,10 @@ public:
 	virtual std::string ToString() const;
 
 public:
+	virtual void BeginPlay() { };
+	virtual void Tick(float deltaTime) { };
+	virtual void Destroy() { };
+
 	bool IsUpdate() const;
 	void UpdateNumFrames();
 	void DecreaseNumFrames();

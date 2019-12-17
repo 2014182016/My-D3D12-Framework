@@ -4,7 +4,9 @@
 // Contains API for shader lighting.
 //***************************************************************************************
 
-#define MAX_LIGHT 1
+#ifndef LIGHT_NUM
+#define LIGHT_NUM 1
+#endif
 
 #define DIRECTIONAL_LIGHT 0
 #define POINT_LIGHT 1
@@ -12,6 +14,9 @@
 
 struct Light
 {
+	float4x4 mWorld;
+	float4x4 mViewProj;
+	float4x4 mShadowTransform;
     float3 mStrength;
     float mFalloffStart; // point/spot light only
     float3 mDirection;   // directional/spot light only
@@ -21,7 +26,7 @@ struct Light
 	bool mEnabled;
 	bool mSelected;
 	uint mType;
-	float mPadding;
+	float mPadding0;
 };
 
 struct Material
@@ -91,7 +96,7 @@ float3 ComputePointLight(Light light, Material mat, float3 pos, float3 normal, f
 
     //범위 판정
     if(d > light.mFalloffEnd)
-        return 0.0f;
+		return float3(0.0f, 0.0f, 0.0f);
 
     // 빛 벡터를 정규화한다.
     lightVec /= d;
@@ -102,7 +107,7 @@ float3 ComputePointLight(Light light, Material mat, float3 pos, float3 normal, f
 
     // 거리에 따라 빛을 감쇠한다.
     float att = CalcAttenuation(d, light.mFalloffStart, light.mFalloffEnd);
-    lightStrength *= att;
+    lightStrength = lightStrength * att;
 
     return BlinnPhong(lightStrength, lightVec, normal, toEye, mat);
 }
@@ -117,7 +122,7 @@ float3 ComputeSpotLight(Light light, Material mat, float3 pos, float3 normal, fl
 
     // 범위 판정
     if(d > light.mFalloffEnd)
-        return 0.0f;
+        return float3(0.0f, 0.0f, 0.0f);
 
     // 빛 벡터를 정규화한다.
     lightVec /= d;
@@ -137,18 +142,15 @@ float3 ComputeSpotLight(Light light, Material mat, float3 pos, float3 normal, fl
     return BlinnPhong(lightStrength, lightVec, normal, toEye, mat);
 }
 
-float4 ComputeLighting(Light lights[MAX_LIGHT], Material mat,
+float4 ComputeLighting(StructuredBuffer<Light> lights, Material mat,
                        float3 pos, float3 normal, float3 toEye,
                        float3 shadowFactor)
 {
     float3 result = 0.0f;
 
-	for (uint i = 0; i < MAX_LIGHT; ++i)
+	for (uint i = 0; i < LIGHT_NUM; ++i)
 	{
-		if (!lights[i].mEnabled)
-			continue;
-
-		if (lights[i].mType != DIRECTIONAL_LIGHT && length(lights[i].mPosition - pos) > lights[i].mFalloffEnd)
+		if (lights[i].mEnabled == 0)
 			continue;
 
 		switch (lights[i].mType)
@@ -167,5 +169,3 @@ float4 ComputeLighting(Light lights[MAX_LIGHT], Material mat,
 
     return float4(result, 0.0f);
 }
-
-

@@ -10,7 +10,7 @@
 struct FrameResource
 {
 public:
-	FrameResource(ID3D12Device* device, UINT passCount, UINT objectCount, UINT materialCount)
+	FrameResource(ID3D12Device* device, UINT passCount, UINT objectCount, UINT lightCount, UINT materialCount)
 	{
 		ThrowIfFailed(device->CreateCommandAllocator(
 			D3D12_COMMAND_LIST_TYPE_DIRECT,
@@ -18,6 +18,7 @@ public:
 
 		mPassPool = std::make_unique<BufferMemoryPool<PassConstants>>(device, passCount, true);
 		mObjectPool = std::make_unique<BufferMemoryPool<ObjectConstants>>(device, objectCount, true);
+		mLightBufferPool = std::make_unique<BufferMemoryPool<LightData>>(device, lightCount, false);
 		mMaterialBufferPool = std::make_unique<BufferMemoryPool<MaterialData>>(device, materialCount, false);
 		mDebugPool = std::make_unique<BufferMemoryPool<DebugData>>(device, objectCount, false);
 		mInstancePool = std::make_unique<BufferMemoryPool<InstanceConstants>>(device, (int)DebugType::Count, true);
@@ -35,6 +36,7 @@ public:
 	// 따라서 프레임마다 상수 버퍼를 새로 만들어야 한다.
 	std::unique_ptr<BufferMemoryPool<PassConstants>> mPassPool = nullptr;
 	std::unique_ptr<BufferMemoryPool<ObjectConstants>> mObjectPool = nullptr;
+	std::unique_ptr<BufferMemoryPool<LightData>> mLightBufferPool = nullptr;
 	std::unique_ptr<BufferMemoryPool<MaterialData>> mMaterialBufferPool = nullptr;
 	std::unique_ptr<BufferMemoryPool<DebugData>> mDebugPool = nullptr;
 	std::unique_ptr<BufferMemoryPool<InstanceConstants>> mInstancePool = nullptr;

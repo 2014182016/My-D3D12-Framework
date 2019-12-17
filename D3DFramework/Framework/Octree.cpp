@@ -8,87 +8,87 @@ using namespace DirectX;
 
 namespace DirectX
 {
-	XMFLOAT3 operator+(const XMFLOAT3& lhs, const XMFLOAT3& rhs)
+	DirectX::XMFLOAT3 operator+(const DirectX::XMFLOAT3& lhs, const float rhs)
 	{
-		XMFLOAT3 result;
+		DirectX::XMFLOAT3 result;
 
-		XMVECTOR vecLhs = XMLoadFloat3(&lhs);
-		XMVECTOR vecRhs = XMLoadFloat3(&rhs);
-		XMVECTOR vecResult = vecLhs + vecRhs;
+		DirectX::XMVECTOR vecLhs = DirectX::XMLoadFloat3(&lhs);
+		DirectX::XMVECTOR vecRhs = DirectX::XMVectorReplicate(rhs);
+		DirectX::XMVECTOR vecResult = vecLhs + vecRhs;
 
-		XMStoreFloat3(&result, vecResult);
+		DirectX::XMStoreFloat3(&result, vecResult);
 		return result;
 	}
 
-	XMFLOAT3 operator-(const XMFLOAT3& lhs, const XMFLOAT3& rhs)
+	DirectX::XMFLOAT3 operator*(const DirectX::XMFLOAT3& lhs, const float rhs)
 	{
-		XMFLOAT3 result;
+		DirectX::XMFLOAT3 result;
 
-		XMVECTOR vecLhs = XMLoadFloat3(&lhs);
-		XMVECTOR vecRhs = XMLoadFloat3(&rhs);
-		XMVECTOR vecResult = vecLhs - vecRhs;
+		DirectX::XMVECTOR vecLhs = DirectX::XMLoadFloat3(&lhs);
+		DirectX::XMVECTOR vecRhs = DirectX::XMVectorReplicate(rhs);
+		DirectX::XMVECTOR vecResult = vecLhs * vecRhs;
 
-		XMStoreFloat3(&result, vecResult);
+		DirectX::XMStoreFloat3(&result, vecResult);
 		return result;
 	}
 
-	XMFLOAT3 operator+(const XMFLOAT3& lhs, const float rhs)
+	DirectX::XMFLOAT3 operator+=(const DirectX::XMFLOAT3& lhs, const DirectX::XMFLOAT3& rhs)
 	{
-		XMFLOAT3 result;
+		DirectX::XMFLOAT3 result;
 
-		XMVECTOR vecLhs = XMLoadFloat3(&lhs);
-		XMVECTOR vecRhs = XMVectorReplicate(rhs);
-		XMVECTOR vecResult = vecLhs + vecRhs;
+		DirectX::XMVECTOR vecLhs = DirectX::XMLoadFloat3(&lhs);
+		DirectX::XMVECTOR vecRhs = DirectX::XMLoadFloat3(&rhs);
+		DirectX::XMVECTOR vecResult = vecLhs + vecRhs;
 
-		XMStoreFloat3(&result, vecResult);
+		DirectX::XMStoreFloat3(&result, vecResult);
 		return result;
 	}
 
-	XMFLOAT3 operator*(const XMFLOAT3& lhs, const float rhs)
+	DirectX::XMFLOAT3 operator+=(const DirectX::XMFLOAT3& lhs, const float rhs)
 	{
-		XMFLOAT3 result;
+		DirectX::XMFLOAT3 result;
 
-		XMVECTOR vecLhs = XMLoadFloat3(&lhs);
-		XMVECTOR vecRhs = XMVectorReplicate(rhs);
-		XMVECTOR vecResult = vecLhs * vecRhs;
+		DirectX::XMVECTOR vecLhs = DirectX::XMLoadFloat3(&lhs);
+		DirectX::XMVECTOR vecRhs = DirectX::XMVectorReplicate(rhs);
+		DirectX::XMVECTOR vecResult = vecLhs + vecRhs;
 
-		XMStoreFloat3(&result, vecResult);
+		DirectX::XMStoreFloat3(&result, vecResult);
 		return result;
 	}
 
-	XMFLOAT3 operator/(const XMFLOAT3& lhs, const float rhs)
+	DirectX::XMFLOAT3 operator+(const DirectX::XMFLOAT3& lhs, const DirectX::XMFLOAT3& rhs)
 	{
-		XMFLOAT3 result;
+		DirectX::XMFLOAT3 result;
 
-		XMVECTOR vecLhs = XMLoadFloat3(&lhs);
-		XMVECTOR vecRhs = XMVectorReplicate(rhs);
-		XMVECTOR vecResult = vecLhs / vecRhs;
+		DirectX::XMVECTOR vecLhs = DirectX::XMLoadFloat3(&lhs);
+		DirectX::XMVECTOR vecRhs = DirectX::XMLoadFloat3(&rhs);
+		DirectX::XMVECTOR vecResult = vecLhs + vecRhs;
 
-		XMStoreFloat3(&result, vecResult);
+		DirectX::XMStoreFloat3(&result, vecResult);
 		return result;
 	}
 
-	XMFLOAT3 operator+=(const XMFLOAT3& lhs, const XMFLOAT3& rhs)
+	DirectX::XMFLOAT3 operator-(const DirectX::XMFLOAT3& lhs, const DirectX::XMFLOAT3& rhs)
 	{
-		XMFLOAT3 result;
+		DirectX::XMFLOAT3 result;
 
-		XMVECTOR vecLhs = XMLoadFloat3(&lhs);
-		XMVECTOR vecRhs = XMLoadFloat3(&rhs);
-		XMVECTOR vecResult = vecLhs + vecRhs;
+		DirectX::XMVECTOR vecLhs = DirectX::XMLoadFloat3(&lhs);
+		DirectX::XMVECTOR vecRhs = DirectX::XMLoadFloat3(&rhs);
+		DirectX::XMVECTOR vecResult = vecLhs - vecRhs;
 
-		XMStoreFloat3(&result, vecResult);
+		DirectX::XMStoreFloat3(&result, vecResult);
 		return result;
 	}
 
-	XMFLOAT3 operator+=(const XMFLOAT3& lhs, const float rhs)
+	DirectX::XMFLOAT3 operator/(const DirectX::XMFLOAT3& lhs, const float rhs)
 	{
-		XMFLOAT3 result;
+		DirectX::XMFLOAT3 result;
 
-		XMVECTOR vecLhs = XMLoadFloat3(&lhs);
-		XMVECTOR vecRhs = XMVectorReplicate(rhs);
-		XMVECTOR vecResult = vecLhs + vecRhs;
+		DirectX::XMVECTOR vecLhs = DirectX::XMLoadFloat3(&lhs);
+		DirectX::XMVECTOR vecRhs = DirectX::XMVectorReplicate(rhs);
+		DirectX::XMVECTOR vecResult = vecLhs / vecRhs;
 
-		XMStoreFloat3(&result, vecResult);
+		DirectX::XMStoreFloat3(&result, vecResult);
 		return result;
 	}
 }
@@ -100,37 +100,10 @@ Octree::Octree(const DirectX::BoundingBox& boundingBox, const std::list<std::sha
 	for (const auto& obj : objList)
 		mObjectList.emplace_front(obj);
 
-	mObjectCount = (UINT)std::distance(mObjectList.begin(), mObjectList.end());
-
 	for (int i = 0; i < 8; ++i)
 		mChildNodes[i] = nullptr;
-}
 
-Octree::Octree(const std::list<std::shared_ptr<GameObject>>& objList)
-{
-	XMVECTOR minPos = XMVectorZero();
-	XMVECTOR maxPos = XMVectorZero();
-
-	for (const auto& obj : objList)
-	{
-		mObjectList.emplace_front(obj);
-
-		XMVECTOR objPos = XMLoadFloat3(&obj->GetPosition());
-		minPos = XMVectorMin(objPos, minPos);
-		maxPos = XMVectorMin(objPos, maxPos);
-	}
-
-	mObjectCount = (UINT)std::distance(mObjectList.begin(), mObjectList.end());
-
-	XMVECTOR vecDimension = (maxPos - minPos) / 2.0f;
-	XMVECTOR center = minPos + vecDimension;
-	float dimension = std::max<float>(XMVectorGetX(vecDimension), std::max<float>(XMVectorGetY(vecDimension), XMVectorGetY(vecDimension)));
-
-	XMStoreFloat3(&mBoundingBox.Center, center);
-	mBoundingBox.Extents += dimension;
-
-	for (int i = 0; i < 8; ++i)
-		mChildNodes[i] = nullptr;
+	mObjectCount = (UINT)std::distance(objList.begin(), objList.end());
 }
 
 Octree::Octree(const BoundingBox& boundingBox)
@@ -229,7 +202,6 @@ void Octree::BuildTree()
 	// 하위 노드에 포함된 오브젝트는 이 노드에서부터 삭제한다.
 	for (auto& obj : delist)
 		mObjectList.remove(obj);
-	mObjectCount = (UINT)std::distance(mObjectList.begin(), mObjectList.end());
 
 	// 하위 노드에 오브젝트가 존재한다면 BuildTree를 재귀적으로 실행한다.
 	for (int i = 0; i < 8; ++i)
@@ -252,7 +224,6 @@ bool Octree::Insert(std::shared_ptr<GameObject> obj)
 	if (mObjectCount == 0)
 	{
 		mObjectList.emplace_front(obj);
-		++mObjectCount;
 		return true;
 	}
 
@@ -260,7 +231,6 @@ bool Octree::Insert(std::shared_ptr<GameObject> obj)
 	if (dimension <= MIN_SIZE)
 	{
 		mObjectList.emplace_front(obj);
-		++mObjectCount;
 		return true;
 	}
 
@@ -302,7 +272,6 @@ bool Octree::Insert(std::shared_ptr<GameObject> obj)
 		}
 
 		mObjectList.emplace_front(obj);
-		++mObjectCount;
 		return true;
 	}
 	case CollisionType::OBB:
@@ -324,7 +293,6 @@ bool Octree::Insert(std::shared_ptr<GameObject> obj)
 		}
 
 		mObjectList.emplace_front(obj);
-		++mObjectCount;
 		return true;
 	}
 	case CollisionType::Sphere:
@@ -346,7 +314,6 @@ bool Octree::Insert(std::shared_ptr<GameObject> obj)
 		}
 
 		mObjectList.emplace_front(obj);
-		++mObjectCount;
 		return true;
 	}
 	}
@@ -358,6 +325,9 @@ void Octree::Update(float deltaTime)
 {
 	if (mTreeBuilt == false || mTreeReady == false)
 		return;
+
+	// 매 프레임마다 오브젝트의 개수를 센다.
+	mObjectCount = (UINT)std::distance(mObjectList.begin(), mObjectList.end());
 
 	// 이 노드가 오브젝트를 가지고 있지 않다면 카운트 다운을 시작하고,
 	// 카운트 다운이 0이 될 시에 이 노드를 삭제한다.
@@ -384,19 +354,12 @@ void Octree::Update(float deltaTime)
 	}
 
 	std::list<std::shared_ptr<GameObject>> movedObjects;
-	for (auto iter = mObjectList.begin(); iter != mObjectList.end(); ++iter)
+	for (const auto& obj : mObjectList)
 	{
-		if ((*iter)->GetIsDestroyesd())
-		{
-			mObjectList.erase(iter--);
-			--mObjectCount;
-			continue;
-		}
-
 		// 이 함수는 Tick이 불리고 난 이후에 WorldUpdate가 Set되므로
-		// Update함수는 Object의 Tick함수 이후에 불려져야 한다.
-		if ((*iter)->GetIsMovable() && (*iter)->GetIsWorldUpdate())
-			movedObjects.emplace_back((*iter));
+		// Update함수는 Object의 Tick함수 이전에 불려져야 한다.
+		if (obj->GetIsMovable() && obj->GetIsWorldUpdate())
+			movedObjects.emplace_front(obj);
 	}
 
 	mHasChildren = false;
@@ -488,7 +451,6 @@ void Octree::Update(float deltaTime)
 		// 알맞은 노드에 다시 삽입한다.
 		currentNode->Insert(obj);
 		mObjectList.remove(obj);
-		--mObjectCount;
 	}
 
 	// 부모노드에 있는 오브젝트들과 1:1검사를 한 뒤
@@ -504,10 +466,10 @@ void Octree::Update(float deltaTime)
 
 		for (auto& other : currentObjList)
 		{
-			std::shared_ptr<GameObject> collisionObj = obj->IsCollision(other);
-			if (collisionObj != nullptr)
+			bool isCollision = obj->IsCollision(other);
+			if (isCollision)
 			{
-				obj->Collision(collisionObj);
+				obj->Collide(other);
 			}
 		}
 	}
@@ -519,10 +481,10 @@ void Octree::Update(float deltaTime)
 
 		for (auto& other : currentObjList)
 		{
-			std::shared_ptr<GameObject> collisionObj = obj->IsCollision(other);
-			if (collisionObj != nullptr)
+			bool isCollision = obj->IsCollision(other);
+			if (isCollision)
 			{
-				obj->Collision(collisionObj);
+				obj->Collide(other);
 			}
 		}
 	}
@@ -568,20 +530,28 @@ void Octree::GetBoundingWorlds(std::vector<XMFLOAT4X4>& worlds) const
 
 void Octree::GetIntersectObjects(const DirectX::BoundingBox& bounding, std::list<std::shared_ptr<GameObject>>& objects)
 {
-	if (mObjectList.empty())
-		return;
+	ContainmentType containmentType = mBoundingBox.Contains(bounding);
 
-	if (mBoundingBox.Contains(bounding) != ContainmentType::DISJOINT)
-		return;
-
-	objects.insert(objects.end(), mObjectList.begin(), mObjectList.end());
-
-	for (int i = 0; i < 8; ++i)
+	switch (containmentType)
 	{
-		if (mChildNodes[i] != nullptr)
+	case DirectX::DISJOINT:
+		break;
+	case DirectX::INTERSECTS:
+		objects.insert(objects.end(), mObjectList.begin(), mObjectList.end());
+
+		for (int i = 0; i < 8; ++i)
 		{
-			mChildNodes[i]->GetIntersectObjects(bounding, objects);
+			if (mChildNodes[i] != nullptr)
+			{
+				mChildNodes[i]->GetIntersectObjects(bounding, objects);
+			}
 		}
+		break;
+	case DirectX::CONTAINS:
+		GetChildObjectList(objects);
+		break;
+	default:
+		break;
 	}
 }
 
@@ -593,5 +563,38 @@ void Octree::GetParentObjectList(std::list<std::shared_ptr<GameObject>>& objList
 		const std::list<std::shared_ptr<GameObject>>& parentObjList = parentNode->GetObjectList();
 		objList.insert(objList.end(), parentObjList.begin(), parentObjList.end());
 		parentNode = parentNode->GetParent();
+	}
+}
+
+void Octree::GetChildObjectList(std::list<std::shared_ptr<class GameObject>>& objList) const
+{
+	if (mChildNodes == nullptr)
+		return;
+
+	for (int i = 0; i < 8; ++i)
+	{
+		if (mChildNodes[i] != nullptr)
+		{
+			std::list<std::shared_ptr<class GameObject>> chileObjList = mChildNodes[i]->GetObjectList();
+			objList.insert(objList.end(), chileObjList.begin(), chileObjList.end());
+			mChildNodes[i]->GetChildObjectList(objList);
+		}
+	}
+}
+
+void Octree::DestroyObjects()
+{
+	mObjectList.remove_if([](std::shared_ptr<GameObject>& obj)->bool
+	{ return obj->GetIsDestroyesd(); });
+
+	if (mChildNodes == nullptr)
+		return;
+
+	for (int i = 0; i < 8; ++i)
+	{
+		if (mChildNodes[i] != nullptr)
+		{
+			mChildNodes[i]->DestroyObjects();
+		}
 	}
 }

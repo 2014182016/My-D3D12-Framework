@@ -2,7 +2,9 @@
 #include "Light.h"
 #include "Structures.h"
 
-Light::Light(std::string name) : Object(name) { }
+using namespace DirectX;
+
+Light::Light(std::string&& name) : Object(std::move(name)) { }
 
 Light::~Light() { }
 
@@ -14,9 +16,10 @@ void Light::SetStrength(float r, float g, float b)
 	mStrength.z = b;
 }
 
-void Light::GetLightConstants(LightConstants& lightConstants)
+void Light::SetLightData(LightData& lightData, const BoundingSphere& sceneBounding)
 {
-	lightConstants.mStrength = mStrength;
-	lightConstants.mType = (std::uint32_t)mLightType;
-	lightConstants.mEnabled = mEnabled;
+	lightData.mPosition = GetPosition();
+	lightData.mStrength = mStrength;
+	lightData.mType = (std::uint32_t)mLightType;
+	lightData.mEnabled = mEnabled;
 }

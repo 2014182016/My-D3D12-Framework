@@ -5,17 +5,18 @@
 class Octree
 {
 public:
-	Octree(const DirectX::BoundingBox& boundingBox, const std::list<std::shared_ptr<class GameObject>>& objList); // 사용할 공간의 크기와 게임 오브젝트를 받아 팔진트리를 생성한다.
-	Octree(const std::list<std::shared_ptr<class GameObject>>& objList); // 게임 오브젝트의 딱 맞는 바운딩 박스를 생성한다.
-	Octree(const DirectX::BoundingBox& boundingBox); // 게임 오브젝트 없이 바운딩 박스만을 생성한다.
+	Octree(const DirectX::BoundingBox& boundingBox, const std::list<std::shared_ptr<class GameObject>>& objList); 
+	Octree(const DirectX::BoundingBox& boundingBox);
 
 public:
 	void BuildTree(); // 가지고 있는 오브젝트 리스트로 팔진트리를 생성한다.
 	bool Insert(std::shared_ptr<class GameObject> obj); // 팔진트리에 적당한 노드에 오브젝트를 삽입한다.
 
 	// 오브젝트가 움직였을 경우에 대해 업데이트 한다. 
-	// Update함수는 Object의 Tick함수 이후에 불려져야 한다.
+	// Update함수는 Object의 Tick함수 이전에 불려져야 한다.
 	void Update(float deltaTime); 
+
+	void DestroyObjects();
 
 public:
 	inline Octree* GetParent() const { return mParent; }
@@ -36,6 +37,7 @@ private:
 	Octree* CreateNode(const DirectX::BoundingBox& boundingBox, std::list<std::shared_ptr<class GameObject>> objList);
 	Octree* CreateNode(const DirectX::BoundingBox& boundingBox, std::shared_ptr<class GameObject> obj);
 	void GetParentObjectList(std::list<std::shared_ptr<class GameObject>>& objList) const;
+	void GetChildObjectList(std::list<std::shared_ptr<class GameObject>>& objList) const;
 
 public:
 	static inline bool mTreeReady = false;

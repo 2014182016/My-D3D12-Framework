@@ -5,7 +5,7 @@
 
 using namespace DirectX;
 
-GameObject::GameObject(std::string name) : Object(name) { }
+GameObject::GameObject(std::string&& name) : Object(std::move(name)) { }
 
 GameObject::~GameObject() { }
 
@@ -79,9 +79,31 @@ void GameObject::Tick(float deltaTime)
 	}
 }
 
-void GameObject::Collision(std::shared_ptr<GameObject> other)
+void GameObject::Collide(std::shared_ptr<GameObject> other)
 {
+	/*
+	XMVECTOR myVel = XMLoadFloat3(&mVelocity);
+	XMVECTOR otherVel = XMLoadFloat3(&other->GetVelocity());
 
+	// 상대속도를 계산
+	XMVECTOR relativeVel = otherVel - myVel;
+
+	float velAlongNormal = XMVector3Dot(relativeVel, collisonNormal);
+	if (velAlongNormal > 0)
+		return;
+
+	// 직관적인 결과를 위해 최저 반발을 이용한다.
+	float e = std::min<float>(mCof, other->GetCof());
+
+	// Impulse Scalar를 계산한다.
+	float j = -(1 + e) * velAlongNormal;
+	j /= mInvMass + other->GetInvMass();
+
+	// 충격량만큼 힘을 준다.
+	XMVECTOR impulse = j * collisonNormal;
+	AddImpulse(-impulse);
+	other->AddImpulse(impulse);
+	*/
 }
 
 std::optional<XMMATRIX> GameObject::GetBoundingWorld() const
@@ -159,16 +181,24 @@ bool GameObject::IsInFrustum(const DirectX::BoundingFrustum& camFrustum) const
 	return false;
 }
 
-void GameObject::SetUsingCollision() 
+void GameObject::SetCollisionEnabled(bool value)
 {
-	if (mMesh) 
-		mCollisionType = mMesh->GetCollisionType(); 
+	if (value)
+	{
+		mCollisionType = CollisionType::None;
+	}
+	else
+	{
+		if (mMesh)
+			mCollisionType = mMesh->GetCollisionType();
+	}
 }
 
-std::shared_ptr<GameObject> GameObject::IsCollision(const std::shared_ptr<GameObject> other) const
+
+bool GameObject::IsCollision(const std::shared_ptr<GameObject> other) const
 {
 	if (mCollisionType == CollisionType::None || other->GetCollisionType() == CollisionType::None)
-		return nullptr;
+		return false;
 
 	switch (mCollisionType) 
 	{
@@ -181,21 +211,21 @@ std::shared_ptr<GameObject> GameObject::IsCollision(const std::shared_ptr<GameOb
 		{
 			const BoundingBox& otherAabb = std::any_cast<BoundingBox>(other->GetCollisionBounding());
 			if (aabb.Contains(otherAabb) != ContainmentType::DISJOINT)
-				return other;
+				return true;
 			break;
 		}
 		case CollisionType::OBB:
 		{
 			const BoundingOrientedBox& otherObb = std::any_cast<BoundingOrientedBox>(other->GetCollisionBounding());
 			if (aabb.Contains(otherObb) != ContainmentType::DISJOINT)
-				return other;
+				return true;
 			break;
 		}
 		case CollisionType::Sphere:
 		{
 			const BoundingSphere& otherSphere = std::any_cast<BoundingSphere>(other->GetCollisionBounding());
 			if (aabb.Contains(otherSphere) != ContainmentType::DISJOINT)
-				return other;
+				return true;
 			break;
 		}
 		}
@@ -210,21 +240,21 @@ std::shared_ptr<GameObject> GameObject::IsCollision(const std::shared_ptr<GameOb
 		{
 			const BoundingBox& otherAabb = std::any_cast<BoundingBox>(other->GetCollisionBounding());
 			if (obb.Contains(otherAabb) != ContainmentType::DISJOINT)
-				return other;
+				return true;
 			break;
 		}
 		case CollisionType::OBB:
 		{
 			const BoundingOrientedBox& otherObb = std::any_cast<BoundingOrientedBox>(other->GetCollisionBounding());
 			if (obb.Contains(otherObb) != ContainmentType::DISJOINT)
-				return other;
+				return true;
 			break;
 		}
 		case CollisionType::Sphere:
 		{
 			const BoundingSphere& otherSphere = std::any_cast<BoundingSphere>(other->GetCollisionBounding());
 			if (obb.Contains(otherSphere) != ContainmentType::DISJOINT)
-				return other;
+				return true;
 			break;
 		}
 		}
@@ -239,21 +269,21 @@ std::shared_ptr<GameObject> GameObject::IsCollision(const std::shared_ptr<GameOb
 		{
 			const BoundingBox& otherAabb = std::any_cast<BoundingBox>(other->GetCollisionBounding());
 			if (sphere.Contains(otherAabb) != ContainmentType::DISJOINT)
-				return other;
+				return true;
 			break;
 		}
 		case CollisionType::OBB:
 		{
 			const BoundingOrientedBox& otherObb = std::any_cast<BoundingOrientedBox>(other->GetCollisionBounding());
 			if (sphere.Contains(otherObb) != ContainmentType::DISJOINT)
-				return other;
+				return true;
 			break;
 		}
 		case CollisionType::Sphere:
 		{
 			const BoundingSphere& otherSphere = std::any_cast<BoundingSphere>(other->GetCollisionBounding());
 			if (sphere.Contains(otherSphere) != ContainmentType::DISJOINT)
-				return other;
+				return true;
 			break;
 		}
 		}
@@ -261,20 +291,27 @@ std::shared_ptr<GameObject> GameObject::IsCollision(const std::shared_ptr<GameOb
 	}
 	}
 
-	return nullptr;
+	return false;
 }
 
-void GameObject::AddForce(DirectX::XMFLOAT3 force)
+void GameObject::AddImpulse(DirectX::XMVECTOR impulse)
 {
-	AddForce(force.x, force.y, force.z);
+	XMFLOAT3 xmf3Impulse;
+	XMStoreFloat3(&xmf3Impulse, impulse);
+	AddImpulse(xmf3Impulse);
 }
 
-void GameObject::AddForce(float forceX, float forceY, float forceZ)
+void GameObject::AddImpulse(DirectX::XMFLOAT3 impulse)
 {
-	if (mMass < FLT_EPSILON)
+	AddImpulse(impulse.x, impulse.y, impulse.z);
+}
+
+void GameObject::AddImpulse(float impulseX, float impulseY, float impulseZ)
+{
+	if (mMass < FLT_EPSILON || !mIsMovable || !mIsPhysics)
 		return;
 
-	mAcceleration.x = forceX / mMass;
-	mAcceleration.y = forceY / mMass;
-	mAcceleration.z = forceZ / mMass;
+	mAcceleration.x = impulseX * mInvMass;
+	mAcceleration.y = impulseY * mInvMass;
+	mAcceleration.z = impulseZ * mInvMass;
 }

@@ -16,9 +16,11 @@
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "D3D12.lib")
 #pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "pdh.lib")
 
 #include <windows.h>
 #include <wrl.h>
+#include <Pdh.h>
 #include <dxgi1_4.h>
 #include <d3d12.h>
 #include <D3Dcompiler.h>
@@ -36,7 +38,6 @@
 #include <list>
 #include <forward_list>
 #include <unordered_map>
-#include <queue>
 #include <bitset>
 #include <fstream>
 #include <iostream>
@@ -67,7 +68,7 @@ namespace DirectX
 
 	static std::ostream& operator<<(std::ostream& os, const DirectX::XMFLOAT3& xmf)
 	{
-		os << xmf.x << " " << xmf.y << " " << xmf.z << std::endl;
+		os << xmf.x << " " << xmf.y << " " << xmf.z;
 		return os;
 	}
 
@@ -76,7 +77,7 @@ namespace DirectX
 		os << xmf4x4f._11 << " " << xmf4x4f._12 << " " << xmf4x4f._13 << " " << xmf4x4f._14 << std::endl;
 		os << xmf4x4f._21 << " " << xmf4x4f._22 << " " << xmf4x4f._23 << " " << xmf4x4f._24 << std::endl;
 		os << xmf4x4f._31 << " " << xmf4x4f._32 << " " << xmf4x4f._33 << " " << xmf4x4f._34 << std::endl;
-		os << xmf4x4f._41 << " " << xmf4x4f._42 << " " << xmf4x4f._43 << " " << xmf4x4f._44 << std::endl;
+		os << xmf4x4f._41 << " " << xmf4x4f._42 << " " << xmf4x4f._43 << " " << xmf4x4f._44;
 		return os;
 	}
 }

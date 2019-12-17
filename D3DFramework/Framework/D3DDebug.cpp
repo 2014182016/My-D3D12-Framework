@@ -31,7 +31,7 @@ D3DDebug::D3DDebug()
 	vertices.clear();
 	indices.clear();
 
-	meshData = GeometryGenerator::CreateSphere(1.0f, 5, 5);
+	meshData = GeometryGenerator::CreateSphere(1.0f, 10, 10);
 	mesh = std::make_unique<MeshGeometry>("Debug_CollisionSphere");
 	for (const auto& ver : meshData.Vertices)
 		vertices.emplace_back(ver.Position, (XMFLOAT4)Colors::Red);
@@ -75,7 +75,7 @@ D3DDebug::D3DDebug()
 	mesh->BuildMesh(md3dDevice.Get(), mCommandList.Get(), vertices.data(), indices.data(), (UINT)vertices.size(), (UINT)indices.size(),
 		(UINT)sizeof(DebugVertex), (UINT)sizeof(std::uint16_t));
 	mesh->SetPrimitiveType(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
-	mDebugMeshes[(int)DebugType::Debug_OctTree] = std::move(mesh);
+	mDebugMeshes[(int)DebugType::Debug_Octree] = std::move(mesh);
 	vertices.clear();
 
 	mInstanceCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(InstanceConstants));
@@ -106,12 +106,12 @@ void D3DDebug::RenderDebug(ID3D12GraphicsCommandList* cmdList, BufferMemoryPool<
 
 		// 인스턴스 관련 버퍼를 업데이트한다.
 		InstanceConstants instanceConstants;
-		instanceConstants.mDebugInstanceIndex = instanceLocation;
+		instanceConstants.mOffsetIndex = instanceLocation;
 
 		currInstanceBuffer->CopyData(i, instanceConstants);
 		auto instanceCBAddressStart = currInstanceBuffer->GetResource()->GetGPUVirtualAddress();
 		D3D12_GPU_VIRTUAL_ADDRESS instanceCBAddress = instanceCBAddressStart + i * mInstanceCBByteSize;
-		cmdList->SetGraphicsRootConstantBufferView(5, instanceCBAddress);
+		cmdList->SetGraphicsRootConstantBufferView(8, instanceCBAddress);
 
 		// 인스턴싱으로 디버기하기 위한 메시를 그린다.
 		mDebugMeshes[i]->Render(cmdList, dataCount);
@@ -288,6 +288,14 @@ void D3DDebug::DrawLine(XMFLOAT3 p1, XMFLOAT3 p2, float time, XMFLOAT4 color)
 	FlushCommandQueue();
 }
 
+void D3DDebug::DrawLine(XMVECTOR p1, XMVECTOR p2, float time, XMFLOAT4 color)
+{
+	XMFLOAT3 p1f, p2f;
+	XMStoreFloat3(&p1f, p1);
+	XMStoreFloat3(&p2f, p2);
+	DrawLine(p1f, p2f, time, color);
+}
+
 void D3DDebug::DrawCube(XMFLOAT3 center, float width, float height, float depth, float time, XMFLOAT4 color)
 {
 	std::vector<DebugVertex> vertices;
@@ -327,14 +335,36 @@ void D3DDebug::DrawCube(XMFLOAT3 center, float width, float height, float depth,
 	FlushCommandQueue();
 }
 
-void D3DDebug::DrawCube(XMFLOAT3 center,XMFLOAT3 extent, float time, XMFLOAT4 color)
+void D3DDebug::DrawCube(XMVECTOR center, float width, float height, float depth, float time, XMFLOAT4 color)
+{
+	XMFLOAT3 centerf;
+	XMStoreFloat3(&centerf, center);
+	DrawCube(centerf, width, height, depth, time, color);
+}
+
+void D3DDebug::DrawCube(XMFLOAT3 center, XMFLOAT3 extent, float time, XMFLOAT4 color)
 {
 	DrawCube(center, extent.x, extent.y, extent.z, time, color);
+}
+
+void D3DDebug::DrawCube(XMVECTOR center, XMVECTOR extent, float time, XMFLOAT4 color)
+{
+	XMFLOAT3 centerf, extentf;
+	XMStoreFloat3(&centerf, center);
+	XMStoreFloat3(&extentf, extent);
+	DrawCube(centerf, extentf.x, extentf.y, extentf.z, time, color);
 }
 
 void D3DDebug::DrawCube(XMFLOAT3 center, float width, float time, XMFLOAT4 color)
 {
 	DrawCube(center, width, width, width, time, color);
+}
+
+void D3DDebug::DrawCube(XMVECTOR center, float width, float time, XMFLOAT4 color)
+{
+	XMFLOAT3 centerf;
+	XMStoreFloat3(&centerf, center);
+	DrawCube(centerf, width, width, width, time, color);
 }
 
 void D3DDebug::DrawRing(DirectX::XMFLOAT3 center, XMVECTOR majorAxis, XMVECTOR minorAxis, float raidus, float time, DirectX::XMFLOAT4 color)
@@ -400,6 +430,13 @@ void D3DDebug::DrawSphere(XMFLOAT3 center, float radius, float time, XMFLOAT4 co
 	DrawRing(center, xaxis, zaxis, radius, time, color);
 	DrawRing(center, xaxis, yaxis, radius, time, color);
 	DrawRing(center, yaxis, zaxis, radius, time, color);
+}
+
+void D3DDebug::DrawSphere(XMVECTOR center, float radius, float time, XMFLOAT4 color)
+{
+	XMFLOAT3 centerf;
+	XMStoreFloat3(&centerf, center);
+	DrawSphere(centerf, radius, time, color);
 }
 
 void D3DDebug::RenderLine(ID3D12GraphicsCommandList* cmdList, float deltaTime)

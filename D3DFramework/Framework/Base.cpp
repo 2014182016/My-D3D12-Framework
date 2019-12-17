@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "Base.h"
 
-Base::Base(std::string name) : mName(name) { mUID = currUID++; }
+Base::Base(std::string&& name) : mName(std::move(name)) { mUID = currUID++; }
 
 Base::~Base() { }
 

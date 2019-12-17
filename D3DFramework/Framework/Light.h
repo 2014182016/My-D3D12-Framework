@@ -1,18 +1,17 @@
 #pragma once
 
-#include "pch.h"
 #include "Object.h"
 
 class Light : public Object
 {
 public:
-	Light(std::string name);
+	Light(std::string&& name);
 	virtual ~Light();
 
 public:
 	// Light의 타입에 따라 LightConstants에 채워야 할 정보는 다르다.
 	// 이 함수를 override하여 타입에 맞는 데이터를 채워넣어준다.
-	virtual void GetLightConstants(struct LightConstants& lightConstants);
+	virtual void SetLightData(struct LightData& lightData, const DirectX::BoundingSphere& sceneBounding);
 
 public:
 	inline LightType GetLightType() const { return mLightType; }

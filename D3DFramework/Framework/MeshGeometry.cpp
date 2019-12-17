@@ -5,7 +5,7 @@
 
 using namespace DirectX;
 
-MeshGeometry::MeshGeometry(std::string name) : Base(name) { }
+MeshGeometry::MeshGeometry(std::string&& name) : Base(std::move(name)) { }
 
 MeshGeometry::~MeshGeometry() { }
 
@@ -87,11 +87,29 @@ void MeshGeometry::Render(ID3D12GraphicsCommandList* commandList, UINT instanceC
 
 	if (isIndexed)
 	{
+		if (mVertexCount == 0 || mIndexCount == 0)
+		{
+#if defined(DEBUG) || defined(_DEBUG)
+			std::cout << ToString() << " MeshGeometry wasn't Initialize" << std::endl;
+#endif
+			return;
+		}
+
+
 		commandList->IASetIndexBuffer(&mIndexBufferView);
 		commandList->DrawIndexedInstanced(mIndexCount, instanceCount, 0, 0, 0);
 	}
 	else
 	{
+		if (mVertexCount == 0)
+		{
+#if defined(DEBUG) || defined(_DEBUG)
+			std::cout << ToString() << " MeshGeometry wasn't Initialize" << std::endl;
+#endif
+			return;
+		}
+
+
 		commandList->DrawInstanced(mVertexCount, instanceCount, 0, 0);
 	}
 }

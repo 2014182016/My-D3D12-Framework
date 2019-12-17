@@ -21,7 +21,7 @@ VertexOut VS(VertexIn vin)
 {
 	VertexOut vout = (VertexOut)0.0f;
 
-	float4 posW = mul(float4(vin.mPosL, 1.0f), gDebugData[vin.instanceID + gDebugInstanceIndex].gBoundingWorld);
+	float4 posW = mul(float4(vin.mPosL, 1.0f), gCollisionDebugData[vin.instanceID + gOffsetIndex].gBoundingWorld);
 	vout.mPosH = mul(posW, gViewProj);
 
 	vout.mColor = vin.mColor;

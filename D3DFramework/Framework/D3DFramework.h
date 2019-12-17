@@ -1,12 +1,10 @@
 #pragma once
 
 #include "D3DApp.h"
-#include "Structures.h"
 
 #if defined(DEBUG) || defined(_DEBUG)
 #pragma comment(linker, "/entry:WinMainCRTStartup /subsystem:console")
 #endif
-
 
 class D3DFramework : public D3DApp
 {
@@ -27,6 +25,8 @@ public:
 	virtual void CreateRtvAndDsvDescriptorHeaps();
 
 public:
+	void RenderGameObjects(ID3D12GraphicsCommandList* cmdList, const std::list<std::shared_ptr<class GameObject>>& gameObjects,
+		UINT& startObjectIndex, DirectX::BoundingFrustum* frustum = nullptr) const;
 	class GameObject* Picking(int screenX, int screenY, float distance = 1000.0f) const;
 
 public:
@@ -35,29 +35,32 @@ public:
 	inline std::list<std::shared_ptr<class GameObject>>& GetGameObjects(int layerIndex) { return mGameObjects.at(layerIndex); }
 
 private:
+	void AddGameObject(std::shared_ptr<class GameObject> object, RenderLayer renderLayer);
+	void AddLight(std::shared_ptr<class Light> object);
+	void DestroyObjects();
+
+	void UpdateLightBuffer(float deltaTime);
 	void UpdateMaterialBuffer(float deltaTime);
 	void UpdateMainPassCB(float deltaTime);
+
+	void BuildObjects();
+	void BuildLights();
+	void BuildFrameResources();
 
 	void BuildRootSignature();
 	void BuildDescriptorHeaps();
 	void BuildShadersAndInputLayout();
 	void BuildPSOs();
-	void BuildFrameResources();
-	void BuildObjects();
-	void BuildLights();
-
-	void RenderGameObjects(ID3D12GraphicsCommandList* cmdList, 
-		const std::list<std::shared_ptr<class GameObject>>& gameObjects, UINT& startObjectIndex) const;
 
 	void DebugCollision(ID3D12GraphicsCommandList* cmdList);
-	void DebugOctTree(ID3D12GraphicsCommandList* cmdList);
+	void DebugOctree(ID3D12GraphicsCommandList* cmdList);
 	void DebugLight(ID3D12GraphicsCommandList* cmdList);
 
-	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6> GetStaticSamplers();
+	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> GetStaticSamplers();
 
 private:
 	std::array<std::unique_ptr<struct FrameResource>, NUM_FRAME_RESOURCES> mFrameResources;
-	FrameResource* mCurrentFrameResource = nullptr;
+	struct FrameResource* mCurrentFrameResource = nullptr;
 	int mCurrentFrameResourceIndex = 0;
 
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mCbvSrvUavDescriptorHeap = nullptr;
@@ -67,20 +70,29 @@ private:
 	std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3DBlob>> mShaders;
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mDefaultLayout;
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mBillboardLayout;
-	std::vector<D3D12_INPUT_ELEMENT_DESC> mDebugLayout;
+	std::vector<D3D12_INPUT_ELEMENT_DESC> mUILayout;
+	std::vector<D3D12_INPUT_ELEMENT_DESC> mCollisionDebugLayout;
 
-	// 모든 오브젝트를 담고 있는 포워트 리스트
 	std::list<std::shared_ptr<class Object>> mAllObjects;
-
 	std::array<std::list<std::shared_ptr<class GameObject>>, (int)RenderLayer::Count> mGameObjects;
+	std::list<std::shared_ptr<class GameObject>> mCollisionObjects;
 	std::list<std::shared_ptr<class Light>> mLights;
 
-	PassConstants mMainPassCB;
 	UINT objCBByteSize = 0;
 	UINT passCBByteSize = 0;
 
+	UINT mCurrentSkyCubeMapIndex = 0;
+	UINT mSkyCubeMapHeapIndex = 0;
+	UINT mShadowMapHeapIndex = 0;
+
+	UINT mObjectNum = 0;
+	UINT mLightNum = 0;
+
+	DirectX::BoundingSphere mSceneBounds;
 	DirectX::BoundingFrustum mWorldCamFrustum;
 
+	std::unique_ptr<struct PassConstants> mMainPassCB;
+	std::unique_ptr<class ShadowMap> mShadowMap;
 	std::unique_ptr<class Camera> mCamera;
 	std::unique_ptr<class AssetManager> mAssetManager;
 	std::unique_ptr<class Octree> mOctreeRoot;

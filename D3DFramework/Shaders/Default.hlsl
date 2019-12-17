@@ -9,16 +9,19 @@ struct VertexIn
 	float3 mPosL     : POSITION;
     float3 mNormalL  : NORMAL;
 	float3 mTangentU : TANGENT;
+	float3 mBinormalU: BINORMAL;
 	float2 mTexC     : TEXCOORD;
 };
 
 struct VertexOut
 {
-	float4 mPosH     : SV_POSITION;
-    float3 mPosW     : POSITION;
-    float3 mNormalW  : NORMAL;
-	float3 mTangentW : TANGENT;
-	float2 mTexC     : TEXCOORD;
+	float4 mPosH      : SV_POSITION;
+	float4 mShadowPosH: POSITION0;
+    float3 mPosW      : POSITION1;
+    float3 mNormalW   : NORMAL;
+	float3 mTangentW  : TANGENT;
+	float3 mBinormalW : BINORMAL;
+	float2 mTexC      : TEXCOORD;
 };
 
 VertexOut VS(VertexIn vin)
@@ -39,9 +42,13 @@ VertexOut VS(VertexIn vin)
 	// 비균등 비례가 있다면 역전치 행렬을 사용해야 한다.
     vout.mNormalW = mul(vin.mNormalL, (float3x3)gWorld);
 	vout.mTangentW = mul(vin.mTangentU, (float3x3)gWorld);
+	vout.mBinormalW = mul(vin.mBinormalU, (float3x3)gWorld);
 	
 	// 출력 정점 특성들은 이후 삼각형을 따라 보간된다.
 	vout.mTexC = mul(float4(vin.mTexC, 0.0f, 1.0f), matData.mMatTransform).xy;
+
+	// 현재 정점을 광원의 텍스처 공간으로 변환한다.
+	vout.mShadowPosH = mul(posW, gLights[0].mShadowTransform);
 	
     return vout;
 }
@@ -52,10 +59,10 @@ float4 PS(VertexOut pin) : SV_Target
 	MaterialData matData = gMaterialData[gMaterialIndex];
 	float4 diffuseAlbedo = matData.mDiffuseAlbedo;
 	float3 specular = matData.mSpecular;
-	float  roughness = matData.mRoughness;
+	float roughness = matData.mRoughness;
 	uint diffuseMapIndex = matData.mDiffuseMapIndex;
 	uint normalMapIndex = matData.mNormalMapIndex;
-	
+
 	// 텍스처 배열의 텍스처를 동적으로 조회한다.
 	if (diffuseMapIndex != -1)
 	{
@@ -69,13 +76,18 @@ float4 PS(VertexOut pin) : SV_Target
 
 	// 법선을 보간하면 단위 길이가 아니게 될 수 있으므로 다시 정규화한다.
     pin.mNormalW = normalize(pin.mNormalW);
-	float3 bumpedNormalW = pin.mNormalW;;
+	pin.mTangentW = normalize(pin.mTangentW);
+	pin.mBinormalW = normalize(pin.mBinormalW);
+	float3 bumpedNormalW = pin.mNormalW;
 	
-	// 노멀맵에서 Local Space의 노멀을 World Space의 노멀로 변환한다.
+	// 노멀맵에서 Tangent Space의 노멀을 World Space의 노멀로 변환한다.
 	if (normalMapIndex != -1)
 	{
 		float4 normalMapSample = gTextureMaps[normalMapIndex].Sample(gsamAnisotropicWrap, pin.mTexC);
-		bumpedNormalW = NormalSampleToWorldSpace(normalMapSample.rgb, pin.mNormalW, pin.mTangentW);
+		float3 normalT = 2.0f * normalMapSample.rgb - 1.0f;
+		float3x3 tbn = float3x3(pin.mTangentW, pin.mBinormalW, pin.mNormalW);
+		bumpedNormalW = mul(normalT, tbn);
+		bumpedNormalW = normalize(bumpedNormalW);
 	}
 
     // 조명되는 픽셀에서 눈으로의 벡터
@@ -84,19 +96,34 @@ float4 PS(VertexOut pin) : SV_Target
 	toEyeW /= distToEye; // normalize
 
     // Diffuse를 전반적으로 밝혀주는 Ambient항
-    float4 ambient = gAmbientLight*diffuseAlbedo;
+    float4 ambient = gAmbientLight * diffuseAlbedo;
 
 	// 다른 물체에 가려진 정도에 따라 shadowFactor로 픽셀을 어둡게 한다.
-    float3 shadowFactor = float3(1.0f, 1.0f, 1.0f);
+	float3 shadowFactor = 1.0f;
+	shadowFactor = CalcShadowFactor(pin.mShadowPosH, 0);
 
 	// roughness와 normal를 이용하여 shininess를 계산한다.
-    const float shininess = 1.0f - roughness;
+	const float shininess = 1.0f - roughness;
+
+    Material mat = { diffuseAlbedo, specular, shininess };
 
 	// Lighting을 실시한다.
-    Material mat = { diffuseAlbedo, specular, shininess };
     float4 directLight = ComputeLighting(gLights, mat, pin.mPosW,
         bumpedNormalW, toEyeW, shadowFactor);
 	float4 litColor = ambient + directLight;
+
+
+#ifdef SKY_REFLECTION
+	// Sky Cube Map으로 환경 매핑을 사용하여 픽셀에 입힌다.
+	if (gCurrentSkyCubeMapIndex != -1)
+	{
+		float3 r = reflect(-toEyeW, pin.mNormalW);
+		float4 reflectionColor = gCubeMaps[gCurrentSkyCubeMapIndex].Sample(gsamLinearWrap, r);
+		float3 fresnelFactor = SchlickFresnel(specular, pin.mNormalW, r);
+		litColor.rgb += shininess * fresnelFactor * reflectionColor.rgb;
+	}
+#endif
+
 
 	if (gFogEnabled)
 	{
@@ -104,7 +131,7 @@ float4 PS(VertexOut pin) : SV_Target
 		float fogAmount = saturate((distToEye - gFogStart) / gFogRange);
 		litColor = lerp(litColor, gFogColor, fogAmount);
 	}
-	
+
     // 분산 재질에서 알파를 가져온다.
     litColor.a = diffuseAlbedo.a;
 

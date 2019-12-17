@@ -1,19 +1,17 @@
 #pragma once
 
-#include "pch.h"
 #include "Base.h"
 #include "Enums.h"
 
 class Object : public Base
 {
 public:
-	Object(std::string name);
+	Object(std::string&& name);
 	virtual ~Object();
 
 public:
-	virtual void BeginPlay() { }
-	virtual void Tick(float deltaTime);
-	virtual void Destroy();
+	virtual void Tick(float deltaTime) override;
+	virtual void Destroy() override;
 
 	// 물체가 움직일 때, 업데이트 해야할 것을 오버라이딩하여 작성한다.
 	virtual void WorldUpdate();

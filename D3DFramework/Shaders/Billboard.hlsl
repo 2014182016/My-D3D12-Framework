@@ -18,10 +18,11 @@ struct VertexOut
 
 struct GeoOut
 {
-	float4 mPosH    : SV_POSITION;
-	float3 mPosW    : POSITION;
-	float3 mNormalW : NORMAL;
-	float2 mTexC    : TEXCOORD;
+	float4 mPosH      : SV_POSITION;
+	float4 mShadowPosH: POSITION0;
+	float3 mPosW      : POSITION1;
+	float3 mNormalW   : NORMAL;
+	float2 mTexC      : TEXCOORD;
 };
 
 VertexOut VS(VertexIn vin)
@@ -78,6 +79,9 @@ void GS(point VertexOut gin[1], // Primitive는 Point이므로 들어오는 정점은 하나�
 		gout.mNormalW = look;
 		gout.mTexC = texC[i];
 
+		// 현재 정점을 광원의 텍스처 공간으로 변환한다.
+		gout.mShadowPosH = mul(v[i], gLights[0].mShadowTransform);
+
 		triStream.Append(gout);
 	}
 }
@@ -88,7 +92,7 @@ float4 PS(GeoOut pin) : SV_Target
 	MaterialData matData = gMaterialData[gMaterialIndex];
 	float4 diffuseAlbedo = matData.mDiffuseAlbedo;
 	float3 specular = matData.mSpecular;
-	float  roughness = matData.mRoughness;
+	float roughness = matData.mRoughness;
 	uint diffuseMapIndex = matData.mDiffuseMapIndex;
 	uint normalMapIndex = matData.mNormalMapIndex;
 
@@ -114,9 +118,19 @@ float4 PS(GeoOut pin) : SV_Target
 	// roughness와 normal를 이용하여 shininess를 계산한다.
 	const float shininess = 1.0f - roughness;
 
+	// 다른 물체에 가려진 정도에 따라 shadowFactor로 픽셀을 어둡게 한다.
+	float3 shadowFactor = float3(1.0f, 1.0f, 1.0f);
+	/*
+	for (int i = 0; i < LIGHT_NUM; ++i)
+	{
+		// shadowFactor[i] = CalcShadowFactor(pin.mShadowPosH, i);
+		// shadowFactor[i] *= diffuseAlbedo.a;
+		shadowFactor[i] = float3(1.0f, 1.0f, 1.0f);
+	}
+	*/
+
 	// Lighting을 실시한다.
 	Material mat = { diffuseAlbedo, specular, shininess };
-	float3 shadowFactor = 1.0f;
 	float4 directLight = ComputeLighting(gLights, mat, pin.mPosW,
 		pin.mNormalW, toEyeW, shadowFactor);
 

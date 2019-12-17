@@ -1,15 +1,14 @@
 #pragma once
 
-#include "pch.h"
 #include "Light.h"
 
 class DirectionalLight : public Light
 {
 public:
-	DirectionalLight(std::string name);
+	DirectionalLight(std::string&& name);
 	virtual ~DirectionalLight();
 
 public:
-	virtual void GetLightConstants(struct LightConstants& lightConstants) override;
+	virtual void SetLightData(struct LightData& lightData, const DirectX::BoundingSphere& sceneBounding) override;
 
 };

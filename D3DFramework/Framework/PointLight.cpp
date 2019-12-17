@@ -2,18 +2,19 @@
 #include "PointLight.h"
 #include "Structures.h"
 
-PointLight::PointLight(std::string name) : Light(name)
+using namespace DirectX;
+
+PointLight::PointLight(std::string&& name) : Light(std::move(name))
 {
 	mLightType = LightType::PointLight;
 }
 
 PointLight::~PointLight() { }
 
-void PointLight::GetLightConstants(LightConstants& lightConstants)
+void PointLight::SetLightData(LightData& lightData, const DirectX::BoundingSphere& sceneBounding)
 {
-	__super::GetLightConstants(lightConstants);
+	__super::SetLightData(lightData, sceneBounding);
 
-	lightConstants.mPosition = GetPosition();
-	lightConstants.mFalloffStart = mFalloffStart;
-	lightConstants.mFalloffEnd = mFalloffEnd;
+	lightData.mFalloffStart = mFalloffStart;
+	lightData.mFalloffEnd = mFalloffEnd;
 }

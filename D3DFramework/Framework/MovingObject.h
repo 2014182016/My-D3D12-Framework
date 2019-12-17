@@ -5,7 +5,7 @@
 class MovingObject : public GameObject
 {
 public:
-	MovingObject(std::string name);
+	MovingObject(std::string&& name);
 	virtual ~MovingObject();
 
 public:

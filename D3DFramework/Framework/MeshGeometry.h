@@ -1,6 +1,5 @@
 #pragma once
 
-#include "pch.h"
 #include "Base.h"
 #include "Enums.h"
 
@@ -20,7 +19,7 @@ public:
 	};
 
 public:
-	MeshGeometry(std::string name);
+	MeshGeometry(std::string&& name);
 	virtual ~MeshGeometry();
 
 public:

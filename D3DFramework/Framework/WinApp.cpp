@@ -77,6 +77,11 @@ bool WinApp::Initialize()
 	if (!InitMainWindow())
 		return false;
 
+	// pdh를 초기화한다.
+	PdhOpenQuery(NULL, NULL, &mQueryHandle);
+	PdhAddCounter(mQueryHandle, L"\\Processor(_Total)\\% Processor Time", NULL, &mCounterHandle);
+	PdhCollectQueryData(mQueryHandle);
+
 	return true;
 }
 
@@ -219,12 +224,19 @@ void WinApp::CalculateFrameStats()
 		float fps = (float)frameCnt; // fps = frameCnt / 1
 		float mspf = 1000.0f / fps;
 
+		// cpu 사용량을 계산한다.
+		PDH_FMT_COUNTERVALUE counterValue;
+		PdhCollectQueryData(mQueryHandle);
+		PdhGetFormattedCounterValue(mCounterHandle, PDH_FMT_LONG, NULL, &counterValue);
+
 		std::wstring fpsStr = std::to_wstring(fps);
 		std::wstring mspfStr = std::to_wstring(mspf);
+		std::wstring cpuStr = std::to_wstring(counterValue.longValue);
 
 		std::wstring windowText = mApplicationName +
 			L"    fps: " + fpsStr +
-			L"   mspf: " + mspfStr;
+			L"   mspf: " + mspfStr +
+			L"    cpu: " + cpuStr + L"%";
 
 		SetWindowText(mhMainWnd, windowText.c_str());
 

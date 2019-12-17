@@ -5,11 +5,11 @@
 class PointLight : public Light
 {
 public:
-	PointLight(std::string name);
+	PointLight(std::string&& name);
 	~PointLight();
 
 public:
-	virtual void GetLightConstants(struct LightConstants& lightConstants) override;
+	virtual void SetLightData(struct LightData& lightData, const DirectX::BoundingSphere& sceneBounding) override;
 
 public:
 	inline float GetFalloffStart() const { return mFalloffStart; }
@@ -18,6 +18,6 @@ public:
 	inline void SetFalloffEnd(float falloffEnd) { mFalloffEnd = falloffEnd; }
 
 protected:
-	float mFalloffStart;
-	float mFalloffEnd;
+	float mFalloffStart = 1.0f;
+	float mFalloffEnd = 10.0f;
 };

@@ -36,7 +36,10 @@ public:
 	inline bool GetOptionEnabled(Option option) const { return mOptions.test((int)option); }
 	void SwitchOptionEnabled(Option option);
 	void SetOptionEnabled(Option option, bool value);
-	
+
+	inline int GetScreenWidth() const { return mScreenWidth; }
+	inline int GetScreenHeight() const { return mScreenHeight; }
+
 
 private:
 	bool InitMainWindow();
@@ -53,6 +56,10 @@ protected:
 
 	HINSTANCE mhAppInst = nullptr; 
 	HWND mhMainWnd = nullptr; 
+
+	// cpu 사용량을 계산하기 위해 PDH(Performance Data Helper)를 이용한다.
+	HQUERY mQueryHandle;
+	HCOUNTER mCounterHandle;
 
 	// 윈도우 속성
 	std::wstring mApplicationName = L"D3DFramework";

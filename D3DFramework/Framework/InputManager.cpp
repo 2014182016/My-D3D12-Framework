@@ -70,11 +70,11 @@ void InputManager::OnKeyUp(unsigned int input)
 	else if (input == VK_F2)
 		mApp->SwitchOptionEnabled(Option::Debug_Collision);
 	else if (input == VK_F3)
-		mApp->SwitchOptionEnabled(Option::Debug_OctTree);
+		mApp->SwitchOptionEnabled(Option::Debug_Octree);
 	else if (input == VK_F4)
 		mApp->SwitchOptionEnabled(Option::Debug_Light);
 	else if (input == VK_F5)
-		mApp->SwitchOptionEnabled(Option::Fullscreen);
+		mApp->SwitchOptionEnabled(Option::Debug_Texture);
 }
 
 void InputManager::Tick(float deltaTime) 

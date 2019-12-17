@@ -25,22 +25,32 @@ public:
 
 	void DrawLine(DirectX::XMFLOAT3 p1, DirectX::XMFLOAT3 p2, float time = 5.0f,
 		DirectX::XMFLOAT4 color = (DirectX::XMFLOAT4)DirectX::Colors::Red);
+	void DrawLine(DirectX::XMVECTOR p1, DirectX::XMVECTOR p2, float time = 5.0f,
+		DirectX::XMFLOAT4 color = (DirectX::XMFLOAT4)DirectX::Colors::Red);
 	void DrawCube(DirectX::XMFLOAT3 center, float width, float height, float depth, float time = 5.0f,
+		DirectX::XMFLOAT4 color = (DirectX::XMFLOAT4)DirectX::Colors::Red);
+	void DrawCube(DirectX::XMVECTOR center, float width, float height, float depth, float time = 5.0f,
 		DirectX::XMFLOAT4 color = (DirectX::XMFLOAT4)DirectX::Colors::Red);
 	void DrawCube(DirectX::XMFLOAT3 center, DirectX::XMFLOAT3 extent, float time = 5.0f,
 		DirectX::XMFLOAT4 color = (DirectX::XMFLOAT4)DirectX::Colors::Red);
+	void DrawCube(DirectX::XMVECTOR center, DirectX::XMVECTOR extent, float time = 5.0f,
+		DirectX::XMFLOAT4 color = (DirectX::XMFLOAT4)DirectX::Colors::Red);
 	void DrawCube(DirectX::XMFLOAT3 center, float width, float time = 5.0f,
+		DirectX::XMFLOAT4 color = (DirectX::XMFLOAT4)DirectX::Colors::Red);
+	void DrawCube(DirectX::XMVECTOR center, float width, float time = 5.0f,
 		DirectX::XMFLOAT4 color = (DirectX::XMFLOAT4)DirectX::Colors::Red);
 	void DrawRing(DirectX::XMFLOAT3 center, DirectX::XMVECTOR majorAxis, DirectX::XMVECTOR minorAxis, 
 		float radius, float time = 5.0f, 
 		DirectX::XMFLOAT4 color = (DirectX::XMFLOAT4)DirectX::Colors::Red);
 	void DrawSphere(DirectX::XMFLOAT3 center, float radius, float time = 5.0f,
 		DirectX::XMFLOAT4 color = (DirectX::XMFLOAT4)DirectX::Colors::Red);
+	void DrawSphere(DirectX::XMVECTOR center, float radius, float time = 5.0f,
+		DirectX::XMFLOAT4 color = (DirectX::XMFLOAT4)DirectX::Colors::Red);
 
 	UINT GetAllDebugDataCount() const;
 
 public:
-	D3DDebug* GetInstance() const { return mInstance; }
+	static D3DDebug* GetInstance() { return mInstance; }
 
 private:
 	void CreateDirectObjects();
@@ -49,7 +59,7 @@ private:
 	void CommandListExcute();
 
 private:
-	D3DDebug* mInstance = nullptr;
+	static inline D3DDebug* mInstance = nullptr;
 
 	std::vector<DebugData> mDebugDatas[(int)DebugType::Count];
 	std::vector<std::unique_ptr<class MeshGeometry>> mDebugMeshes;

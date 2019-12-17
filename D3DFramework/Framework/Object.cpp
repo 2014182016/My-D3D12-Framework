@@ -3,7 +3,7 @@
 
 using namespace DirectX;
 
-Object::Object(std::string name) : Base(name) { }
+Object::Object(std::string&& name) : Base(std::move(name)) { }
 
 Object::~Object() { }
 
@@ -17,6 +17,7 @@ void Object::Tick(float deltaTime)
 	if (mIsWorldUpdate)
 	{
 		WorldUpdate();
+		UpdateNumFrames();
 
 		mIsWorldUpdate = false;
 	}
