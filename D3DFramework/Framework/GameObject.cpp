@@ -185,12 +185,12 @@ void GameObject::SetCollisionEnabled(bool value)
 {
 	if (value)
 	{
-		mCollisionType = CollisionType::None;
+		if (mMesh)
+			mCollisionType = mMesh->GetCollisionType();
 	}
 	else
 	{
-		if (mMesh)
-			mCollisionType = mMesh->GetCollisionType();
+		mCollisionType = CollisionType::None;
 	}
 }
 

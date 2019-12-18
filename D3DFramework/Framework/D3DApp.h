@@ -24,6 +24,7 @@ public:
 	void SetGamma(float gamma);
 
 	inline static D3DApp* GetApp() { return static_cast<D3DApp*>(mApp); }
+	inline IDirectSound3DListener8* GetListener() { return mListener.Get(); }
 
 	inline DirectX::XMFLOAT4 GetBackgroundColor() const { return mBackBufferClearColor; }
 	inline void SetBackgroundColor(DirectX::XMFLOAT4 color) { mBackBufferClearColor = color; }
@@ -66,6 +67,10 @@ protected:
 
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mRtvHeap;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mDsvHeap;
+
+	Microsoft::WRL::ComPtr<IDirectSound8> md3dSound;
+	Microsoft::WRL::ComPtr<IDirectSoundBuffer> mPrimarySoundBuffer;
+	Microsoft::WRL::ComPtr<IDirectSound3DListener8> mListener;
 
 	D3D12_VIEWPORT mScreenViewport;
 	D3D12_RECT mScissorRect;

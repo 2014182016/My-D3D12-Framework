@@ -34,6 +34,12 @@ enum class LightType : std::uint32_t
 	SpotLight
 };
 
+enum class SoundType : int
+{
+	Sound2D = 0,
+	Sound3D,
+};
+
 // RenderLayer는 렌더할 때의 순으로 정렬한다.
 enum class RenderLayer : int
 {

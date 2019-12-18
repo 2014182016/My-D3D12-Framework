@@ -7,6 +7,7 @@
 #include "Camera.h"
 #include "D3DUtil.h"
 #include "AssetManager.h"
+#include "InputManager.h"
 #include "GameObject.h"
 #include "Material.h"
 #include "MeshGeometry.h"
@@ -26,9 +27,9 @@ using Microsoft::WRL::ComPtr;
 D3DFramework::D3DFramework(HINSTANCE hInstance, int screenWidth, int screenHeight, std::wstring applicationName)
 	: D3DApp(hInstance, screenWidth, screenHeight, applicationName) 
 {
+	mMainPassCB = std::make_unique<PassConstants>();
 	mCamera = std::make_unique<Camera>();
 	mAssetManager = std::make_unique<AssetManager>();
-	mMainPassCB = std::make_unique<PassConstants>();
 
 	mSceneBounds.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
 	mSceneBounds.Radius = sqrtf(10.0f*10.0f + 15.0f*15.0f);
@@ -45,11 +46,13 @@ bool D3DFramework::Initialize()
 	// 초기화 명령들을 준비하기 위해 명령 목록들을 재설정한다.
 	ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), nullptr));
 
+	mCamera->SetListener(mListener.Get());
 	mCamera->SetPosition(0.0f, 2.0f, -15.0f);
 
 	mDebug = std::make_unique<D3DDebug>();
 
-	mAssetManager->Initialize(md3dDevice.Get(), mCommandList.Get());
+	mAssetManager->Initialize(md3dDevice.Get(), mCommandList.Get(), md3dSound.Get());
+
 	mShadowMap = std::make_unique<ShadowMap>(md3dDevice.Get(), SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
 
 	objCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
@@ -79,7 +82,7 @@ bool D3DFramework::Initialize()
 	}
 
 	BoundingBox octreeAABB = BoundingBox(XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(100.0f, 100.0f, 100.0f));
-	mOctreeRoot = std::make_unique<Octree>(octreeAABB, mCollisionObjects);
+	mOctreeRoot = std::make_unique<Octree>(octreeAABB, mActualObjects);
 	mOctreeRoot->BuildTree();
 
 	return true;
@@ -192,7 +195,7 @@ void D3DFramework::Render()
 	for (const auto& light : mLights)
 	{
 		if(light->IsUpdate())
-			mShadowMap->RenderSceneToShadowMap(mCommandList.Get(), mPSOs["Shadow"].Get(), mCollisionObjects, objectCBIndex);
+			mShadowMap->RenderSceneToShadowMap(mCommandList.Get(), mPSOs["Shadow"].Get(), mActualObjects, objectCBIndex);
 	}
 
 	// Default Pass
@@ -303,7 +306,7 @@ void D3DFramework::AddGameObject(std::shared_ptr<GameObject> object, RenderLayer
 	mGameObjects[(int)renderLayer].emplace_back(object);
 
 	if (renderLayer == RenderLayer::Opaque || renderLayer == RenderLayer::Transparent || renderLayer == RenderLayer::AlphaTested)
-		mCollisionObjects.emplace_back(object);
+		mActualObjects.emplace_back(object);
 
 	++mObjectNum;
 
@@ -1093,7 +1096,6 @@ GameObject* D3DFramework::Picking(int screenX, int screenY, float distance) cons
 	XMFLOAT4X4 proj = mCamera->GetProj4x4f();
 
 	// Picking Ray를 뷰 공간으로 계산한다.
-	// Compute picking ray in view space.
 	float vx = (2.0f * screenX / mScreenWidth - 1.0f) / proj(0, 0);
 	float vy = (-2.0f * screenY / mScreenHeight + 1.0f) / proj(1, 1);
 
@@ -1110,10 +1112,7 @@ GameObject* D3DFramework::Picking(int screenX, int screenY, float distance) cons
 
 #if defined(DEBUG) || defined(_DEBUG)
 	XMVECTOR rayEnd = rayOrigin + rayDir * distance;
-	XMFLOAT3 xmf3RayOrigin, xmf3RayEnd;
-	XMStoreFloat3(&xmf3RayOrigin, rayOrigin);
-	XMStoreFloat3(&xmf3RayEnd, rayEnd);
-	mDebug->DrawLine(xmf3RayOrigin, xmf3RayEnd);
+	mDebug->DrawLine(rayOrigin, rayEnd);
 #endif
 	
 	bool nearestHit = false;
@@ -1121,45 +1120,44 @@ GameObject* D3DFramework::Picking(int screenX, int screenY, float distance) cons
 	GameObject* hitObj = nullptr;
 
 	// Picking Ray로 충돌을 검사한다.
-	for(const auto& list : mGameObjects)
-		for (const auto& obj : list)
+	for (const auto& obj : mActualObjects)
+	{
+		bool isHit = false;
+		float hitDist = FLT_MAX;
+
+		switch (obj->GetCollisionType())
 		{
-			bool isHit = false;
-			float hitDist = FLT_MAX;
+		case CollisionType::AABB:
+		{
+			const BoundingBox& aabb = std::any_cast<BoundingBox>(obj->GetCollisionBounding());
+			isHit = aabb.Intersects(rayOrigin, rayDir, hitDist);
+			break;
+		}
+		case CollisionType::OBB:
+		{
+			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(obj->GetCollisionBounding());
+			isHit = obb.Intersects(rayOrigin, rayDir, hitDist);
+			break;
+		}
+		case CollisionType::Sphere:
+		{
+			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(obj->GetCollisionBounding());
+			isHit = sphere.Intersects(rayOrigin, rayDir, hitDist);
+			break;
+		}
+		}
 
-			switch (obj->GetCollisionType())
+		if (isHit)
+		{
+			// 충돌된 Game Object들 중 가장 가까운 객체가 선택된 객체이다.
+			if (nearestDist > hitDist)
 			{
-			case CollisionType::AABB: 
-			{
-				const BoundingBox& aabb = std::any_cast<BoundingBox>(obj->GetCollisionBounding());
-				isHit = aabb.Intersects(rayOrigin, rayDir, hitDist);
-				break;
-			}
-			case CollisionType::OBB: 
-			{
-				const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(obj->GetCollisionBounding());
-				isHit = obb.Intersects(rayOrigin, rayDir, hitDist);
-				break;
-			}
-			case CollisionType::Sphere: 
-			{
-				const BoundingSphere& sphere = std::any_cast<BoundingSphere>(obj->GetCollisionBounding());
-				isHit = sphere.Intersects(rayOrigin, rayDir, hitDist);
-				break;
-			}
-			}
-
-			if (isHit)
-			{
-				// 충돌된 Game Object들 중 가장 가까운 객체가 선택된 객체이다.
-				if (nearestDist > hitDist)
-				{
-					nearestDist = hitDist;
-					hitObj = obj.get();
-					nearestHit = true;
-				}
+				nearestDist = hitDist;
+				hitObj = obj.get();
+				nearestHit = true;
 			}
 		}
+	}
 
 #if defined(DEBUG) || defined(_DEBUG)
 	if (nearestHit)

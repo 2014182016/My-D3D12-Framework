@@ -50,6 +50,7 @@
     <ClCompile Include="Framework\pch.cpp" />
     <ClCompile Include="Framework\PointLight.cpp" />
     <ClCompile Include="Framework\ShadowMap.cpp" />
+    <ClCompile Include="Framework\Sound.cpp" />
     <ClCompile Include="Framework\SpotLight.cpp" />
     <ClCompile Include="Framework\WinApp.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -82,6 +83,7 @@
     <ClInclude Include="Framework\Octree.h" />
     <ClInclude Include="Framework\pch.h" />
     <ClInclude Include="Framework\ShadowMap.h" />
+    <ClInclude Include="Framework\Sound.h" />
     <ClInclude Include="Framework\Structures.h" />
     <ClInclude Include="Framework\PointLight.h" />
     <ClInclude Include="Framework\SpotLight.h" />

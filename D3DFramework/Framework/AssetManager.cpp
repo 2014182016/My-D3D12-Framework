@@ -4,7 +4,7 @@
 #include "MeshGeometry.h"
 #include "D3DUtil.h"
 #include "Structures.h"
-#include <float.h>
+#include "Sound.h"
 
 using namespace DirectX;
 using namespace std::literals;
@@ -20,16 +20,17 @@ AssetManager::AssetManager()
 
 AssetManager::~AssetManager() { }
 
-void AssetManager::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList)
+void AssetManager::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, IDirectSound8* d3dSound)
 {
 	LoadTextures(device, commandList);
+	LoadWaves(d3dSound);
 	BuildGeometry(device, commandList);
 	BuildMaterial();
 }
 
 void AssetManager::LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList)
 {
-	for (const auto& texInfo : mTexNames)
+	for (const auto& texInfo : mTexInfos)
 	{
 		auto[texName, fileName] = texInfo;
 
@@ -42,7 +43,7 @@ void AssetManager::LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList*
 		mTextures[texName] = std::move(texMap);
 	}
 
-	for (const auto& texInfo : mCubeTexNames)
+	for (const auto& texInfo : mCubeTexInfos)
 	{
 		auto[texName, fileName] = texInfo;
 
@@ -56,7 +57,13 @@ void AssetManager::LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList*
 	}
 }
 
-void AssetManager::LoadObj(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, std::tuple<std::string, std::wstring, CollisionType> modelInfo)
+void AssetManager::LoadWaves(IDirectSound8* d3dSound)
+{
+	for (const auto& soundInfo : mSoundInfos)
+		LoadWave(d3dSound, soundInfo);
+}
+
+void AssetManager::LoadObj(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, MeshInfo modelInfo)
 {
 	std::vector<XMFLOAT3> positions;
 	std::vector<XMFLOAT2> texcoords;
@@ -232,10 +239,17 @@ void AssetManager::LoadObj(ID3D12Device* device, ID3D12GraphicsCommandList* comm
 	fileName.erase(fileName.size() - 4, 4); // fileName에서 obj 포맷 string을 지운다.
 	ObjToH3d(vertices, indices, fileName); // obj파일은 h3d파일로 변환한다.
 
-	CreateMeshGeometry(device, commandList, vertices, indices, collisionType, meshName);
+	std::unique_ptr<MeshGeometry> mesh = std::make_unique<MeshGeometry>(std::move(meshName));
+	mesh->BuildMesh(device, commandList, vertices.data(), indices.data(),
+		(UINT)vertices.size(), (UINT)indices.size(), (UINT)sizeof(Vertex), (UINT)sizeof(std::uint16_t));
+
+	if(collisionType != CollisionType::None)
+		mesh->BuildCollisionBound(&vertices[0].mPos, vertices.size(), (size_t)sizeof(Vertex), collisionType);
+
+	mMeshes[mesh->GetName()] = std::move(mesh);
 }
 
-void AssetManager::LoadH3d(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, std::tuple<std::string, std::wstring, CollisionType> modelInfo)
+void AssetManager::LoadH3d(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, MeshInfo modelInfo)
 {
 	std::vector<Vertex> vertices;
 	std::vector<std::uint16_t> indices;
@@ -281,7 +295,14 @@ void AssetManager::LoadH3d(ID3D12Device* device, ID3D12GraphicsCommandList* comm
 
 	fin.close();
 
-	CreateMeshGeometry(device, commandList, vertices, indices, collisionType, meshName);
+	std::unique_ptr<MeshGeometry> mesh = std::make_unique<MeshGeometry>(std::move(meshName));
+	mesh->BuildMesh(device, commandList, vertices.data(), indices.data(),
+		(UINT)vertices.size(), (UINT)indices.size(), (UINT)sizeof(Vertex), (UINT)sizeof(std::uint16_t));
+
+	if (collisionType != CollisionType::None)
+		mesh->BuildCollisionBound(&vertices[0].mPos, vertices.size(), (size_t)sizeof(Vertex), collisionType);
+
+	mMeshes[mesh->GetName()] = std::move(mesh);
 }
 
 void AssetManager::ObjToH3d(const std::vector<struct Vertex>& vertices, const std::vector<std::uint16_t> indices, std::wstring fileName) const
@@ -366,14 +387,80 @@ void AssetManager::CalculateTBN(const VertexBasic& v1, const VertexBasic& v2, co
 	XMStoreFloat3(&binormal, binormalVec);
 }
 
-void AssetManager::CreateMeshGeometry(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
-	std::vector<struct Vertex>& vertices, std::vector<std::uint16_t> indices, CollisionType collisionType, std::string meshName)
+void AssetManager::LoadWave(IDirectSound8* d3dSound, SoundInfo soundInfo)
 {
-	std::unique_ptr<MeshGeometry> mesh = std::make_unique<MeshGeometry>(std::move(meshName));
-	mesh->BuildMesh(device, commandList, vertices.data(), indices.data(),
-		(UINT)vertices.size(), (UINT)indices.size(), (UINT)sizeof(Vertex), (UINT)sizeof(std::uint16_t));
-	mesh->BuildCollisionBound(&vertices[0].mPos, vertices.size(), (size_t)sizeof(Vertex), collisionType);
-	mMeshes[mesh->GetName()] = std::move(mesh);
+	auto[objectName, fileName, soundType] = soundInfo;
+
+	FILE* filePtr = nullptr;
+	if(fopen_s(&filePtr, fileName.c_str(), "rb") != 0)
+	{
+#if defined(DEBUG) || defined(_DEBUG)
+		std::cout << fileName.c_str() << " Wave File not Found" << std::endl;
+#endif
+		return;
+	}
+
+	WaveHeaderType waveFileHeader;
+	if (fread(&waveFileHeader, sizeof(waveFileHeader), 1, filePtr) == -1)
+		return;
+
+
+	// RIFF 포맷인지 확인한다.
+	if ((waveFileHeader.chunkId[0] != 'R') || (waveFileHeader.chunkId[1] != 'I') ||
+		(waveFileHeader.chunkId[2] != 'F') || (waveFileHeader.chunkId[3] != 'F'))
+		return;
+
+	// Wave 포맷인지 확인한다.
+	if ((waveFileHeader.format[0] != 'W') || (waveFileHeader.format[1] != 'A') ||
+		(waveFileHeader.format[2] != 'V') || (waveFileHeader.format[3] != 'E'))
+		return;
+
+	// fmt 포맷인지 확인한다.
+	if ((waveFileHeader.subChunkId[0] != 'f') || (waveFileHeader.subChunkId[1] != 'm') ||
+		(waveFileHeader.subChunkId[2] != 't') || (waveFileHeader.subChunkId[3] != ' '))
+		return;
+
+	/*
+	// 오디오 포맷이 WAVE_FORMAT_PCM인지 확인한다.
+	if (waveFileHeader.audioFormat != WAVE_FORMAT_PCM)
+		return;
+
+	// 스테레오 포맷으로 기록되어 있는지 확인한다.
+	if (waveFileHeader.numChannels != 2)
+		return;
+
+	// 44.1kHz 비율로 기록되었는지 확인한다.
+	if (waveFileHeader.sampleRate != 44100)
+		return;
+
+	// 16비트로 기록되어 있는지 확인한다.
+	if (waveFileHeader.bitsPerSample != 16)
+		return;
+	*/
+
+	// data인지 확인한다.
+	if ((waveFileHeader.dataChunkId[0] != 'd') || (waveFileHeader.dataChunkId[1] != 'a') ||
+		(waveFileHeader.dataChunkId[2] != 't') || (waveFileHeader.dataChunkId[3] != 'a'))
+	{
+#if defined(DEBUG) || defined(_DEBUG)
+		std::cout << fileName.c_str() << " Not Match Data" << std::endl;
+#endif
+		return;
+	}
+
+	std::unique_ptr<Sound> sound = std::make_unique<Sound>(std::move(objectName));
+
+	switch (soundType)
+	{
+	case SoundType::Sound2D:
+		sound->CreateSoundBuffer2D(d3dSound, filePtr, waveFileHeader);
+		break;
+	case SoundType::Sound3D:
+		sound->CreateSoundBuffer3D(d3dSound, filePtr, waveFileHeader);
+		break;
+	}
+
+	mSounds[sound->GetName()] = std::move(sound);
 }
 
 void AssetManager::BuildMaterial()
@@ -493,29 +580,14 @@ Material* AssetManager::FindMaterial(std::string&& name) const
 	return (*iter).second.get();
 }
 
-Texture* AssetManager::FindTexture(std::string&& name) const
+Sound* AssetManager::FindSound(std::string&& name) const
 {
-	auto iter = mTextures.find(name);
+	auto iter = mSounds.find(name);
 
-	if (iter == mTextures.end())
+	if (iter == mSounds.end())
 	{
 #if defined(DEBUG) | defined(_DEBUG)
-		std::cout << "Texture " << name << "이 발견되지 않음." << std::endl;
-#endif
-		return nullptr;
-	}
-
-	return (*iter).second.get();
-}
-
-Texture* AssetManager::FindCubeTexture(std::string&& name) const
-{
-	auto iter = mCubeTextures.find(name);
-
-	if (iter == mCubeTextures.end())
-	{
-#if defined(DEBUG) | defined(_DEBUG)
-		std::cout << "CubeTexture " << name << "이 발견되지 않음." << std::endl;
+		std::cout << "Sound " << name << "이 발견되지 않음." << std::endl;
 #endif
 		return nullptr;
 	}
@@ -526,7 +598,7 @@ Texture* AssetManager::FindCubeTexture(std::string&& name) const
 
 ID3D12Resource* AssetManager::GetTextureResource(UINT index) const
 {
-	std::string texName = mTexNames[index].first;
+	std::string texName = mTexInfos[index].first;
 	auto tex = mTextures.find(texName);
 
 	return tex->second->mResource.Get();
@@ -534,7 +606,7 @@ ID3D12Resource* AssetManager::GetTextureResource(UINT index) const
 
 ID3D12Resource* AssetManager::GetCubeTextureResource(UINT index) const
 {
-	std::string cubeTexName = mCubeTexNames[index].first;
+	std::string cubeTexName = mCubeTexInfos[index].first;
 	auto tex = mCubeTextures.find(cubeTexName);
 
 	return tex->second->mResource.Get();
@@ -543,12 +615,12 @@ ID3D12Resource* AssetManager::GetCubeTextureResource(UINT index) const
 int AssetManager::FindTextureIndex(std::string&& name) const
 {
 	// texNames가 정렬되어 있지 않은 상태에서 텍스처 이름과 name이 같은 것을 찾는다.
-	auto iter = std::find_if(mTexNames.begin(), mTexNames.end(),
+	auto iter = std::find_if(mTexInfos.begin(), mTexInfos.end(),
 		[&name](const TexName& pair) -> bool {
 		return std::equal(name.begin(), name.end(), pair.first.begin(), pair.first.end()); });
 
 
-	if (iter == mTexNames.end())
+	if (iter == mTexInfos.end())
 	{
 #if defined(DEBUG) | defined(_DEBUG)
 		std::cout << name << "이 발견되지 않음." << std::endl;
@@ -557,18 +629,18 @@ int AssetManager::FindTextureIndex(std::string&& name) const
 	}
 
 	// texName의 처음과 찾은 지점사이의 거리를 측정하여 index를 넘겨준다.
-	return (int)std::distance(mTexNames.begin(), iter);
+	return (int)std::distance(mTexInfos.begin(), iter);
 }
 
 int AssetManager::FindCubeTextureIndex(std::string&& name) const
 {
 	// texNames가 정렬되어 있지 않은 상태에서 텍스처 이름과 name이 같은 것을 찾는다.
-	auto iter = std::find_if(mCubeTexNames.begin(), mCubeTexNames.end(),
+	auto iter = std::find_if(mCubeTexInfos.begin(), mCubeTexInfos.end(),
 		[&name](const TexName& pair) -> bool {
 		return std::equal(name.begin(), name.end(), pair.first.begin(), pair.first.end()); });
 
 
-	if (iter == mCubeTexNames.end())
+	if (iter == mCubeTexInfos.end())
 	{
 #if defined(DEBUG) | defined(_DEBUG)
 		std::cout << name << "이 발견되지 않음." << std::endl;
@@ -577,5 +649,5 @@ int AssetManager::FindCubeTextureIndex(std::string&& name) const
 	}
 
 	// texName의 처음과 찾은 지점사이의 거리를 측정하여 index를 넘겨준다.
-	return (int)std::distance(mCubeTexNames.begin(), iter);
+	return (int)std::distance(mCubeTexInfos.begin(), iter);
 }

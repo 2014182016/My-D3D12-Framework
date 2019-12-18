@@ -2,14 +2,13 @@
 #include "InputManager.h"
 #include "D3DFramework.h"
 #include "Camera.h"
+#include "AssetManager.h"
+#include "Sound.h"
 
 InputManager::InputManager()
 {
 	for (int i = 0; i < 256; ++i)
 		mKeys[i] = false;
-
-	mApp = D3DFramework::GetApp();
-	assert(mApp);
 }
 
 InputManager::~InputManager() { }
@@ -24,7 +23,7 @@ void InputManager::OnMouseDown(WPARAM btnState, int x, int y)
 		// 마우스를 보이지 않게 한다.
 		::SetCursor(NULL);
 
-		SetCapture(mApp->GetMainWnd());
+		SetCapture(D3DFramework::GetApp()->GetMainWnd());
 	}
 	else if ((btnState & MK_RBUTTON) != 0)
 	{
@@ -39,6 +38,8 @@ void InputManager::OnMouseUp(WPARAM btnState, int x, int y)
 
 void InputManager::OnMouseMove(WPARAM btnState, int x, int y) 
 {
+	Camera* camera = D3DFramework::GetApp()->GetCamera();
+
 	// 왼쪽 마우스 버튼이 눌려졌다면 카메라를 회전시킨다.
 	if ((btnState & MK_LBUTTON) != 0)
 	{
@@ -47,8 +48,8 @@ void InputManager::OnMouseMove(WPARAM btnState, int x, int y)
 		float dy = DirectX::XMConvertToRadians(mCameraRotateSpeed * static_cast<float>(y - mLastMousePos.y));
 
 		// 회전의 단위는 라디안이다.
-		mApp->GetCamera()->RotateY(dx);
-		mApp->GetCamera()->Pitch(dy);
+		camera->RotateY(dx);
+		camera->Pitch(dy);
 	}
 
 	mLastMousePos.x = x;
@@ -66,30 +67,32 @@ void InputManager::OnKeyUp(unsigned int input)
 	mKeys[input] = false;
 
 	if (input == VK_F1)
-		mApp->SwitchOptionEnabled(Option::Wireframe);
+		D3DFramework::GetApp()->SwitchOptionEnabled(Option::Wireframe);
 	else if (input == VK_F2)
-		mApp->SwitchOptionEnabled(Option::Debug_Collision);
+		D3DFramework::GetApp()->SwitchOptionEnabled(Option::Debug_Collision);
 	else if (input == VK_F3)
-		mApp->SwitchOptionEnabled(Option::Debug_Octree);
+		D3DFramework::GetApp()->SwitchOptionEnabled(Option::Debug_Octree);
 	else if (input == VK_F4)
-		mApp->SwitchOptionEnabled(Option::Debug_Light);
+		D3DFramework::GetApp()->SwitchOptionEnabled(Option::Debug_Light);
 	else if (input == VK_F5)
-		mApp->SwitchOptionEnabled(Option::Debug_Texture);
+		D3DFramework::GetApp()->SwitchOptionEnabled(Option::Debug_Texture);
 }
 
 void InputManager::Tick(float deltaTime) 
 {
+	Camera* camera = D3DFramework::GetApp()->GetCamera();
+
 	if (mKeys['w'] || mKeys['W'])
-		mApp->GetCamera()->Walk(mCameraWalkSpeed * deltaTime);
+		camera->Walk(mCameraWalkSpeed * deltaTime);
 
 	if (mKeys['s'] || mKeys['S'])
-		mApp->GetCamera()->Walk(-mCameraWalkSpeed * deltaTime);
+		camera->Walk(-mCameraWalkSpeed * deltaTime);
 
 	if (mKeys['a'] || mKeys['A'])
-		mApp->GetCamera()->Strafe(-mCameraWalkSpeed * deltaTime);
+		camera->Strafe(-mCameraWalkSpeed * deltaTime);
 
 	if (mKeys['d'] || mKeys['D'])
-		mApp->GetCamera()->Strafe(mCameraWalkSpeed * deltaTime);
+		camera->Strafe(mCameraWalkSpeed * deltaTime);
 
-	mApp->GetCamera()->UpdateViewMatrix();
+	camera->UpdateViewMatrix();
 }

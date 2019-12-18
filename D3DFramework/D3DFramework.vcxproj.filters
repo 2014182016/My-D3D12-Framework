@@ -105,6 +105,9 @@
     <ClCompile Include="Framework\CubeRenderTarget.cpp">
       <Filter>소스 파일\Framework</Filter>
     </ClCompile>
+    <ClCompile Include="Framework\Sound.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Framework\WinApp.h">
@@ -201,6 +204,9 @@
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Framework\CubeRenderTarget.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Framework\Sound.h">
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
   </ItemGroup>

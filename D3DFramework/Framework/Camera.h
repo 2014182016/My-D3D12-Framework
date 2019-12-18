@@ -59,6 +59,7 @@ public:
 	float GetFarWindowHeight()const;
 
 	DirectX::BoundingFrustum GetWorldCameraBounding() const;
+	inline void SetListener(IDirectSound3DListener8* listener) { mListener = listener; }
 
 private:
 	DirectX::XMFLOAT3 mPosition = { 0.0f, 0.0f, 0.0f };
@@ -79,6 +80,7 @@ private:
 	bool mViewDirty = true;
 
 	DirectX::BoundingFrustum mCamFrustum;
+	IDirectSound3DListener8* mListener = nullptr;
 };
 
 #endif // CAMERA_H

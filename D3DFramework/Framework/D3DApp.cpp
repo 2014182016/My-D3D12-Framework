@@ -228,6 +228,33 @@ bool D3DApp::InitDirect3D()
 	// Alt-Enter를 비활성화한다.
 	mdxgiFactory->MakeWindowAssociation(mhMainWnd, DXGI_MWA_NO_ALT_ENTER);
 
+
+	// Direct Sound 생성
+	ThrowIfFailed(DirectSoundCreate8(NULL, md3dSound.GetAddressOf(), NULL));
+	ThrowIfFailed(md3dSound->SetCooperativeLevel(mhMainWnd, DSSCL_PRIORITY));
+
+	DSBUFFERDESC soundBufferDesc;
+	soundBufferDesc.dwSize = sizeof(DSBUFFERDESC);
+	soundBufferDesc.dwFlags = DSBCAPS_PRIMARYBUFFER | DSBCAPS_CTRLVOLUME | DSBCAPS_CTRL3D;
+	soundBufferDesc.dwBufferBytes = 0;
+	soundBufferDesc.dwReserved = 0;
+	soundBufferDesc.lpwfxFormat = NULL;
+	soundBufferDesc.guid3DAlgorithm = GUID_NULL;
+	// 주 사운드 버퍼 생성
+	ThrowIfFailed(md3dSound->CreateSoundBuffer(&soundBufferDesc, mPrimarySoundBuffer.GetAddressOf(), NULL));
+
+	WAVEFORMATEX waveFormat;
+	waveFormat.wFormatTag = WAVE_FORMAT_PCM;
+	waveFormat.nSamplesPerSec = 44100;
+	waveFormat.wBitsPerSample = 16;
+	waveFormat.nChannels = 2;
+	waveFormat.nBlockAlign = (waveFormat.wBitsPerSample / 8) * waveFormat.nChannels;
+	waveFormat.nAvgBytesPerSec = waveFormat.nSamplesPerSec * waveFormat.nBlockAlign;
+	waveFormat.cbSize = 0;
+	ThrowIfFailed(mPrimarySoundBuffer->SetFormat(&waveFormat));
+	// 리스너 생성
+	ThrowIfFailed(mPrimarySoundBuffer->QueryInterface(IID_IDirectSound3DListener8, (void**)mListener.GetAddressOf()));
+
 	return true;
 }
 

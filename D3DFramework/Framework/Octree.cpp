@@ -98,7 +98,10 @@ Octree::Octree(const DirectX::BoundingBox& boundingBox, const std::list<std::sha
 	mBoundingBox = boundingBox;
 
 	for (const auto& obj : objList)
-		mObjectList.emplace_front(obj);
+	{
+		if(obj->GetCollisionType() != CollisionType::None)
+			mObjectList.emplace_front(obj);
+	}
 
 	for (int i = 0; i < 8; ++i)
 		mChildNodes[i] = nullptr;

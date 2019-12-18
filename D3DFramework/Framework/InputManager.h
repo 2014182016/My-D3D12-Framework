@@ -28,7 +28,4 @@ private:
 
 	float mCameraWalkSpeed = 50.0f;
 	float mCameraRotateSpeed = 0.25f;
-
-	// 프레임워크에서 원하는 함수 및 데이터를 사용하기 위한 App변수
-	class D3DFramework* mApp = nullptr;
 };

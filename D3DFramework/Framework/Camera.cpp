@@ -29,12 +29,16 @@ XMFLOAT3 Camera::GetPosition3f()const
 void Camera::SetPosition(float x, float y, float z)
 {
 	mPosition = XMFLOAT3(x, y, z);
+	mListener->SetPosition(mPosition.x, mPosition.y, mPosition.z, DS3D_IMMEDIATE);
+
 	mViewDirty = true;
 }
 
 void Camera::SetPosition(const XMFLOAT3& v)
 {
 	mPosition = v;
+	mListener->SetPosition(mPosition.x, mPosition.y, mPosition.z, DS3D_IMMEDIATE);
+
 	mViewDirty = true;
 }
 
@@ -186,7 +190,7 @@ void Camera::Strafe(float d)
 	XMVECTOR p = XMLoadFloat3(&mPosition);
 	XMStoreFloat3(&mPosition, XMVectorMultiplyAdd(s, r, p));
 
-	mViewDirty = true;
+	SetPosition(mPosition);
 }
 
 void Camera::Walk(float d)
@@ -197,7 +201,7 @@ void Camera::Walk(float d)
 	XMVECTOR p = XMLoadFloat3(&mPosition);
 	XMStoreFloat3(&mPosition, XMVectorMultiplyAdd(s, l, p));
 
-	mViewDirty = true;
+	SetPosition(mPosition);
 }
 
 void Camera::Pitch(float angle)

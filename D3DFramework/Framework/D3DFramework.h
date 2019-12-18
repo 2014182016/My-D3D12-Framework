@@ -75,7 +75,7 @@ private:
 
 	std::list<std::shared_ptr<class Object>> mAllObjects;
 	std::array<std::list<std::shared_ptr<class GameObject>>, (int)RenderLayer::Count> mGameObjects;
-	std::list<std::shared_ptr<class GameObject>> mCollisionObjects;
+	std::list<std::shared_ptr<class GameObject>> mActualObjects;
 	std::list<std::shared_ptr<class Light>> mLights;
 
 	UINT objCBByteSize = 0;

@@ -13,16 +13,25 @@
 #include <crtdbg.h>
 #endif
 
+#define DIRECTINPUT_VERSION 0x0800
+
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "D3D12.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "pdh.lib")
+#pragma comment(lib, "winmm.lib")
+#pragma comment(lib, "dsound.lib")
+#pragma comment(lib, "dinput8.lib")
+
 
 #include <windows.h>
 #include <wrl.h>
 #include <Pdh.h>
 #include <dxgi1_4.h>
 #include <d3d12.h>
+#include <mmsystem.h>
+#include <dsound.h>
+#include <dinput.h>
 #include <D3Dcompiler.h>
 #include <DirectXMath.h>
 #include <DirectXPackedVector.h>
