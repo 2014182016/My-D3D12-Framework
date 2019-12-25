@@ -19,79 +19,6 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Framework\AssetManager.cpp" />
-    <ClCompile Include="Framework\Base.cpp" />
-    <ClCompile Include="Framework\Camera.cpp" />
-    <ClCompile Include="Framework\CubeRenderTarget.cpp" />
-    <ClCompile Include="Framework\D3DApp.cpp" />
-    <ClCompile Include="Framework\D3DDebug.cpp" />
-    <ClCompile Include="Framework\D3DFramework.cpp" />
-    <ClCompile Include="Framework\D3DUtil.cpp" />
-    <ClCompile Include="Framework\DDSTextureLoader.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="Framework\DirectionalLight.cpp" />
-    <ClCompile Include="Framework\GameObject.cpp" />
-    <ClCompile Include="Framework\GameTimer.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="Framework\GeometryGenerator.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="Framework\InputManager.cpp" />
-    <ClCompile Include="Framework\Light.cpp" />
-    <ClCompile Include="Framework\Main.cpp" />
-    <ClCompile Include="Framework\Material.cpp" />
-    <ClCompile Include="Framework\MeshGeometry.cpp" />
-    <ClCompile Include="Framework\MovingDirectionalLight.cpp" />
-    <ClCompile Include="Framework\MovingObject.cpp" />
-    <ClCompile Include="Framework\Object.cpp" />
-    <ClCompile Include="Framework\Octree.cpp" />
-    <ClCompile Include="Framework\pch.cpp" />
-    <ClCompile Include="Framework\PointLight.cpp" />
-    <ClCompile Include="Framework\ShadowMap.cpp" />
-    <ClCompile Include="Framework\Sound.cpp" />
-    <ClCompile Include="Framework\SpotLight.cpp" />
-    <ClCompile Include="Framework\WinApp.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="Framework\AssetManager.h" />
-    <ClInclude Include="Framework\Base.h" />
-    <ClInclude Include="Framework\BufferMemoryPool.hpp" />
-    <ClInclude Include="Framework\Camera.h" />
-    <ClInclude Include="Framework\CubeRenderTarget.h" />
-    <ClInclude Include="Framework\D3DApp.h" />
-    <ClInclude Include="Framework\D3DDebug.h" />
-    <ClInclude Include="Framework\D3DFramework.h" />
-    <ClInclude Include="Framework\D3DUtil.h" />
-    <ClInclude Include="Framework\DDSTextureLoader.h" />
-    <ClInclude Include="Framework\DirectionalLight.h" />
-    <ClInclude Include="Framework\Enums.h" />
-    <ClInclude Include="Framework\FrameResource.h" />
-    <ClInclude Include="Framework\GameObject.h" />
-    <ClInclude Include="Framework\GameTimer.h" />
-    <ClInclude Include="Framework\GeometryGenerator.h" />
-    <ClInclude Include="Framework\InputManager.h" />
-    <ClInclude Include="Framework\Light.h" />
-    <ClInclude Include="Framework\Material.h" />
-    <ClInclude Include="Framework\MeshGeometry.h" />
-    <ClInclude Include="Framework\MovingDirectionalLight.h" />
-    <ClInclude Include="Framework\MovingObject.h" />
-    <ClInclude Include="Framework\Object.h" />
-    <ClInclude Include="Framework\Octree.h" />
-    <ClInclude Include="Framework\pch.h" />
-    <ClInclude Include="Framework\ShadowMap.h" />
-    <ClInclude Include="Framework\Sound.h" />
-    <ClInclude Include="Framework\Structures.h" />
-    <ClInclude Include="Framework\PointLight.h" />
-    <ClInclude Include="Framework\SpotLight.h" />
-    <ClInclude Include="Framework\Timer.hpp" />
-    <ClInclude Include="Framework\UploadBuffer.h" />
-    <ClInclude Include="Framework\WinApp.h" />
-  </ItemGroup>
-  <ItemGroup>
     <FxCompile Include="Shaders\Billboard.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.1</ShaderModel>
@@ -163,7 +90,7 @@
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </FxCompile>
-    <FxCompile Include="Shaders\TextureDebug.hlsl">
+    <FxCompile Include="Shaders\Widget.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
@@ -185,6 +112,86 @@
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Source\Component\Component.cpp" />
+    <ClCompile Include="Source\Component\Material.cpp" />
+    <ClCompile Include="Source\Component\MeshGeometry.cpp" />
+    <ClCompile Include="Source\Component\Sound.cpp" />
+    <ClCompile Include="Source\Component\Widget.cpp" />
+    <ClCompile Include="Source\Framework\AssetManager.cpp" />
+    <ClCompile Include="Source\Framework\Camera.cpp" />
+    <ClCompile Include="Source\Framework\CubeRenderTarget.cpp" />
+    <ClCompile Include="Source\Framework\D3DApp.cpp" />
+    <ClCompile Include="Source\Framework\D3DDebug.cpp" />
+    <ClCompile Include="Source\Framework\D3DFramework.cpp" />
+    <ClCompile Include="Source\Framework\D3DUtil.cpp" />
+    <ClCompile Include="Source\Framework\DDSTextureLoader.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\GameTimer.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\GeometryGenerator.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\InputManager.cpp" />
+    <ClCompile Include="Source\Framework\Main.cpp" />
+    <ClCompile Include="Source\Framework\Octree.cpp" />
+    <ClCompile Include="Source\Framework\pch.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\ShadowMap.cpp" />
+    <ClCompile Include="Source\Framework\WinApp.cpp" />
+    <ClCompile Include="Source\Object\DirectionalLight.cpp" />
+    <ClCompile Include="Source\Object\GameObject.cpp" />
+    <ClCompile Include="Source\Object\Light.cpp" />
+    <ClCompile Include="Source\Object\MovingDirectionalLight.cpp" />
+    <ClCompile Include="Source\Object\MovingObject.cpp" />
+    <ClCompile Include="Source\Object\Object.cpp" />
+    <ClCompile Include="Source\Object\Particle.cpp" />
+    <ClCompile Include="Source\Object\PointLight.cpp" />
+    <ClCompile Include="Source\Object\SpotLight.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Source\Component\Component.h" />
+    <ClInclude Include="Source\Component\Material.h" />
+    <ClInclude Include="Source\Component\MeshGeometry.h" />
+    <ClInclude Include="Source\Component\Sound.h" />
+    <ClInclude Include="Source\Component\Widget.h" />
+    <ClInclude Include="Source\Framework\AssetManager.h" />
+    <ClInclude Include="Source\Framework\BufferMemoryPool.hpp" />
+    <ClInclude Include="Source\Framework\Camera.h" />
+    <ClInclude Include="Source\Framework\CubeRenderTarget.h" />
+    <ClInclude Include="Source\Framework\D3DApp.h" />
+    <ClInclude Include="Source\Framework\D3DDebug.h" />
+    <ClInclude Include="Source\Framework\D3DFramework.h" />
+    <ClInclude Include="Source\Framework\D3DUtil.h" />
+    <ClInclude Include="Source\Framework\d3dx12.h" />
+    <ClInclude Include="Source\Framework\DDSTextureLoader.h" />
+    <ClInclude Include="Source\Framework\Enums.h" />
+    <ClInclude Include="Source\Framework\FrameResource.h" />
+    <ClInclude Include="Source\Framework\GameTimer.h" />
+    <ClInclude Include="Source\Framework\GeometryGenerator.h" />
+    <ClInclude Include="Source\Framework\InputManager.h" />
+    <ClInclude Include="Source\Framework\Octree.h" />
+    <ClInclude Include="Source\Framework\pch.h" />
+    <ClInclude Include="Source\Framework\ShadowMap.h" />
+    <ClInclude Include="Source\Framework\Structures.h" />
+    <ClInclude Include="Source\Framework\Timer.hpp" />
+    <ClInclude Include="Source\Framework\UploadBuffer.h" />
+    <ClInclude Include="Source\Framework\WinApp.h" />
+    <ClInclude Include="Source\Object\DirectionalLight.h" />
+    <ClInclude Include="Source\Object\GameObject.h" />
+    <ClInclude Include="Source\Object\Light.h" />
+    <ClInclude Include="Source\Object\MovingDirectionalLight.h" />
+    <ClInclude Include="Source\Object\MovingObject.h" />
+    <ClInclude Include="Source\Object\Object.h" />
+    <ClInclude Include="Source\Object\Particle.h" />
+    <ClInclude Include="Source\Object\PointLight.h" />
+    <ClInclude Include="Source\Object\SpotLight.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
@@ -243,6 +250,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <SourcePath>$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -273,6 +281,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpplatest</LanguageStandard>
+      <AdditionalIncludeDirectories>D:\Visual Studio 2017\Projects\D3DFramework\D3DFramework\Source\Framework;D:\Visual Studio 2017\Projects\D3DFramework\D3DFramework\Source\Object;D:\Visual Studio 2017\Projects\D3DFramework\D3DFramework\Source\Component;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>

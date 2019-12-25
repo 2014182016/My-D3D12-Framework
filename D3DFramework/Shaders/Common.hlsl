@@ -4,6 +4,8 @@
 
 #include "LightingUtil.hlsl"
 
+#define DISABLED -1
+
 #define TEX_NUM 8
 #define CUBE_MAP_NUM 1
 
@@ -19,18 +21,12 @@ struct MaterialData
 	uint     mMatPad2;
 };
 
-struct CollisionDebugData
-{
-	float4x4 gBoundingWorld;
-};
-
 Texture2D gTextureMaps[TEX_NUM] : register(t0, space0);
 Texture2D gShadowMap[LIGHT_NUM]: register(t0, space1);
 TextureCube gCubeMaps[CUBE_MAP_NUM] : register(t0, space2);
 
 StructuredBuffer<Light> gLights : register(t0, space3);
 StructuredBuffer<MaterialData> gMaterialData : register(t1, space3);
-StructuredBuffer<CollisionDebugData> gCollisionDebugData : register(t2, space3);
 
 SamplerState gsamPointWrap        : register(s0);
 SamplerState gsamPointClamp       : register(s1);
@@ -74,12 +70,29 @@ cbuffer cbPass : register(b1)
 	float gPadding0;
 };
 
-cbuffer cbInstance : register(b2)
+cbuffer cbWidget :register(b2)
 {
-	uint gInstanceIndex;
-	uint gOffsetIndex;
-	uint gInstPad1;
-	uint gInstPad2;
+	uint gWidgetMaterialIndex;
+	uint gWidgetPosX;
+	uint gWidgetPosY;
+	uint gWidgetWidth;
+
+	uint gWidgetHeight;
+	float gWidgetAnchorX;
+	float gWidgetAnchorY;
+	uint gWidgetPadding0;
+}
+
+cbuffer cbDebug : register(b3)
+{
+	float4x4 gDebugWorld;
+	float4 gDebugColor;
+}
+
+// [0, 1] 범위의 값을 [-1, 1]로 변환한다.
+float TransformHomogenous(float pos)
+{
+	return (pos * 2.0f) - 1.0f;
 }
 
 // 법선 맵 표본을 World Space로 변환한다.

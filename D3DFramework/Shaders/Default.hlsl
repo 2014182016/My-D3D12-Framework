@@ -64,7 +64,7 @@ float4 PS(VertexOut pin) : SV_Target
 	uint normalMapIndex = matData.mNormalMapIndex;
 
 	// 텍스처 배열의 텍스처를 동적으로 조회한다.
-	if (diffuseMapIndex != -1)
+	if (diffuseMapIndex != DISABLED)
 	{
 		diffuseAlbedo *= gTextureMaps[diffuseMapIndex].Sample(gsamAnisotropicWrap, pin.mTexC);
 	}
@@ -81,7 +81,7 @@ float4 PS(VertexOut pin) : SV_Target
 	float3 bumpedNormalW = pin.mNormalW;
 	
 	// 노멀맵에서 Tangent Space의 노멀을 World Space의 노멀로 변환한다.
-	if (normalMapIndex != -1)
+	if (normalMapIndex != DISABLED)
 	{
 		float4 normalMapSample = gTextureMaps[normalMapIndex].Sample(gsamAnisotropicWrap, pin.mTexC);
 		float3 normalT = 2.0f * normalMapSample.rgb - 1.0f;
@@ -115,7 +115,7 @@ float4 PS(VertexOut pin) : SV_Target
 
 #ifdef SKY_REFLECTION
 	// Sky Cube Map으로 환경 매핑을 사용하여 픽셀에 입힌다.
-	if (gCurrentSkyCubeMapIndex != -1)
+	if (gCurrentSkyCubeMapIndex != DISABLED)
 	{
 		float3 r = reflect(-toEyeW, pin.mNormalW);
 		float4 reflectionColor = gCubeMaps[gCurrentSkyCubeMapIndex].Sample(gsamLinearWrap, r);
