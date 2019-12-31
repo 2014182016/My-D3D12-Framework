@@ -269,7 +269,7 @@ void Octree::Update(float deltaTime)
 	{
 		// 이 함수는 Tick이 불리고 난 이후에 WorldUpdate가 Set되므로
 		// Update함수는 Object의 Tick함수 이전에 불려져야 한다.
-		if (obj->GetIsMovable() && obj->GetIsWorldUpdate())
+		if (obj->GetIsWorldUpdate())
 			movedObjects.emplace_front(obj);
 	}
 
@@ -493,7 +493,7 @@ void Octree::GetChildObjectList(std::list<std::shared_ptr<class GameObject>>& ob
 	}
 }
 
-void Octree::DestroyObjects()
+void Octree::DestroyObject()
 {
 	mObjectList.remove_if([](std::shared_ptr<GameObject>& obj)->bool
 	{ return obj->GetIsDestroyesd(); });
@@ -505,7 +505,7 @@ void Octree::DestroyObjects()
 	{
 		if (mChildNodes[i] != nullptr)
 		{
-			mChildNodes[i]->DestroyObjects();
+			mChildNodes[i]->DestroyObject();
 		}
 	}
 }

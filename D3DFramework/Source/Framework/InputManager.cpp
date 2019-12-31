@@ -67,13 +67,13 @@ void InputManager::OnKeyUp(unsigned int input)
 	mKeys[input] = false;
 
 	if (input == VK_F1)
-		D3DFramework::GetApp()->SwitchOptionEnabled(Option::Wireframe);
+		D3DFramework::GetInstance()->SwitchOptionEnabled(Option::Wireframe);
 	else if (input == VK_F2)
-		D3DFramework::GetApp()->SwitchOptionEnabled(Option::Debug_Collision);
+		D3DFramework::GetInstance()->SwitchOptionEnabled(Option::Debug_Collision);
 	else if (input == VK_F3)
-		D3DFramework::GetApp()->SwitchOptionEnabled(Option::Debug_Octree);
+		D3DFramework::GetInstance()->SwitchOptionEnabled(Option::Debug_Octree);
 	else if (input == VK_F4)
-		D3DFramework::GetApp()->SwitchOptionEnabled(Option::Debug_Light);
+		D3DFramework::GetInstance()->SwitchOptionEnabled(Option::Debug_Light);
 }
 
 void InputManager::Tick(float deltaTime) 

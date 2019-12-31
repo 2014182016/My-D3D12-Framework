@@ -37,7 +37,7 @@ public:
 	inline int GetNormalIndex() const { return mNormalSrvHeapIndex; }
 	inline void SetNormalIndex(int index) { mNormalSrvHeapIndex = index; }
 
-	inline int GetMaterialIndex() const { return mMatCBIndex; }
+	inline UINT GetMaterialIndex() const { return mMaterialIndex; }
 
 protected:
 	DirectX::XMFLOAT4X4 mMatTransform = DirectX::Identity4x4f();
@@ -53,7 +53,7 @@ private:
 	int mNormalSrvHeapIndex = -1;
 
 	// 머터리얼을 생성할 때마다 삽입할 상수 버퍼에서의 인덱스
-	static inline int mCurrentIndex = 0;
+	static inline UINT currentMaterialIndex = 0;
 	// 이 머터리얼에 일치하는 상수 버퍼에서의 인덱스
-	int mMatCBIndex = -1;
+	UINT mMaterialIndex = -1;
 };

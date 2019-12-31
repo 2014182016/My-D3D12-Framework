@@ -1,20 +1,12 @@
-//***************************************************************************************
-// TreeSprite.hlsl by Frank Luna (C) 2015 All Rights Reserved.
-//***************************************************************************************
-
 #include "Common.hlsl"
 
 struct VertexIn
 {
 	float3 mPosH : POSITION;
+	float2 mTexC : TEXCOORD;
 };
 
 struct VertexOut
-{
-	float3 mPosH : POSITION;
-};
-
-struct GeoOut
 {
 	float4 mPosH : SV_POSITION;
 	float2 mTexC : TEXCOORD;
@@ -24,58 +16,17 @@ VertexOut VS(VertexIn vin)
 {
 	VertexOut vout;
 
-	// 자료를 그대로 기하 셰이더에 넘겨준다.
-	vout.mPosH = vin.mPosH;
+	MaterialData matData = gMaterialData[gWidgetMaterialIndex];
+
+	vout.mPosH = float4(vin.mPosH, 1.0f);
+	vout.mTexC = mul(float4(vin.mTexC, 0.0f, 1.0f), matData.mMatTransform).xy;
 
 	return vout;
 }
 
-// 각 점을 사각형(정점 4개)으로 확장하므로 기하 셰이더 호출당
-// 최대 출력 정점 개수는 4이다.
-[maxvertexcount(4)]
-void GS(point VertexOut gin[1], // Primitive는 Point이므로 들어오는 정점은 하나이다.
-	inout TriangleStream<GeoOut> triStream)
+float4 PS(VertexOut pin) : SV_Target
 {
-	MaterialData matData = gMaterialData[gWidgetMaterialIndex];
-
-	float minPosX = gWidgetAnchorX + (gWidgetPosX * gInvRenderTargetSize.x);
-	float minPosY = gWidgetAnchorY + (gWidgetPosY * gInvRenderTargetSize.y);
-	float maxPosX = gWidgetAnchorX + ((gWidgetPosX + gWidgetWidth) * gInvRenderTargetSize.x);
-	float maxPosY = gWidgetAnchorY + ((gWidgetPosY + gWidgetHeight) * gInvRenderTargetSize.y);
-
-	minPosX = TransformHomogenous(minPosX);
-	minPosY = TransformHomogenous(minPosY);
-	maxPosX = TransformHomogenous(maxPosX);
-	maxPosY = TransformHomogenous(maxPosY);
-
-	float4 v[4];
-	v[0] = float4(minPosX, minPosY, 0.0f, 1.0f); // Left Top
-	v[1] = float4(minPosX, maxPosY, 0.0f, 1.0f); // Left Bottom
-	v[2] = float4(maxPosX, minPosY, 0.0f, 1.0f); // Right Top
-	v[3] = float4(maxPosX, maxPosY, 0.0f, 1.0f); // Right Bottom
-
-	float2 texC[4] =
-	{
-		float2(0.0f, 0.0f), // Left Bottom
-		float2(0.0f, 1.0f), // Left Top
-		float2(1.0f, 0.0f), // Right Bottom
-		float2(1.0f, 1.0f)  // Right Top
-	};
-
-	GeoOut gout;
-	[unroll]
-	for (int i = 0; i < 4; ++i)
-	{
-		gout.mPosH = v[i];
-		gout.mTexC = mul(float4(texC[i], 0.0f, 1.0f), matData.mMatTransform).xy;
-
-		triStream.Append(gout);
-	}
-}
-
-float4 PS(GeoOut pin) : SV_Target
-{
-	if (gMaterialIndex == DISABLED)
+	if (gWidgetMaterialIndex == DISABLED)
 		return float4(0.0f, 0.0f, 0.0f, 1.0f);
 
 	// 이 픽셀에 사용할 Material Data를 가져온다.

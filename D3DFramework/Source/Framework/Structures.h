@@ -3,6 +3,7 @@
 #define STRUCTURES_H
 
 #include "pch.h"
+#include "Enums.h"
 
 struct WaveHeaderType
 {
@@ -43,13 +44,9 @@ struct ObjectConstants
 struct WidgetConstants
 {
 	std::uint32_t mMaterialIndex = -1;
-	std::uint32_t mPosX = 0;
-	std::uint32_t mPosY = 0;
-	std::uint32_t mWidth = 0;
-	std::uint32_t mHeight = 0;
-	float mAnchorX = 0.0f;
-	float mAnchorY = 0.0f;
-	std::uint32_t mPadding0;
+	float mPadding0;
+	float mPadding1;
+	float mPadding2;
 };
 
 struct DebugConstants
@@ -102,10 +99,14 @@ struct PassConstants
 
 	// 안개 속성
 	DirectX::XMFLOAT4 mFogColor = { 0.7f, 0.7f, 0.7f, 1.0f };
-	float mFogStart = 5.0f;
-	float mFogRange = 150.0f;
+	float mFogStart = 5.0f; // Linear Fog
+	float mFogRange = 150.0f; // Linear Fog
+	float mFogDensity = 0.0f; // Exponential Fog
 	std::uint32_t mFogEnabled = false;
+	std::uint32_t mFogType = (std::uint32_t)FogType::Exponential;
 	float mPadding0;
+	float mPadding1;
+	float mPadding2;
 };
 
 struct MaterialData
@@ -120,10 +121,18 @@ struct MaterialData
 	// 0 ~ 1 사이의 값을 가지며 이 값을 통해 표면의 거칠기를
 	// 나타내는 m을 유도한다.
 	float mRoughness = 0.25f;
-	std::uint32_t mDiffuseMapIndex = 0;
-	std::uint32_t mNormalMapIndex = 0;
+	std::uint32_t mDiffuseMapIndex = -1;
+	std::uint32_t mNormalMapIndex = -1;
 	std::uint32_t mMaterialPad1;
 	std::uint32_t mMaterialPad2;
+};
+
+struct ParticleConstants
+{
+	std::uint32_t mMaterialIndex;
+	std::uint32_t mFacingCamera;
+	float mPadding0;
+	float mPadding1;
 };
 
 struct FaceIndex
@@ -186,15 +195,20 @@ struct BillboardVertex
 struct WidgetVertex
 {
 	WidgetVertex() = default;
-	WidgetVertex(DirectX::XMFLOAT3 pos) : mPos(pos) { }
+	WidgetVertex(DirectX::XMFLOAT3 pos, DirectX::XMFLOAT2 tex) : mPos(pos), mTex(tex) { }
 	DirectX::XMFLOAT3 mPos;
+	DirectX::XMFLOAT2 mTex;
 };
 
 struct ParticleVertex
 {
 	ParticleVertex() = default;
-	ParticleVertex(DirectX::XMFLOAT3 pos) : mPos(pos) { }
+	ParticleVertex(DirectX::XMFLOAT3 pos, DirectX::XMFLOAT4 color, DirectX::XMFLOAT3 normal, DirectX::XMFLOAT2 size)
+		: mPos(pos), mColor(color), mNormal(normal), mSize(size) { }
 	DirectX::XMFLOAT3 mPos;
+	DirectX::XMFLOAT4 mColor;
+	DirectX::XMFLOAT3 mNormal;
+	DirectX::XMFLOAT2 mSize;
 };
 
 struct DebugVertex

@@ -15,6 +15,13 @@ enum class Option : int
 	Count,
 };
 
+enum class FogType : std::uint32_t
+{
+	Linear,
+	Exponential,
+	Exponential2,
+};
+
 
 enum class CollisionType : int
 {

@@ -23,15 +23,11 @@ public:
 	virtual ~MeshGeometry();
 
 public:
-	// mesh를 생성하기 위한 함수
-	// vertex와 index관련되는 정보들이 함수에 인자에 들어간다.
-	void BuildMesh(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
-		void* vertices, std::uint16_t* indices, UINT vertexCount, UINT indexCount, UINT vertexStride, UINT indexStride);
-	void BuildVertices(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
-		void* vertices, UINT vertexCount, UINT vertexStride);
-	void BuildIndices(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
-		std::uint16_t* indices, UINT indexCount, UINT indexStride);
+	void BuildVertices(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, void* vertices, UINT vertexCount, UINT vertexStride);
+	void BuildIndices(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, std::uint16_t* indices, UINT indexCount, UINT indexStride);
 	void BuildCollisionBound(DirectX::XMFLOAT3* posPtr, size_t vertexCount, size_t stride,  CollisionType type);
+
+	void SetDynamicVertexBuffer(ID3D12Resource* vb, UINT vertexCount, UINT vertexStride);
 
 	void Render(ID3D12GraphicsCommandList* commandList, UINT instanceCount = 1, bool isIndexed = true) const;
 
@@ -45,8 +41,6 @@ public:
 public:
 	inline D3D12_VERTEX_BUFFER_VIEW GetVertexBufferView() const { return mVertexBufferView; }
 	inline D3D12_INDEX_BUFFER_VIEW GetIndexBufferView() const { return mIndexBufferView; }
-
-	inline void SetDynamicVertexBuffer(ID3D12Resource* vb) { mVertexBufferGPU = vb; }
 
 	inline void SetPrimitiveType(D3D12_PRIMITIVE_TOPOLOGY primitiveType) { mPrimitiveType = primitiveType; }
 

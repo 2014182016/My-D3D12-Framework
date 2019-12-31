@@ -16,11 +16,13 @@ public:
 	// 이 객체에 대한 설명을 string_view로 돌려주는 함수
 	virtual std::string ToString() const;
 
+
 public:
 	virtual void BeginPlay() { };
 	virtual void Tick(float deltaTime) { };
 	virtual void Destroy() { };
 
+public:
 	bool IsUpdate() const;
 	void UpdateNumFrames();
 	void DecreaseNumFrames();

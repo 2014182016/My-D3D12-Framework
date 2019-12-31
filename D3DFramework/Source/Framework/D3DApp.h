@@ -5,7 +5,7 @@
 // RootParamter¿« ShaderRegister, Register Space
 using RootParameterInfo = std::pair<UINT, UINT>;
 
-#define ROOT_PARAMETER_NUM 9
+#define ROOT_PARAMETER_NUM 10
 
 // Root Parameter Index
 #define RP_OBJECT 0
@@ -16,7 +16,8 @@ using RootParameterInfo = std::pair<UINT, UINT>;
 #define RP_SHADOWMAP 5
 #define RP_CUBEMAP 6
 #define RP_WIDGET 7
-#define RP_COLLISIONDEBUG 8
+#define RP_PARTICLE 8
+#define RP_COLLISIONDEBUG 9
 
 class D3DApp : public WinApp
 {
@@ -102,6 +103,7 @@ protected:
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mWidgetLayout;
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mLineLayout;
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mCollisionDebugLayout;
+	std::vector<D3D12_INPUT_ELEMENT_DESC> mParticleLayout;
 
 	D3D12_VIEWPORT mScreenViewport;
 	D3D12_RECT mScissorRect;
@@ -110,6 +112,7 @@ protected:
 	UINT passCBByteSize = 0;
 	UINT widgetCBByteSize = 0;
 	UINT debugCBByteSize = 0;
+	UINT particleCBByteSize = 0;
 
 	UINT mCurrentSkyCubeMapIndex = 0;
 	UINT mSkyCubeMapHeapIndex = 0;
@@ -136,7 +139,8 @@ private:
 		RootParameterInfo(0,1), // ShadowMaps
 		RootParameterInfo(0,2), // CubeMaps
 		RootParameterInfo(2,0), // Widget
-		RootParameterInfo(3,0), // CollisionDebug
+		RootParameterInfo(3,0), // Particle
+		RootParameterInfo(4,0), // CollisionDebug
 	};
 };
 

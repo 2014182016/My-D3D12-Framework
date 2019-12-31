@@ -47,8 +47,8 @@ void D3DDebug::CreateDebugMeshes()
 	mesh = std::make_unique<MeshGeometry>("Debug_CollisionBox");
 	for (const auto& ver : meshData.Vertices)
 		vertices.emplace_back(ver.Position);
-	mesh->BuildMesh(md3dDevice, mCommandList.Get(), vertices.data(), meshData.GetIndices16().data(),
-		(UINT)vertices.size(), (UINT)meshData.GetIndices16().size(), (UINT)sizeof(DebugVertex), (UINT)sizeof(std::uint16_t));
+	mesh->BuildVertices(md3dDevice, mCommandList.Get(), (void*)vertices.data(), (UINT)vertices.size(), (UINT)sizeof(DebugVertex));
+	mesh->BuildIndices(md3dDevice, mCommandList.Get(), meshData.GetIndices16().data(), (UINT)meshData.GetIndices16().size(), (UINT)sizeof(std::uint16_t));
 	mDebugMeshes[(int)DebugType::Debug_CollisionBox] = std::move(mesh);
 	vertices.clear();
 	indices.clear();
@@ -57,8 +57,8 @@ void D3DDebug::CreateDebugMeshes()
 	mesh = std::make_unique<MeshGeometry>("Debug_CollisionSphere");
 	for (const auto& ver : meshData.Vertices)
 		vertices.emplace_back(ver.Position);
-	mesh->BuildMesh(md3dDevice, mCommandList.Get(), vertices.data(), meshData.GetIndices16().data(),
-		(UINT)vertices.size(), (UINT)meshData.GetIndices16().size(), (UINT)sizeof(DebugVertex), (UINT)sizeof(std::uint16_t));
+	mesh->BuildVertices(md3dDevice, mCommandList.Get(), (void*)vertices.data(), (UINT)vertices.size(), (UINT)sizeof(DebugVertex));
+	mesh->BuildIndices(md3dDevice, mCommandList.Get(), meshData.GetIndices16().data(), (UINT)meshData.GetIndices16().size(), (UINT)sizeof(std::uint16_t));
 	mDebugMeshes[(int)DebugType::Debug_CollisionSphere] = std::move(mesh);
 	vertices.clear();
 	indices.clear();
@@ -67,8 +67,8 @@ void D3DDebug::CreateDebugMeshes()
 	mesh = std::make_unique<MeshGeometry>("Debug_Light");
 	for (const auto& ver : meshData.Vertices)
 		vertices.emplace_back(ver.Position);
-	mesh->BuildMesh(md3dDevice, mCommandList.Get(), vertices.data(), meshData.GetIndices16().data(),
-		(UINT)vertices.size(), (UINT)meshData.GetIndices16().size(), (UINT)sizeof(DebugVertex), (UINT)sizeof(std::uint16_t));
+	mesh->BuildVertices(md3dDevice, mCommandList.Get(), (void*)vertices.data(), (UINT)vertices.size(), (UINT)sizeof(DebugVertex));
+	mesh->BuildIndices(md3dDevice, mCommandList.Get(), meshData.GetIndices16().data(), (UINT)meshData.GetIndices16().size(), (UINT)sizeof(std::uint16_t));
 	mDebugMeshes[(int)DebugType::Debug_Light] = std::move(mesh);
 	vertices.clear();
 	indices.clear();
@@ -94,8 +94,8 @@ void D3DDebug::CreateDebugMeshes()
 	indices.emplace_back(1); indices.emplace_back(5);
 	indices.emplace_back(2); indices.emplace_back(6);
 	indices.emplace_back(3); indices.emplace_back(7);
-	mesh->BuildMesh(md3dDevice, mCommandList.Get(), vertices.data(), indices.data(), (UINT)vertices.size(), (UINT)indices.size(),
-		(UINT)sizeof(DebugVertex), (UINT)sizeof(std::uint16_t));
+	mesh->BuildVertices(md3dDevice, mCommandList.Get(), (void*)vertices.data(), (UINT)vertices.size(), (UINT)sizeof(DebugVertex));
+	mesh->BuildIndices(md3dDevice, mCommandList.Get(), indices.data(), (UINT)indices.size(), (UINT)sizeof(std::uint16_t));
 	mesh->SetPrimitiveType(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
 	mDebugMeshes[(int)DebugType::Debug_Octree] = std::move(mesh);
 	vertices.clear();

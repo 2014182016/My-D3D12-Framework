@@ -17,14 +17,15 @@ public:
 public:
 	virtual bool Initialize() override;
 	virtual void OnDestroy() override; 
-
+	virtual void CreateRtvAndDsvDescriptorHeaps() override;
 	virtual void OnResize(int screenWidth, int screenHeight) override;
 	virtual void Tick(float deltaTime) override;
 	virtual void Render() override;
 
 public:
-	void RenderGameObjects(ID3D12GraphicsCommandList* cmdList, const std::list<std::shared_ptr<class GameObject>>& gameObjects,
-		UINT& startObjectIndex, DirectX::BoundingFrustum* frustum = nullptr) const;
+	void InitFramework();
+
+	void RenderGameObject(ID3D12GraphicsCommandList* cmdList, const std::list<std::shared_ptr<class GameObject>>& gameObjects, DirectX::BoundingFrustum* frustum = nullptr) const;
 	class GameObject* Picking(int screenX, int screenY, float distance = 1000.0f) const;
 
 public:
@@ -33,30 +34,35 @@ public:
 	inline std::list<std::shared_ptr<class GameObject>>& GetGameObjects(int layerIndex) { return mGameObjects.at(layerIndex); }
 
 private:
-	void InitFramework();
-
 	void CreateObjects();
 	void CreateLights();
-	void CreateUIs();
+	void CreateWidgets();
+	void CreateParticles();
 	void CreateFrameResources();
 	void CreateShadowMapResource(UINT textureNum, UINT cubeTextureNum);
 
 	void AddGameObject(std::shared_ptr<class GameObject> object, RenderLayer renderLayer);
-	void DestroyObjects();
-	void UpdateObjectBufferPool();
 
+	void UpdateObjectBuffer(float deltaTime);
 	void UpdateLightBuffer(float deltaTime);
 	void UpdateMaterialBuffer(float deltaTime);
-	void UpdateMainPassCB(float deltaTime);
-	void UpdateWidgetCB(float deltaTime);
+	void UpdateMainPassBuffer(float deltaTime);
+	void UpdateWidgetBuffer(float deltaTime);
+	void UpdateParticleBuffer(float deltaTime);
 
 	void UpdateDebugCollision(ID3D12GraphicsCommandList* cmdList);
 	void UpdateDebugOctree(ID3D12GraphicsCommandList* cmdList);
 	void UpdateDebugLight(ID3D12GraphicsCommandList* cmdList);
+
 	void UpdateDebugBufferPool();
+	void UpdateObjectBufferPool();
 
 	void RenderCollisionDebug(ID3D12GraphicsCommandList* cmdList);
 	void RenderWidget(ID3D12GraphicsCommandList* cmdList);
+	void RenderParticle(ID3D12GraphicsCommandList* cmdList);
+
+	void DestroyObject();
+	void DestroyParticle();
 
 private:
 	static inline D3DFramework* instance = nullptr;
@@ -65,11 +71,11 @@ private:
 	struct FrameResource* mCurrentFrameResource = nullptr;
 	UINT mCurrentFrameResourceIndex = 0;
 
-	std::list<std::shared_ptr<class Object>> mAllObjects;
 	std::array<std::list<std::shared_ptr<class GameObject>>, (int)RenderLayer::Count> mGameObjects;
 	std::list<std::shared_ptr<class GameObject>> mActualObjects;
 	std::list<std::shared_ptr<class Light>> mLights;
 	std::list<std::shared_ptr<class Widget>> mWidgets;
+	std::list<std::shared_ptr<class Particle>> mParticles;
 
 	DirectX::BoundingSphere mSceneBounds;
 	DirectX::BoundingFrustum mWorldCamFrustum;

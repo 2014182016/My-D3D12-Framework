@@ -13,6 +13,7 @@ D3DApp::D3DApp(HINSTANCE hInstance, int screenWidth, int screenHeight, std::wstr
 	passCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(PassConstants));
 	widgetCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(WidgetConstants));
 	debugCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(DebugConstants));
+	particleCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(ParticleConstants));
 }
 
 D3DApp::~D3DApp() { }
@@ -460,8 +461,6 @@ void D3DApp::CreateRootSignature(UINT textureNum, UINT cubeTextureNum, UINT shad
 	// 일반적으로 셰이더 프로그램은 특정 자원들(상수 버퍼, 텍스처, 표본추출기 등)이
 	// 입력된다고 기대한다. 루트 서명은 셰이더 프로그램이 기대하는 자원들을 정의한다.
 
-	mRootSignature.Reset();
-
 	std::array<CD3DX12_ROOT_PARAMETER, ROOT_PARAMETER_NUM> slotRootParameter;
 
 	CD3DX12_DESCRIPTOR_RANGE texTable[3];
@@ -478,6 +477,7 @@ void D3DApp::CreateRootSignature(UINT textureNum, UINT cubeTextureNum, UINT shad
 	slotRootParameter[RP_SHADOWMAP].InitAsDescriptorTable(1, &texTable[1], D3D12_SHADER_VISIBILITY_PIXEL); // Shadow Maps
 	slotRootParameter[RP_CUBEMAP].InitAsDescriptorTable(1, &texTable[2], D3D12_SHADER_VISIBILITY_PIXEL); // CubeTextures
 	slotRootParameter[RP_WIDGET].InitAsConstantBufferView(mRootParameterInfos[RP_WIDGET].first, mRootParameterInfos[RP_WIDGET].second); // Widget
+	slotRootParameter[RP_PARTICLE].InitAsConstantBufferView(mRootParameterInfos[RP_PARTICLE].first, mRootParameterInfos[RP_PARTICLE].second); // Particle
 	slotRootParameter[RP_COLLISIONDEBUG].InitAsConstantBufferView(mRootParameterInfos[RP_COLLISIONDEBUG].first, mRootParameterInfos[RP_COLLISIONDEBUG].second); // Collision Debug
 
 	auto staticSamplers = GetStaticSamplers();
@@ -507,8 +507,6 @@ void D3DApp::CreateRootSignature(UINT textureNum, UINT cubeTextureNum, UINT shad
 
 void D3DApp::CreateDescriptorHeaps(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum)
 {
-	mCbvSrvUavDescriptorHeap.Reset();
-
 	D3D12_DESCRIPTOR_HEAP_DESC cbvSrvUavDescriptorHeap = {};
 	cbvSrvUavDescriptorHeap.NumDescriptors = textureNum + cubeTextureNum + shadowMapNum;
 	cbvSrvUavDescriptorHeap.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
@@ -593,12 +591,15 @@ void D3DApp::CreateShadersAndInputLayout()
 	mShaders["SkyVS"] = D3DUtil::CompileShader(L"Shaders\\Sky.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["SkyPS"] = D3DUtil::CompileShader(L"Shaders\\Sky.hlsl", nullptr, "PS", "ps_5_1");
 
-	mShaders["ShadowVS"] = D3DUtil::CompileShader(L"Shaders\\Shadow.hlsl", nullptr, "VS", "vs_5_1");
-	mShaders["ShadowPS"] = D3DUtil::CompileShader(L"Shaders\\Shadow.hlsl", alphaTestDefines, "PS", "ps_5_1");
+	mShaders["ShadowMapVS"] = D3DUtil::CompileShader(L"Shaders\\ShadowMap.hlsl", nullptr, "VS", "vs_5_1");
+	mShaders["ShadowMapPS"] = D3DUtil::CompileShader(L"Shaders\\ShadowMap.hlsl", alphaTestDefines, "PS", "ps_5_1");
 
 	mShaders["WidgetVS"] = D3DUtil::CompileShader(L"Shaders\\Widget.hlsl", nullptr, "VS", "vs_5_1");
-	mShaders["WidgetGS"] = D3DUtil::CompileShader(L"Shaders\\Widget.hlsl", nullptr, "GS", "gs_5_1");
 	mShaders["WidgetPS"] = D3DUtil::CompileShader(L"Shaders\\Widget.hlsl", alphaTestDefines, "PS", "ps_5_1");
+
+	mShaders["ParticleVS"] = D3DUtil::CompileShader(L"Shaders\\Particle.hlsl", nullptr, "VS", "vs_5_1");
+	mShaders["ParticleGS"] = D3DUtil::CompileShader(L"Shaders\\Particle.hlsl", nullptr, "GS", "gs_5_1");
+	mShaders["ParticlePS"] = D3DUtil::CompileShader(L"Shaders\\Particle.hlsl", alphaTestDefines, "PS", "ps_5_1");
 
 	mShaders["AlphaTestedPS"] = D3DUtil::CompileShader(L"Shaders\\Default.hlsl", alphaTestDefines, "PS", "ps_5_1");
 
@@ -625,6 +626,7 @@ void D3DApp::CreateShadersAndInputLayout()
 	mWidgetLayout =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 	};
 
 	mCollisionDebugLayout =
@@ -637,6 +639,14 @@ void D3DApp::CreateShadersAndInputLayout()
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 	};
+
+	mParticleLayout =
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 28, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "SIZE", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 40, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	};
 }
 
 void D3DApp::CreatePSOs()
@@ -645,10 +655,6 @@ void D3DApp::CreatePSOs()
 	// 이 모든 것을 하나의 집합체로 지정하는 이유는 Direct3D가 모든 상태가
 	// 호환되는지 미리 검증할 수 있으며 드라이버는 하드웨어 상태의 프로그래밍을
 	// 위한 모든 코드를 미리 생성할 수 있기 때문이다.
-
-	for (auto& pso : mPSOs)
-		pso.second.Reset();
-	mPSOs.clear();
 
 	// PSO for opaque objects.
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaquePsoDesc;
@@ -783,19 +789,35 @@ void D3DApp::CreatePSOs()
 	billboardPsoDesc.BlendState.AlphaToCoverageEnable = GetOptionEnabled(Option::Msaa);
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&billboardPsoDesc, IID_PPV_ARGS(&mPSOs["Billborad"])));
 
+	// PSO for Particle
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC particlePsoDesc = opaquePsoDesc;
+	particlePsoDesc.InputLayout = { mParticleLayout.data(), (UINT)mParticleLayout.size() };
+	particlePsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["ParticleVS"]->GetBufferPointer()),
+		mShaders["ParticleVS"]->GetBufferSize()
+	};
+	particlePsoDesc.GS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["ParticleGS"]->GetBufferPointer()),
+		mShaders["ParticleGS"]->GetBufferSize()
+	};
+	particlePsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["ParticlePS"]->GetBufferPointer()),
+		mShaders["ParticlePS"]->GetBufferSize()
+	};
+	particlePsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&particlePsoDesc, IID_PPV_ARGS(&mPSOs["Particle"])));
 
-	// PSO for UI
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC widgetPsoDesc = billboardPsoDesc;
+
+	// PSO for Widget
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC widgetPsoDesc = opaquePsoDesc;
 	widgetPsoDesc.InputLayout = { mWidgetLayout.data(), (UINT)mWidgetLayout.size() };
 	widgetPsoDesc.VS =
 	{
 		reinterpret_cast<BYTE*>(mShaders["WidgetVS"]->GetBufferPointer()),
 		mShaders["WidgetVS"]->GetBufferSize()
-	};
-	widgetPsoDesc.GS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["WidgetGS"]->GetBufferPointer()),
-		mShaders["WidgetGS"]->GetBufferSize()
 	};
 	widgetPsoDesc.PS =
 	{
@@ -803,6 +825,7 @@ void D3DApp::CreatePSOs()
 		mShaders["WidgetPS"]->GetBufferSize()
 	};
 	widgetPsoDesc.DepthStencilState.DepthEnable = false;
+	widgetPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&widgetPsoDesc, IID_PPV_ARGS(&mPSOs["Widget"])));
 
 
@@ -838,20 +861,20 @@ void D3DApp::CreatePSOs()
 	smapPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
 	smapPsoDesc.VS =
 	{
-		reinterpret_cast<BYTE*>(mShaders["ShadowVS"]->GetBufferPointer()),
-		mShaders["ShadowVS"]->GetBufferSize()
+		reinterpret_cast<BYTE*>(mShaders["ShadowMapVS"]->GetBufferPointer()),
+		mShaders["ShadowMapVS"]->GetBufferSize()
 	};
 	smapPsoDesc.PS =
 	{
-		reinterpret_cast<BYTE*>(mShaders["ShadowPS"]->GetBufferPointer()),
-		mShaders["ShadowPS"]->GetBufferSize()
+		reinterpret_cast<BYTE*>(mShaders["ShadowMapPS"]->GetBufferPointer()),
+		mShaders["ShadowMapPS"]->GetBufferSize()
 	};
 	// 그림자 맵 패스에는 렌더 대상이 없다.
 	// 그림자 맵은 깊이 버퍼만을 사용하므로 렌더 대상을 사용하지 않음으로써
 	// 일종의 최적화를 적용할 수 있다.
 	smapPsoDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
 	smapPsoDesc.NumRenderTargets = 0;
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&smapPsoDesc, IID_PPV_ARGS(&mPSOs["Shadow"])));
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&smapPsoDesc, IID_PPV_ARGS(&mPSOs["ShadowMap"])));
 }
 
 void D3DApp::SetGamma(float gamma)

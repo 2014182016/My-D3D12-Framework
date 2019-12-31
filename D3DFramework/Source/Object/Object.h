@@ -46,8 +46,6 @@ public:
 	inline void SetScale(DirectX::XMFLOAT3 scale) { mScale = scale; }
 
 	inline bool GetIsDestroyesd() const { return mIsDestroyed; }
-	inline bool GetIsMovable() const { return mIsMovable; }
-	inline void SetMovable(bool value) { mIsMovable = value; }
 
 	// 오브젝트가 실질적으로 움직였는지 여부를 알아낸다.
 	// 단, Tick함수가 불리기 이전에 불러야 유효하다.
@@ -64,6 +62,5 @@ protected:
 	DirectX::XMFLOAT3 mScale = { 1.0f, 1.0f, 1.0f };
 
 	bool mIsWorldUpdate = true;
-	bool mIsMovable = false;
 	bool mIsDestroyed = false;
 };

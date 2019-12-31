@@ -29,10 +29,10 @@ VertexOut VS(VertexIn vin)
 	VertexOut vout = (VertexOut)0.0f;
 
 	// 이 정점에 사용할 Material을 가져온다.
-	MaterialData matData = gMaterialData[gMaterialIndex];
+	MaterialData matData = gMaterialData[gObjMaterialIndex];
 	
     // World Space로 변환한다.
-    float4 posW = mul(float4(vin.mPosL, 1.0f), gWorld);
+    float4 posW = mul(float4(vin.mPosL, 1.0f), gObjWorld);
     vout.mPosW = posW.xyz;
 
 	// 동차 절단 공간으로 변환한다.
@@ -40,9 +40,9 @@ VertexOut VS(VertexIn vin)
 
 	// World Matrix에 비균등 비례가 없다고 가정하고 Normal을 변환한다.
 	// 비균등 비례가 있다면 역전치 행렬을 사용해야 한다.
-    vout.mNormalW = mul(vin.mNormalL, (float3x3)gWorld);
-	vout.mTangentW = mul(vin.mTangentU, (float3x3)gWorld);
-	vout.mBinormalW = mul(vin.mBinormalU, (float3x3)gWorld);
+    vout.mNormalW = mul(vin.mNormalL, (float3x3)gObjWorld);
+	vout.mTangentW = mul(vin.mTangentU, (float3x3)gObjWorld);
+	vout.mBinormalW = mul(vin.mBinormalU, (float3x3)gObjWorld);
 	
 	// 출력 정점 특성들은 이후 삼각형을 따라 보간된다.
 	vout.mTexC = mul(float4(vin.mTexC, 0.0f, 1.0f), matData.mMatTransform).xy;
@@ -56,7 +56,7 @@ VertexOut VS(VertexIn vin)
 float4 PS(VertexOut pin) : SV_Target
 {
 	// 이 픽셀에 사용할 Material Data를 가져온다.
-	MaterialData matData = gMaterialData[gMaterialIndex];
+	MaterialData matData = gMaterialData[gObjMaterialIndex];
 	float4 diffuseAlbedo = matData.mDiffuseAlbedo;
 	float3 specular = matData.mSpecular;
 	float roughness = matData.mRoughness;
@@ -112,6 +112,9 @@ float4 PS(VertexOut pin) : SV_Target
         bumpedNormalW, toEyeW, shadowFactor);
 	float4 litColor = ambient + directLight;
 
+	// 분산 재질에서 알파를 가져온다.
+	litColor.a = diffuseAlbedo.a;
+
 
 #ifdef SKY_REFLECTION
 	// Sky Cube Map으로 환경 매핑을 사용하여 픽셀에 입힌다.
@@ -124,16 +127,29 @@ float4 PS(VertexOut pin) : SV_Target
 	}
 #endif
 
-
 	if (gFogEnabled)
 	{
-		// 거리에 따라 안개 색상을 선형 감쇠로 계산한다.
-		float fogAmount = saturate((distToEye - gFogStart) / gFogRange);
-		litColor = lerp(litColor, gFogColor, fogAmount);
-	}
+		float fogAmount;
 
-    // 분산 재질에서 알파를 가져온다.
-    litColor.a = diffuseAlbedo.a;
+		switch(gFogType)
+		{
+		case FOG_LINEAR:
+			// 거리에 따라 안개 색상을 선형 감쇠로 계산한다.
+			fogAmount = saturate((distToEye - gFogStart) / gFogRange);
+			litColor = lerp(litColor, gFogColor, fogAmount);
+			break;
+		case FOG_EXPONENTIAL:
+			// 지수적으로 멀리 있을수록 안개가 더 두꺼워진다.
+			fogAmount = exp(-distToEye * gFogDensity);
+			litColor = lerp(gFogColor, litColor, fogAmount);
+			break;
+		case FOG_EXPONENTIAL2:
+			// 매우 두꺼운 안개를 나타낸다.
+			fogAmount = exp(-pow(distToEye * gFogDensity, 2));
+			litColor = lerp(gFogColor, litColor, fogAmount);
+			break;
+		}
+	}
 
     return litColor;
 }

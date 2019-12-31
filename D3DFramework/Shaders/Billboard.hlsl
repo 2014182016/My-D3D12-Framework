@@ -89,7 +89,7 @@ void GS(point VertexOut gin[1], // Primitive는 Point이므로 들어오는 정점은 하나�
 float4 PS(GeoOut pin) : SV_Target
 {
 	// 이 픽셀에 사용할 Material Data를 가져온다.
-	MaterialData matData = gMaterialData[gMaterialIndex];
+	MaterialData matData = gMaterialData[gObjMaterialIndex];
 	float4 diffuseAlbedo = matData.mDiffuseAlbedo;
 	float3 specular = matData.mSpecular;
 	float roughness = matData.mRoughness;

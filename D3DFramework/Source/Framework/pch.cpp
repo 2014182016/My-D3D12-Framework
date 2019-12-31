@@ -83,12 +83,22 @@ float GetRandomFloat(float min, float max)
 	static std::random_device rd;
 	static std::mt19937_64 mt(rd());
 
-	if ((min - max) < FLT_EPSILON)
+	if (max - min < FLT_EPSILON)
 		return min;
 
 	std::uniform_real_distribution uid(min, max);
 
 	return uid(mt);
+}
+
+DirectX::XMFLOAT2 GetRandomFloat2(const DirectX::XMFLOAT2& min, const DirectX::XMFLOAT2& max)
+{
+	DirectX::XMFLOAT2 result;
+
+	result.x = GetRandomFloat(min.x, max.x);
+	result.y = GetRandomFloat(min.y, max.y);
+
+	return result;
 }
 
 DirectX::XMFLOAT3 GetRandomFloat3(const DirectX::XMFLOAT3& min, const DirectX::XMFLOAT3& max)
@@ -98,6 +108,18 @@ DirectX::XMFLOAT3 GetRandomFloat3(const DirectX::XMFLOAT3& min, const DirectX::X
 	result.x = GetRandomFloat(min.x, max.x);
 	result.y = GetRandomFloat(min.y, max.y);
 	result.z = GetRandomFloat(min.z, max.z);
+
+	return result;
+}
+
+DirectX::XMFLOAT4 GetRandomFloat4(const DirectX::XMFLOAT4& min, const DirectX::XMFLOAT4& max)
+{
+	DirectX::XMFLOAT4 result;
+
+	result.x = GetRandomFloat(min.x, max.x);
+	result.y = GetRandomFloat(min.y, max.y);
+	result.z = GetRandomFloat(min.z, max.z);
+	result.w = GetRandomFloat(min.w, max.w);
 
 	return result;
 }

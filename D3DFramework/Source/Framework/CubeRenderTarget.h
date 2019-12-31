@@ -26,8 +26,7 @@ public:
 		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv[6]);
 
 	void OnResize(UINT newWidth, UINT newHeight);
-	void RenderSceneToCubeMap(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* cubePSO,
-		const std::list<std::shared_ptr<class GameObject>>& objects, UINT& objectStartIndex);
+	void RenderSceneToCubeMap(ID3D12GraphicsCommandList* cmdList, const std::list<std::shared_ptr<class GameObject>>& objects);
 
 public:
 	inline ID3D12Resource* Resource() { return mCubeMap.Get(); }

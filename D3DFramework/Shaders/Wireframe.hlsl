@@ -1,7 +1,3 @@
-//***************************************************************************************
-// Default.hlsl by Frank Luna (C) 2015 All Rights Reserved.
-//***************************************************************************************
-
 #include "Common.hlsl"
 
 struct VertexIn
@@ -20,7 +16,7 @@ VertexOut VS(VertexIn vin)
 {
 	VertexOut vout = (VertexOut)0.0f;
 
-	float4 posW = mul(float4(vin.mPosL, 1.0f), gWorld);
+	float4 posW = mul(float4(vin.mPosL, 1.0f), gObjWorld);
 	vout.mPosH = mul(posW, gViewProj);
 
 	vout.mColor = vin.mColor;

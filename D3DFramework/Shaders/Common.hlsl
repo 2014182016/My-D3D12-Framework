@@ -9,6 +9,10 @@
 #define TEX_NUM 8
 #define CUBE_MAP_NUM 1
 
+#define FOG_LINEAR 0
+#define FOG_EXPONENTIAL 1
+#define FOG_EXPONENTIAL2 2 
+
 struct MaterialData
 {
 	float4x4 mMatTransform;
@@ -38,8 +42,8 @@ SamplerComparisonState gsamShadow : register(s6);
 
 cbuffer cbPerObject : register(b0)
 {
-    float4x4 gWorld;
-	uint gMaterialIndex;
+    float4x4 gObjWorld;
+	uint gObjMaterialIndex;
 	uint gObjPad0;
 	uint gObjPad1;
 	uint gObjPad2;
@@ -66,33 +70,34 @@ cbuffer cbPass : register(b1)
 	float4 gFogColor;
 	float gFogStart;
 	float gFogRange;
+	float gFogDensity;
 	bool gFogEnabled;
+	uint gFogType;
 	float gPadding0;
+	float gPadding1;
+	float gPadding2;
 };
 
-cbuffer cbWidget :register(b2)
+cbuffer cbWidget : register(b2)
 {
 	uint gWidgetMaterialIndex;
-	uint gWidgetPosX;
-	uint gWidgetPosY;
-	uint gWidgetWidth;
-
-	uint gWidgetHeight;
-	float gWidgetAnchorX;
-	float gWidgetAnchorY;
-	uint gWidgetPadding0;
+	float gWidgetPadding0;
+	float gWidgetPadding1;
+	float gWidgetPadding2;
 }
 
-cbuffer cbDebug : register(b3)
+cbuffer cbParticle : register(b3)
+{
+	uint gParticleMaterialIndex;
+	bool gParticleFacingCamera;
+	float gParticlePadding0;
+	float gParticlePadding1;
+}
+
+cbuffer cbDebug : register(b4)
 {
 	float4x4 gDebugWorld;
 	float4 gDebugColor;
-}
-
-// [0, 1] 범위의 값을 [-1, 1]로 변환한다.
-float TransformHomogenous(float pos)
-{
-	return (pos * 2.0f) - 1.0f;
 }
 
 // 법선 맵 표본을 World Space로 변환한다.

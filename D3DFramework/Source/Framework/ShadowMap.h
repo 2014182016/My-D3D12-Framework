@@ -25,8 +25,7 @@ public:
 		CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
 		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv);
 	void OnResize(UINT newWidth, UINT newHeight);
-	void RenderSceneToShadowMap(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* shadowPSO,
-		const std::list<std::shared_ptr<class GameObject>>& objects, UINT& objectStartIndex);
+	void RenderSceneToShadowMap(ID3D12GraphicsCommandList* cmdList, const std::list<std::shared_ptr<class GameObject>>& objects);
 
 public:
 	inline UINT GetWidth() const { return mWidth; }

@@ -20,10 +20,10 @@ VertexOut VS(VertexIn vin)
 {
 	VertexOut vout = (VertexOut)0.0f;
 
-	MaterialData matData = gMaterialData[gMaterialIndex];
+	MaterialData matData = gMaterialData[gObjMaterialIndex];
 
 	// 세계 공간으로 변환한다.
-	float4 posW = mul(float4(vin.mPosL, 1.0f), gWorld);
+	float4 posW = mul(float4(vin.mPosL, 1.0f), gObjWorld);
 
 	// 동차 절단 공간으로 변환한다.
 	vout.mPosH = mul(posW, gLights[0].mViewProj);
@@ -37,7 +37,7 @@ VertexOut VS(VertexIn vin)
 void PS(VertexOut pin)
 {
 	// 이 픽셀에 사용할 Material Data를 가져온다.
-	MaterialData matData = gMaterialData[gMaterialIndex];
+	MaterialData matData = gMaterialData[gObjMaterialIndex];
 	float4 diffuseAlbedo = matData.mDiffuseAlbedo;
 	uint diffuseMapIndex = matData.mDiffuseMapIndex;
 

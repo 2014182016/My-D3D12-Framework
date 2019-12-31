@@ -5,7 +5,7 @@ using namespace DirectX;
 
 Material::Material(std::string&& name) : Component(std::move(name))
 {
-	mMatCBIndex = mCurrentIndex++;
+	mMaterialIndex = currentMaterialIndex++;
 }
 
 Material::~Material() { }

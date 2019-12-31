@@ -53,6 +53,7 @@ private:
 
 private:
 	static inline AssetManager* instance = nullptr;
+	static inline bool isInitialized = false;
 
 	std::unordered_map<std::string, std::unique_ptr<class MeshGeometry>> mMeshes;
 	std::unordered_map<std::string, std::unique_ptr<class Material>> mMaterials;

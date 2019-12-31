@@ -18,7 +18,7 @@ VertexOut VS(VertexIn vin)
 	// 로컬 공간 위치를 큐브맵 조회 벡터로 사용한다.
 	vout.PosL = vin.PosL;
 
-	float4 posW = mul(float4(vin.PosL, 1.0f), gWorld);
+	float4 posW = mul(float4(vin.PosL, 1.0f), gObjWorld);
 
 	// z / w = 1이 되도록(즉, 하늘 구가 항상 먼 평면에 있도록) z = w로 설정한다.
 	vout.PosH = mul(posW, gViewProj).xyww;

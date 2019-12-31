@@ -1,63 +1,99 @@
 #include "pch.h"
 #include "Particle.h"
+#include "MeshGeometry.h"
+#include "Structures.h"
 
+using namespace std::literals;
 using namespace DirectX;
 
-Particle::Particle(std::string&& name,UINT maxParticleNum) : Object(std::move(name)) 
+Particle::Particle(std::string&& name, UINT maxParticleNum) : Object(std::move(name)) 
 {
 	mMaxParticleNum = maxParticleNum;
-	particleArray = new ParticleType[mMaxParticleNum];
+	mParitlcePool = std::make_unique<ObjectPool<ParticleData>>(maxParticleNum);
 }
 
-Particle::~Particle() 
-{
-	delete[] particleArray;
-}
+Particle::~Particle() { }
 
 void Particle::Tick(float deltaTime)
 {
+	mLifeTime -= deltaTime;
+	if (mLifeTime < 0.0f)
+		Destroy();
+
 	if (mIsActive)
 	{
+		mSpawnTime -= deltaTime;
 		if (mSpawnTime < 0.0f)
 		{
-			SpawnParticleType();
+			for (UINT i = 0; i < mBurstNum; ++i)
+				SpawnParticleData();
 ;			mSpawnTime = GetRandomFloat(mSpawnTimeRange.first, mSpawnTimeRange.second);
 		}
 
-		mSpawnTime -= deltaTime;
-		DestroyParticleType();
+		UpdateParticleData(deltaTime);
+		DestroyParticleData();
 	}
 }
 
-void Particle::SpawnParticleType()
+
+void Particle::SpawnParticleData()
 {
-	if (mActiveParticleNum <= mMaxParticleNum)
+	if (mParitlcePool->Size() <= 0)
 		return;
 
-	ParticleType particleType;
+	ParticleData* particleData = mParitlcePool->Acquire();
 
-	particleType.mPosition = GetRandomFloat3(mSpawnPosRange.first, mSpawnPosRange.second);
-	particleType.mVelocity = GetRandomFloat3(mVelocityRange.first, mVelocityRange.second);
-	particleType.mSize = GetRandomFloat(mSizeRange.first, mSizeRange.second);
-	particleType.mLifeTime = GetRandomFloat(mLifeTimeRange.first, mLifeTimeRange.second);
-
-	XMFLOAT3 colorDiffuse = GetRandomFloat3(mSpawnPosRange.first, mSpawnPosRange.second);
-	float opacity = GetRandomFloat(mOpacity.first, mOpacity.second);
-	particleType.mColor = XMFLOAT4(colorDiffuse.x, colorDiffuse.y, colorDiffuse.z, opacity);
+	particleData->mPosition = mPosition + GetRandomFloat3(mSpawnDistanceRange.first, mSpawnDistanceRange.second);
+	particleData->mVelocity = GetRandomFloat3(mVelocityRange.first, mVelocityRange.second);
+	particleData->mSize = GetRandomFloat2(mSizeRange.first, mSizeRange.second);
+	particleData->mLifeTime = GetRandomFloat(mLifeTimeRange.first, mLifeTimeRange.second);
+	particleData->mColor = GetRandomFloat4(mColorRange.first, mColorRange.second);
 
 	if (mFacingCamera)
-		particleType.mNormal = GetRandomNormal();
+		particleData->mNormal = GetRandomNormal();
 
-	particleArray[mActiveParticleNum++] = particleType;
+	mParticleDatas.push_back(particleData);
 }
 
-void Particle::DestroyParticleType()
+void Particle::DestroyParticleData()
 {
-	for (int i = 0; i < mActiveParticleNum; ++i)
+	for (auto iter = mParticleDatas.begin(); iter != mParticleDatas.end(); )
 	{
-		if (particleArray[i].mLifeTime < 0.0f)
+		ParticleData* data = *iter;
+		if (data->mLifeTime < 0.0f)
 		{
-			
+			iter = mParticleDatas.erase(iter);
+			mParitlcePool->Release(data);
+			continue;
+		}
+		else
+		{
+			++iter;
 		}
 	}
+}
+
+void Particle::UpdateParticleData(float deltaTime)
+{
+	for (auto& particleData : mParticleDatas)
+	{
+		if (mEnabledGravity)
+		{
+			particleData->mVelocity.y += GA * deltaTime;
+			particleData->mPosition = particleData->mPosition + particleData->mVelocity * deltaTime;
+		}
+		else
+		{
+			particleData->mPosition = particleData->mPosition + particleData->mVelocity * deltaTime;
+		}
+		particleData->mLifeTime -= deltaTime;
+	}
+
+	UpdateNumFrames();
+}
+
+void Particle::BuildParticleMesh(ID3D12Device* device, ID3D12GraphicsCommandList* commandList)
+{
+	mMesh = std::make_unique<MeshGeometry>(GetName() + "Mesh"s + std::to_string(mParticleIndex));
+	mMesh->SetPrimitiveType(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 }

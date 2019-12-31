@@ -20,7 +20,7 @@ public:
 
 public:
 	inline bool GetIsKeyDown(unsigned int input) const { return mKeys[input]; }
-	inline POINT GetLastMoustPos() const { return mLastMousePos; }
+	inline POINT GetMoustPos() const { return mLastMousePos; }
 
 private:
 	bool mKeys[256];

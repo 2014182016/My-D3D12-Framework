@@ -64,15 +64,13 @@ void GameObject::Tick(float deltaTime)
 		}
 
 		// 중력 적용
-		mVelocity.y += -GA * deltaTime;
+		mVelocity.y += GA * deltaTime;
 
 		// 가속도 적용
-		mVelocity.x += mAcceleration.x * deltaTime;
-		mVelocity.y += mAcceleration.y * deltaTime;
-		mVelocity.z += mAcceleration.z * deltaTime;
+		mVelocity = mVelocity + mAcceleration * deltaTime;
 		
 		// 위치 적용
-		Move(mVelocity.x * deltaTime, mVelocity.y * deltaTime, mVelocity.z * deltaTime);
+		Move(mVelocity * deltaTime);
 
 		if (mPosition.y < DEATH_Z)
 			Destroy();
@@ -308,7 +306,7 @@ void GameObject::AddImpulse(DirectX::XMFLOAT3 impulse)
 
 void GameObject::AddImpulse(float impulseX, float impulseY, float impulseZ)
 {
-	if (mMass < FLT_EPSILON || !mIsMovable || !mIsPhysics)
+	if (mMass < FLT_EPSILON || !mIsPhysics)
 		return;
 
 	mAcceleration.x = impulseX * mInvMass;

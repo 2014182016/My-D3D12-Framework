@@ -19,6 +19,8 @@
 #include "PointLight.h"
 #include "SpotLight.h"
 #include "Widget.h"
+#include "Particle.h"
+
 #include "MovingObject.h"
 #include "MovingDirectionalLight.h"
 
@@ -68,6 +70,9 @@ void D3DFramework::OnResize(int screenWidth, int screenHeight)
 	__super::OnResize(screenWidth, screenHeight);
 
 	mCamera->SetLens(0.25f*DirectX::XM_PI, GetAspectRatio(), 1.0f, 1000.0f);
+
+	for (auto& widget : mWidgets)
+		widget->UpdateNumFrames();
 }
 
 void D3DFramework::InitFramework()
@@ -84,7 +89,8 @@ void D3DFramework::InitFramework()
 
 	CreateObjects();
 	CreateLights();
-	CreateUIs();
+	CreateWidgets();
+	CreateParticles();
 	CreateFrameResources();
 
 	UINT textureNum = (UINT)AssetManager::GetInstance()->GetTextures().size();
@@ -104,10 +110,30 @@ void D3DFramework::InitFramework()
 	// 초기화가 끝날 때까지 기다린다.
 	FlushCommandQueue();
 
-	for (const auto& obj : mAllObjects)
+	for (const auto& list : mGameObjects)
 	{
-		obj->BeginPlay();
+		for (const auto& obj : list)
+			obj->BeginPlay();
 	}
+}
+
+void D3DFramework::CreateRtvAndDsvDescriptorHeaps()
+{
+	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc;
+	rtvHeapDesc.NumDescriptors = SWAP_CHAIN_BUFFER_COUNT;
+	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	rtvHeapDesc.NodeMask = 0;
+	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(
+		&rtvHeapDesc, IID_PPV_ARGS(mRtvHeap.GetAddressOf())));
+
+	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc;
+	dsvHeapDesc.NumDescriptors = 1 + 1;
+	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	dsvHeapDesc.NodeMask = 0;
+	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(
+		&dsvHeapDesc, IID_PPV_ARGS(mDsvHeap.GetAddressOf())));
 }
 
 void D3DFramework::CreateShadowMapResource(UINT textureNum, UINT cubeTextureNum)
@@ -121,61 +147,6 @@ void D3DFramework::CreateShadowMapResource(UINT textureNum, UINT cubeTextureNum)
 		CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, mShadowMapHeapIndex, mCbvSrvUavDescriptorSize),
 		CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, mShadowMapHeapIndex, mCbvSrvUavDescriptorSize),
 		CD3DX12_CPU_DESCRIPTOR_HANDLE(dsvCpuStart, 1, mDsvDescriptorSize));
-}
-
-void D3DFramework::Tick(float deltaTime)
-{
-	mCurrentFrameResourceIndex = (mCurrentFrameResourceIndex + 1) % NUM_FRAME_RESOURCES;
-	mCurrentFrameResource = mFrameResources[mCurrentFrameResourceIndex].get();
-
-	// GPU가 현재 FrameResource까지 명령을 끝맞쳤는지 확인한다.
-	// 아니라면 Fence Point에 도달할 떄까지 기다린다.
-	if (mCurrentFrameResource->mFence != 0 && mFence->GetCompletedValue() < mCurrentFrameResource->mFence)
-	{
-		HANDLE eventHandle = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
-		ThrowIfFailed(mFence->SetEventOnCompletion(mCurrentFrameResource->mFence, eventHandle));
-		WaitForSingleObject(eventHandle, INFINITE);
-		CloseHandle(eventHandle);
-	}
-
-	mWorldCamFrustum = mCamera->GetWorldCameraBounding();
-
-	DestroyObjects();
-
-	mOctreeRoot->Update(deltaTime);
-	for (auto& obj : mAllObjects)
-	{
-		obj->Tick(deltaTime);
-	}
-
-	UpdateLightBuffer(deltaTime);
-	UpdateMaterialBuffer(deltaTime);
-	UpdateMainPassCB(deltaTime);
-	UpdateWidgetCB(deltaTime);
-
-#if defined(DEBUG) || defined(_DEBUG)
-	if (GetOptionEnabled(Option::Debug_Collision) ||
-		GetOptionEnabled(Option::Debug_Octree) ||
-		GetOptionEnabled(Option::Debug_Light))
-	{
-		D3DDebug::GetInstance()->Reset();
-
-		if (GetOptionEnabled(Option::Debug_Collision))
-		{
-			UpdateDebugCollision(mCommandList.Get());
-		}
-		if (GetOptionEnabled(Option::Debug_Octree))
-		{
-			UpdateDebugOctree(mCommandList.Get());
-		}
-		if (GetOptionEnabled(Option::Debug_Light))
-		{
-			UpdateDebugLight(mCommandList.Get());
-		}
-
-		UpdateDebugBufferPool();
-	}
-#endif
 }
 
 void D3DFramework::Render()
@@ -220,11 +191,11 @@ void D3DFramework::Render()
 	shadowMapDescriptor.Offset(mShadowMapHeapIndex, mCbvSrvUavDescriptorSize);
 	mCommandList->SetGraphicsRootDescriptorTable(RP_SHADOWMAP, shadowMapDescriptor);
 	
-	UINT objectCBIndex = 0;
+	mCommandList->SetPipelineState(mPSOs["ShadowMap"].Get());
 	for (const auto& light : mLights)
 	{
-		if(light->IsUpdate())
-			mShadowMap->RenderSceneToShadowMap(mCommandList.Get(), mPSOs["Shadow"].Get(), mActualObjects, objectCBIndex);
+		if (light->IsUpdate())
+			mShadowMap->RenderSceneToShadowMap(mCommandList.Get(), mActualObjects);
 	}
 
 	// Default Pass
@@ -246,25 +217,28 @@ void D3DFramework::Render()
 	{
 		mCommandList->SetPipelineState(mPSOs["Wireframe"].Get());
 		for (const auto& list : mGameObjects)
-			RenderGameObjects(mCommandList.Get(), list, objectCBIndex, &mWorldCamFrustum);
+			RenderGameObject(mCommandList.Get(), list, &mWorldCamFrustum);
 	}
 	else
 	{
 		mCommandList->SetPipelineState(mPSOs["Opaque"].Get());
-		RenderGameObjects(mCommandList.Get(), mGameObjects[(int)RenderLayer::Opaque], objectCBIndex, &mWorldCamFrustum);
+		RenderGameObject(mCommandList.Get(), mGameObjects[(int)RenderLayer::Opaque], &mWorldCamFrustum);
 
 		mCommandList->SetPipelineState(mPSOs["AlphaTested"].Get());
-		RenderGameObjects(mCommandList.Get(), mGameObjects[(int)RenderLayer::AlphaTested], objectCBIndex, &mWorldCamFrustum);
+		RenderGameObject(mCommandList.Get(), mGameObjects[(int)RenderLayer::AlphaTested], &mWorldCamFrustum);
 
 		mCommandList->SetPipelineState(mPSOs["Billborad"].Get());
-		RenderGameObjects(mCommandList.Get(), mGameObjects[(int)RenderLayer::Billborad], objectCBIndex, &mWorldCamFrustum);
+		RenderGameObject(mCommandList.Get(), mGameObjects[(int)RenderLayer::Billborad], &mWorldCamFrustum);
 
 		mCommandList->SetPipelineState(mPSOs["Sky"].Get());
-		RenderGameObjects(mCommandList.Get(), mGameObjects[(int)RenderLayer::Sky], objectCBIndex);
+		RenderGameObject(mCommandList.Get(), mGameObjects[(int)RenderLayer::Sky]);
 
 		mCommandList->SetPipelineState(mPSOs["Transparent"].Get());
-		RenderGameObjects(mCommandList.Get(), mGameObjects[(int)RenderLayer::Transparent], objectCBIndex, &mWorldCamFrustum);
+		RenderGameObject(mCommandList.Get(), mGameObjects[(int)RenderLayer::Transparent], &mWorldCamFrustum);
 	}
+
+	mCommandList->SetPipelineState(mPSOs["Particle"].Get());
+	RenderParticle(mCommandList.Get());
 
 #if defined(DEBUG) || defined(_DEBUG)
 	if (GetOptionEnabled(Option::Debug_Collision) ||
@@ -303,33 +277,140 @@ void D3DFramework::Render()
 	mCommandQueue->Signal(mFence.Get(), mCurrentFence);
 }
 
+void D3DFramework::Tick(float deltaTime)
+{
+	mCurrentFrameResourceIndex = (mCurrentFrameResourceIndex + 1) % NUM_FRAME_RESOURCES;
+	mCurrentFrameResource = mFrameResources[mCurrentFrameResourceIndex].get();
+
+	// GPU가 현재 FrameResource까지 명령을 끝맞쳤는지 확인한다.
+	// 아니라면 Fence Point에 도달할 떄까지 기다린다.
+	if (mCurrentFrameResource->mFence != 0 && mFence->GetCompletedValue() < mCurrentFrameResource->mFence)
+	{
+		HANDLE eventHandle = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
+		ThrowIfFailed(mFence->SetEventOnCompletion(mCurrentFrameResource->mFence, eventHandle));
+		WaitForSingleObject(eventHandle, INFINITE);
+		CloseHandle(eventHandle);
+	}
+
+	mWorldCamFrustum = mCamera->GetWorldCameraBounding();
+
+	DestroyObject();
+	DestroyParticle();
+
+	mOctreeRoot->Update(deltaTime);
+	UpdateObjectBuffer(deltaTime);
+	UpdateLightBuffer(deltaTime);
+	UpdateMaterialBuffer(deltaTime);
+	UpdateMainPassBuffer(deltaTime);
+	UpdateWidgetBuffer(deltaTime);
+	UpdateParticleBuffer(deltaTime);
+
+#if defined(DEBUG) || defined(_DEBUG)
+	if (GetOptionEnabled(Option::Debug_Collision) ||
+		GetOptionEnabled(Option::Debug_Octree) ||
+		GetOptionEnabled(Option::Debug_Light))
+	{
+		D3DDebug::GetInstance()->Reset();
+
+		if (GetOptionEnabled(Option::Debug_Collision))
+		{
+			UpdateDebugCollision(mCommandList.Get());
+		}
+		if (GetOptionEnabled(Option::Debug_Octree))
+		{
+			UpdateDebugOctree(mCommandList.Get());
+		}
+		if (GetOptionEnabled(Option::Debug_Light))
+		{
+			UpdateDebugLight(mCommandList.Get());
+		}
+
+		UpdateDebugBufferPool();
+	}
+#endif
+}
+
+
 void D3DFramework::AddGameObject(std::shared_ptr<GameObject> object, RenderLayer renderLayer)
 {
-	mAllObjects.emplace_back(object);
-	mGameObjects[(int)renderLayer].emplace_back(object);
+	mGameObjects[(int)renderLayer].push_back(object);
 
 	if (renderLayer == RenderLayer::Opaque || renderLayer == RenderLayer::Transparent || renderLayer == RenderLayer::AlphaTested)
 	{
 		object->WorldUpdate();
-		mActualObjects.emplace_back(object);
+		mActualObjects.push_back(object);
 
 		if (mOctreeRoot)
-			mOctreeRoot->Insert(object);
+		{
+			if(object->GetCollisionType() != CollisionType::None)
+				mOctreeRoot->Insert(object);
+		}
 	}
 
 	UpdateObjectBufferPool();
 }
 
-void D3DFramework::DestroyObjects()
+void D3DFramework::DestroyObject()
 {
 	for (auto& list : mGameObjects)
-		list.remove_if([](const std::shared_ptr<GameObject>& obj)->bool
-			{ return obj->GetIsDestroyesd(); });
+	{
+		list.remove_if([](const std::shared_ptr<Object>& obj)->bool
+		{ return obj->GetIsDestroyesd(); });
+	}
 
-	mAllObjects.remove_if([](const std::shared_ptr<Object>& obj)->bool
+	mActualObjects.remove_if([](const std::shared_ptr<Object>& obj)->bool
 	{ return obj->GetIsDestroyesd(); });
 
-	mOctreeRoot->DestroyObjects();
+	mOctreeRoot->DestroyObject();
+}
+
+void D3DFramework::DestroyParticle()
+{
+	for (auto iter = mParticles.begin(); iter != mParticles.end();)
+	{
+		auto& particle = *iter;
+		if (particle->GetIsDestroyesd())
+		{
+			auto& particleVBs = mCurrentFrameResource->mParticleVBs;
+			auto vbIter = particleVBs.begin() + particle->GetParticleIndex();
+			particleVBs.erase(vbIter);
+			iter = mParticles.erase(iter);
+			continue;
+		}
+		else
+		{
+			++iter;
+		}
+	}
+}
+
+void D3DFramework::UpdateObjectBuffer(float deltaTime)
+{
+	auto currObjectCB = mCurrentFrameResource->mObjectPool->GetBuffer();
+	UINT objectIndex = 0;
+
+	for(auto& list : mGameObjects)
+		for (auto& obj : list)
+		{
+			obj->Tick(deltaTime);
+
+			if (objectIndex != obj->GetObjectIndex())
+			{
+				obj->SetObjectIndex(objectIndex);
+				obj->UpdateNumFrames();
+			}
+
+			if (obj->IsUpdate())
+			{
+				// 오브젝트의 상수 버퍼를 업데이트한다.
+				ObjectConstants objConstants;
+				XMStoreFloat4x4(&objConstants.mWorld, XMMatrixTranspose(obj->GetWorld()));
+				objConstants.mMaterialIndex = obj->GetMaterial()->GetMaterialIndex();
+
+				currObjectCB->CopyData(objectIndex, objConstants);
+			}
+			++objectIndex;
+		}
 }
 
 void D3DFramework::UpdateLightBuffer(float deltaTime)
@@ -377,7 +458,7 @@ void D3DFramework::UpdateMaterialBuffer(float deltaTime)
 	}
 }
 
-void D3DFramework::UpdateMainPassCB(float deltaTime)
+void D3DFramework::UpdateMainPassBuffer(float deltaTime)
 {
 	XMMATRIX view = mCamera->GetView();
 	XMMATRIX proj = mCamera->GetProj();
@@ -397,44 +478,116 @@ void D3DFramework::UpdateMainPassCB(float deltaTime)
 	mMainPassCB->mCurrentSkyCubeMapIndex = mCurrentSkyCubeMapIndex;
 	mMainPassCB->mRenderTargetSize = XMFLOAT2((float)mScreenWidth, (float)mScreenHeight);
 	mMainPassCB->mInvRenderTargetSize = XMFLOAT2(1.0f / mScreenWidth, 1.0f / mScreenHeight);
-	mMainPassCB->mNearZ = 1.0f;
-	mMainPassCB->mFarZ = 1000.0f;
+	mMainPassCB->mNearZ = mCamera->GetNearZ();
+	mMainPassCB->mFarZ = mCamera->GetFarZ();
 	mMainPassCB->mTotalTime = mGameTimer->GetTotalTime();
 	mMainPassCB->mDeltaTime = mGameTimer->GetDeltaTime();
 	mMainPassCB->mAmbientLight = { 0.05f, 0.05f, 0.05f, 1.0f };
 	mMainPassCB->mFogColor = { 0.7f, 0.7f, 0.7f, 1.0f };
-	mMainPassCB->mFogStart = 5.0f;
-	mMainPassCB->mFogRange = 10.0f;
+	mMainPassCB->mFogStart = 0.0f;
+	mMainPassCB->mFogRange = 100.0f;
+	mMainPassCB->mFogDensity = 0.1f;
 	mMainPassCB->mFogEnabled = GetOptionEnabled(Option::Fog);
+	mMainPassCB->mFogType = (std::uint32_t)FogType::Exponential;
 
 	auto passCB = mCurrentFrameResource->mPassPool->GetBuffer();
 	passCB->CopyData(0, *mMainPassCB);
 }
 
-void D3DFramework::UpdateWidgetCB(float deltaTime)
+void D3DFramework::UpdateWidgetBuffer(float deltaTime)
 {
 	auto currWidgetPool = mCurrentFrameResource->mWidgetPool->GetBuffer();
-	UINT i = 0;
+	auto& currWidgetVBs = mCurrentFrameResource->mWidgetVBs;
 	for (const auto& widget : mWidgets)
 	{
 		widget->Tick(deltaTime);
 		if (widget->IsUpdate())
 		{
+			UINT index = widget->GetWidgetIndex();
 			WidgetConstants widgetConstants;
 
-			widgetConstants.mMaterialIndex = widget->GetMaterial()->GetMaterialIndex();
-			widgetConstants.mPosX = widget->GetPosX();
-			widgetConstants.mPosY = widget->GetPosY();
-			widgetConstants.mWidth = widget->GetWidth();
-			widgetConstants.mHeight = widget->GetHeight();
-			widgetConstants.mAnchorX = widget->GetAnchorX();
-			widgetConstants.mAnchorY = widget->GetAnchotY();
+			if(widget->GetMaterial())
+				widgetConstants.mMaterialIndex = widget->GetMaterial()->GetMaterialIndex();
+			currWidgetPool->CopyData(index, widgetConstants);
 
-			currWidgetPool->CopyData(i, widgetConstants);
+			float posX = (float)widget->GetPosX();
+			float posY = (float)widget->GetPosY();
+			float width = (float)widget->GetWidth();
+			float height = (float)widget->GetHeight();
+			float anchorX = widget->GetAnchorX();
+			float anchorY = widget->GetAnchorY();
+
+			float minX = anchorX + ((float)posX / mScreenWidth);
+			float minY = anchorY + ((float)posY / mScreenHeight);
+			float maxX = anchorX + ((float)posX + float(width) / mScreenWidth);
+			float maxY = anchorY + ((float)posY + float(height) / mScreenHeight);
+
+			// [0, 1]범위로 설정된 위젯의 정점 위치를 동차 좌표계의 [-1, 1]범위로 변환한다.
+			std::function<float(float)> transformHomogenous = [](float x) { return x * 2.0f - 1.0f; };
+
+			minX = transformHomogenous(minX);
+			minY = transformHomogenous(minY);
+			maxX = transformHomogenous(maxX);
+			maxY = transformHomogenous(maxY);
+
+			WidgetVertex vertices[4];
+			vertices[0] = WidgetVertex(XMFLOAT3(minX, minY, 0.0f), XMFLOAT2(0.0f, 0.0f));
+			vertices[1] = WidgetVertex(XMFLOAT3(minX, maxY, 0.0f), XMFLOAT2(0.0f, 1.0f));
+			vertices[2] = WidgetVertex(XMFLOAT3(maxX, minY, 0.0f), XMFLOAT2(1.0f, 0.0f));
+			vertices[3] = WidgetVertex(XMFLOAT3(maxX, maxY, 0.0f), XMFLOAT2(1.0f, 1.0f));
+
+			UINT widgetIndex = widget->GetWidgetIndex();
+			for (int i = 0; i < 4; ++i)
+				currWidgetVBs[widgetIndex]->CopyData(i, vertices[i]);
+			widget->GetMesh()->SetDynamicVertexBuffer(currWidgetVBs[widgetIndex]->GetResource(),
+				4, (UINT)sizeof(WidgetVertex));
 
 			widget->DecreaseNumFrames();
 		}
-		++i;
+	}
+}
+
+void D3DFramework::UpdateParticleBuffer(float deltaTime)
+{
+	auto currParticlePool = mCurrentFrameResource->mParticlePool->GetBuffer();
+	auto& currParticleVBs = mCurrentFrameResource->mParticleVBs;
+	UINT particleIndex = 0;
+
+	for (const auto& particle : mParticles)
+	{
+		particle->Tick(deltaTime);
+		if (particleIndex != particle->GetParticleIndex())
+		{
+			particle->UpdateNumFrames();
+			particle->SetParticleIndex(particleIndex);
+		}
+
+		if (particle->IsUpdate())
+		{
+			ParticleConstants particleConstants;
+
+			particleConstants.mMaterialIndex = particle->GetMaterial()->GetMaterialIndex();
+			particleConstants.mFacingCamera = true;
+
+			currParticlePool->CopyData(particleIndex, particleConstants);
+
+			auto& particleDatas = particle->GetParticleDatas();
+			UINT vertexIndex = 0;
+			for (auto& paritlceData : particleDatas)
+			{
+				ParticleVertex v;
+				v.mPos = paritlceData->mPosition;
+				v.mColor = paritlceData->mColor;
+				v.mNormal = paritlceData->mNormal;
+				v.mSize = paritlceData->mSize;
+				currParticleVBs[particleIndex]->CopyData(vertexIndex++, v);
+			}
+			particle->GetMesh()->SetDynamicVertexBuffer(currParticleVBs[particleIndex]->GetResource(),
+				vertexIndex, (UINT)sizeof(ParticleVertex));
+
+			particle->DecreaseNumFrames();
+		}
+		++particleIndex;
 	}
 }
 
@@ -533,6 +686,7 @@ void D3DFramework::UpdateObjectBufferPool()
 void D3DFramework::CreateObjects()
 {
 	std::shared_ptr<GameObject> object;
+	UINT objectIndex = 0;
 	
 	object = std::make_shared<GameObject>("Sky"s);
 	object->SetScale(5000.0f, 5000.0f, 5000.0f);
@@ -540,6 +694,7 @@ void D3DFramework::CreateObjects()
 	object->SetMesh(AssetManager::GetInstance()->FindMesh("SkySphere"s));
 	object->SetRenderLayer(RenderLayer::Sky);
 	object->SetCollisionEnabled(false);
+	object->SetObjectIndex(objectIndex++);
 	AddGameObject(object, object->GetRenderLayer());
 
 	object = std::make_shared<GameObject>("Floor0"s);
@@ -547,6 +702,7 @@ void D3DFramework::CreateObjects()
 	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tile0"s));
 	object->SetMesh(AssetManager::GetInstance()->FindMesh("Cube_AABB"s));
 	object->SetRenderLayer(RenderLayer::Opaque);
+	object->SetObjectIndex(objectIndex++);
 	AddGameObject(object, object->GetRenderLayer());
 
 	object = std::make_shared<MovingObject>("MovingObject0");
@@ -555,6 +711,7 @@ void D3DFramework::CreateObjects()
 	object->SetMesh(AssetManager::GetInstance()->FindMesh("Cube_AABB"s));
 	object->SetPhysics(true);
 	object->SetMass(10.0f);
+	object->SetObjectIndex(objectIndex++);
 	AddGameObject(object, object->GetRenderLayer());
 
 	for (int i = 0; i < 5; ++i)
@@ -564,6 +721,7 @@ void D3DFramework::CreateObjects()
 		object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Brick0"s));
 		object->SetMesh(AssetManager::GetInstance()->FindMesh("Cylinder"s));
 		object->SetRenderLayer(RenderLayer::Opaque);
+		object->SetObjectIndex(objectIndex++);
 		AddGameObject(object, object->GetRenderLayer());
 
 		object = std::make_shared<GameObject>("ColumnRight"s + std::to_string(i));
@@ -571,6 +729,7 @@ void D3DFramework::CreateObjects()
 		object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Brick0"s));
 		object->SetMesh(AssetManager::GetInstance()->FindMesh("Cylinder"s));
 		object->SetRenderLayer(RenderLayer::Opaque);
+		object->SetObjectIndex(objectIndex++);
 		AddGameObject(object, object->GetRenderLayer());
 
 		object = std::make_shared<GameObject>("SphereLeft"s + std::to_string(i));
@@ -578,6 +737,7 @@ void D3DFramework::CreateObjects()
 		object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Mirror0"s));
 		object->SetMesh(AssetManager::GetInstance()->FindMesh("Sphere"s));
 		object->SetRenderLayer(RenderLayer::Transparent);
+		object->SetObjectIndex(objectIndex++);
 		AddGameObject(object, object->GetRenderLayer());
 
 		object = std::make_shared<GameObject>("SphereRight"s + std::to_string(i));
@@ -585,6 +745,7 @@ void D3DFramework::CreateObjects()
 		object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Mirror0"s));
 		object->SetMesh(AssetManager::GetInstance()->FindMesh("Sphere"s));
 		object->SetRenderLayer(RenderLayer::Transparent);
+		object->SetObjectIndex(objectIndex++);
 		AddGameObject(object, object->GetRenderLayer());
 	}
 }
@@ -599,18 +760,43 @@ void D3DFramework::CreateLights()
 	dirLight->SetPosition(10.0f, 10.0f, -10.0f);
 	dirLight->SetStrength(0.8f, 0.8f, 0.8f);
 	dirLight->Rotate(45.0f, -45.0f, 0.0f);
-	mLights.emplace_back(std::move(dirLight));
+	mLights.push_back(std::move(dirLight));
 }
 
-void D3DFramework::CreateUIs()
+void D3DFramework::CreateWidgets()
 {
 	std::shared_ptr<Widget> widget;
+	UINT widgetIndex = 0;
 
 	widget = std::make_shared<Widget>("Widget0"s);
 	widget->SetSize(400, 300);
-	widget->SetAnchor(0.5f, 0.5f);
+	widget->SetAnchor(0.0f, 0.0f);
 	widget->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tile0"s));
-	//mWidgets.emplace_back(std::move(widget));
+	widget->BuildWidgetMesh(md3dDevice.Get(), mCommandList.Get());
+	widget->SetWidgetIndex(widgetIndex++);
+	//mWidgets.push_back(std::move(widget));
+}
+
+void D3DFramework::CreateParticles()
+{
+	std::shared_ptr<Particle> particle;
+	UINT particleIndex = 0;
+
+	particle = std::make_shared<Particle>("Particle0"s, 500);
+	particle->SetPosition(0.0f, 5.0f, 0.0f);
+	particle->SetSpawnDistanceRange(XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 1.0f));
+	particle->SetVelocityRange(XMFLOAT3(-10.0f, -10.0f, -10.0f), XMFLOAT3(10.0f, 10.0f, 10.0f));
+	particle->SetColorRange(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
+	particle->SetSizeRange(XMFLOAT2(2.0f, 2.0f));
+	particle->SetSpawnTimeRange(1.0f, 2.0f);
+	particle->SetLifeTimeRange(1.5f, 3.0f);
+	particle->SetLifeTime(10.0f);
+	particle->SetBurstNum(5);
+	particle->SetEnabledGravity(true);
+	particle->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tree0"s));
+	particle->BuildParticleMesh(md3dDevice.Get(), mCommandList.Get());
+	particle->SetParticleIndex(particleIndex++);
+	mParticles.push_back(std::move(particle));
 }
 
 void D3DFramework::CreateFrameResources()
@@ -622,15 +808,28 @@ void D3DFramework::CreateFrameResources()
 	for (int i = 0; i < NUM_FRAME_RESOURCES; ++i)
 	{
 		mFrameResources[i] = std::make_unique<FrameResource>(md3dDevice.Get(),
-			1, gameObjectNum * 2, (UINT)mLights.size(), (UINT)AssetManager::GetInstance()->GetMaterials().size(), (UINT)mWidgets.size());
+			1, gameObjectNum * 2, (UINT)mLights.size(), (UINT)AssetManager::GetInstance()->GetMaterials().size(),
+			(UINT)mWidgets.size(), (UINT)mParticles.size());
+
+		mFrameResources[i]->mWidgetVBs.reserve((UINT)mWidgets.size());
+		for (const auto& widget : mWidgets)
+		{
+			std::unique_ptr<UploadBuffer<WidgetVertex>> vb = std::make_unique<UploadBuffer<WidgetVertex>>(md3dDevice.Get(), 4, false);
+			mFrameResources[i]->mWidgetVBs.push_back(std::move(vb));
+		}
+
+		mFrameResources[i]->mParticleVBs.reserve((UINT)mParticles.size());
+		for (const auto& particle : mParticles)
+		{
+			std::unique_ptr<UploadBuffer<ParticleVertex>> vb = std::make_unique<UploadBuffer<ParticleVertex>>(md3dDevice.Get(), particle->GetMaxParticleNum(), false);
+			mFrameResources[i]->mParticleVBs.push_back(std::move(vb));
+		}
 	}
 }
 
-void D3DFramework::RenderGameObjects(ID3D12GraphicsCommandList* cmdList, const std::list<std::shared_ptr<GameObject>>& gameObjects,
-	UINT& startObjectIndex, BoundingFrustum* frustum) const
+void D3DFramework::RenderGameObject(ID3D12GraphicsCommandList* cmdList, const std::list<std::shared_ptr<GameObject>>& gameObjects, BoundingFrustum* frustum) const
 {
 	auto currObjectCB = mCurrentFrameResource->mObjectPool->GetBuffer();
-	UINT& objectCBIndex = startObjectIndex;
 
 	for (const auto& obj : gameObjects)
 	{
@@ -645,19 +844,11 @@ void D3DFramework::RenderGameObjects(ID3D12GraphicsCommandList* cmdList, const s
 				continue;
 		}
 
-		// 오브젝트의 상수 버퍼를 업데이트한다.
-		ObjectConstants objConstants;
-		XMStoreFloat4x4(&objConstants.mWorld, XMMatrixTranspose(obj->GetWorld()));
-		objConstants.mMaterialIndex = obj->GetMaterial()->GetMaterialIndex();
-
-		currObjectCB->CopyData(objectCBIndex, objConstants);
 		auto objCBAddressStart = currObjectCB->GetResource()->GetGPUVirtualAddress();
-		D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = objCBAddressStart + objectCBIndex * objCBByteSize;
+		D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = objCBAddressStart + obj->GetObjectIndex() * objCBByteSize;
 		cmdList->SetGraphicsRootConstantBufferView(RP_OBJECT, objCBAddress);
 
 		obj->GetMesh()->Render(cmdList);
-
-		++objectCBIndex;
 	}
 }
 
@@ -692,7 +883,7 @@ void D3DFramework::RenderCollisionDebug(ID3D12GraphicsCommandList* cmdList)
 void D3DFramework::RenderWidget(ID3D12GraphicsCommandList* cmdList)
 {
 	auto widgetPool = mCurrentFrameResource->mWidgetPool.get();
-	UINT widgetObjIndex = 0;
+	UINT widgetIndex = 0;
 
 	for (const auto& widget : mWidgets)
 	{
@@ -700,12 +891,32 @@ void D3DFramework::RenderWidget(ID3D12GraphicsCommandList* cmdList)
 			continue;
 
 		auto widgetAddressStart = widgetPool->GetBuffer()->GetResource()->GetGPUVirtualAddress();
-		D3D12_GPU_VIRTUAL_ADDRESS widgetCBAddress = widgetAddressStart + widgetObjIndex * widgetCBByteSize;
+		D3D12_GPU_VIRTUAL_ADDRESS widgetCBAddress = widgetAddressStart + widgetIndex * widgetCBByteSize;
 		mCommandList->SetGraphicsRootConstantBufferView(RP_WIDGET, widgetCBAddress);
 
-		widget->GetMesh()->Render(cmdList, 1, false);
+		widget->GetMesh()->Render(cmdList);
 
-		++widgetObjIndex;
+		++widgetIndex;
+	}
+}
+
+void D3DFramework::RenderParticle(ID3D12GraphicsCommandList* cmdList)
+{
+	auto particlePool = mCurrentFrameResource->mParticlePool.get();
+	UINT particleIndex = 0;
+
+	for (const auto& particle : mParticles)
+	{
+		if (!particle->GetIsVisible())
+			continue;
+
+		auto particleAddressStart = particlePool->GetBuffer()->GetResource()->GetGPUVirtualAddress();
+		D3D12_GPU_VIRTUAL_ADDRESS particleCBAddress = particleAddressStart + particleIndex * particleCBByteSize;
+		mCommandList->SetGraphicsRootConstantBufferView(RP_PARTICLE, particleCBAddress);
+
+		particle->GetMesh()->Render(cmdList, 1, false);
+
+		++particleIndex;
 	}
 }
 

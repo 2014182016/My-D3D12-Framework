@@ -9,20 +9,26 @@ public:
 	virtual ~Widget();
 
 public:
+	// 동적 정점 버퍼를 사용하기 위해 만드는 임시 메쉬
+	void BuildWidgetMesh(ID3D12Device* device, ID3D12GraphicsCommandList* commandList);
+
 	void SetPosition(std::uint32_t x, std::uint32_t y);
 	void SetSize(std::uint32_t width, std::uint32_t height);
 	void SetAnchor(float x, float y);
-	void SetMaterial(class Material* material);
+public:
+	inline void SetWidgetIndex(UINT index) { mWidgetIndex = index; }
+	inline UINT GetWidgetIndex() const { return mWidgetIndex; }
 
 	inline std::uint32_t GetPosX() const { return mPosX; }
 	inline std::uint32_t GetPosY() const { return mPosY; }
 	inline std::uint32_t GetWidth() const { return mWidth; }
 	inline std::uint32_t GetHeight() const { return mHeight; }
 	inline float GetAnchorX() const { return mAnchorX; }
-	inline float GetAnchotY() const { return mAnchorY; }
+	inline float GetAnchorY() const { return mAnchorY; }
 
+	inline void SetMaterial(class Material* material) { mMaterial = material; }
 	inline class Material* GetMaterial() const { return mMaterial; }
-	inline static class MeshGeometry* GetMesh() { return mMesh; }
+	inline class MeshGeometry* GetMesh() { return mMesh.get(); }
 
 	inline void SetIsVisible(bool value) { mIsVisible = value; }
 	inline bool GetIsVisible() const { return mIsVisible; }
@@ -35,9 +41,11 @@ protected:
 	float mAnchorX = 0.0f;
 	float mAnchorY = 0.0f;
 
-private:
-	static inline class MeshGeometry* mMesh = nullptr;
+	std::unique_ptr<class MeshGeometry> mMesh = nullptr;
 	class Material* mMaterial = nullptr;
+
+private:
+	UINT mWidgetIndex = 0;
 
 	bool mIsVisible = true;
 };

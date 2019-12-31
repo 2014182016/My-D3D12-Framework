@@ -9,13 +9,6 @@ MeshGeometry::MeshGeometry(std::string&& name) : Component(std::move(name)) { }
 
 MeshGeometry::~MeshGeometry() { }
 
-void MeshGeometry::BuildMesh(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
-	void* vertices, std::uint16_t* indices, UINT vertexCount, UINT indexCount, UINT vertexStride, UINT indexStride)
-{
-	BuildVertices(device, commandList, vertices, vertexCount, vertexStride);
-	BuildIndices(device, commandList, indices, indexCount, indexStride);
-}
-
 void MeshGeometry::BuildVertices(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 	void* vertices, UINT vertexCount, UINT vertexStride)
 {
@@ -78,6 +71,17 @@ void MeshGeometry::BuildCollisionBound(XMFLOAT3* points, size_t vertexCount, siz
 		break;
 	}
 	}
+}
+
+void MeshGeometry::SetDynamicVertexBuffer(ID3D12Resource* vb, UINT vertexCount, UINT vertexStride)
+{
+	const UINT vbByteSize = vertexCount * vertexStride;
+
+	mVertexBufferGPU = vb;
+	mVertexBufferView.BufferLocation = mVertexBufferGPU->GetGPUVirtualAddress();
+	mVertexBufferView.StrideInBytes = vertexStride;
+	mVertexBufferView.SizeInBytes = vbByteSize;
+	mVertexCount = vertexCount;
 }
 
 void MeshGeometry::Render(ID3D12GraphicsCommandList* commandList, UINT instanceCount, bool isIndexed) const

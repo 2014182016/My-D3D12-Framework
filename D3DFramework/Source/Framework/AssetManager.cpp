@@ -23,10 +23,15 @@ AssetManager::~AssetManager() { }
 
 void AssetManager::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, IDirectSound8* d3dSound)
 {
+	if (isInitialized)
+		return;
+
 	LoadTextures(device, commandList);
 	LoadWaves(d3dSound);
 	BuildGeometry(device, commandList);
 	BuildMaterial();
+
+	isInitialized = true;
 }
 
 void AssetManager::LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList)
@@ -231,8 +236,8 @@ void AssetManager::LoadObj(ID3D12Device* device, ID3D12GraphicsCommandList* comm
 	ObjToH3d(vertices, indices, fileName); // obj파일은 h3d파일로 변환한다.
 
 	std::unique_ptr<MeshGeometry> mesh = std::make_unique<MeshGeometry>(std::move(meshName));
-	mesh->BuildMesh(device, commandList, vertices.data(), indices.data(),
-		(UINT)vertices.size(), (UINT)indices.size(), (UINT)sizeof(Vertex), (UINT)sizeof(std::uint16_t));
+	mesh->BuildVertices(device, commandList, (void*)vertices.data(),(UINT)vertices.size(), (UINT)sizeof(Vertex));
+	mesh->BuildIndices(device, commandList, indices.data(), (UINT)indices.size(), (UINT)sizeof(std::uint16_t));
 
 	if(collisionType != CollisionType::None)
 		mesh->BuildCollisionBound(&vertices[0].mPos, vertices.size(), (size_t)sizeof(Vertex), collisionType);
@@ -289,8 +294,8 @@ void AssetManager::LoadH3d(ID3D12Device* device, ID3D12GraphicsCommandList* comm
 	fin.close();
 
 	std::unique_ptr<MeshGeometry> mesh = std::make_unique<MeshGeometry>(std::move(meshName));
-	mesh->BuildMesh(device, commandList, vertices.data(), indices.data(),
-		(UINT)vertices.size(), (UINT)indices.size(), (UINT)sizeof(Vertex), (UINT)sizeof(std::uint16_t));
+	mesh->BuildVertices(device, commandList, (void*)vertices.data(), (UINT)vertices.size(), (UINT)sizeof(Vertex));
+	mesh->BuildIndices(device, commandList, indices.data(), (UINT)indices.size(), (UINT)sizeof(std::uint16_t));
 
 	if (collisionType != CollisionType::None)
 		mesh->BuildCollisionBound(&vertices[0].mPos, vertices.size(), (size_t)sizeof(Vertex), collisionType);
@@ -526,26 +531,6 @@ void AssetManager::BuildGeometry(ID3D12Device* device, ID3D12GraphicsCommandList
 
 	for (const auto& objInfo : mObjModels)
 		LoadObj(device, commandList, objInfo);
-
-	{
-		std::vector<WidgetVertex> vertices;
-		std::unique_ptr<MeshGeometry> mesh = std::make_unique<MeshGeometry>("WidgetPoint"s);
-
-		vertices.emplace_back(XMFLOAT3(-1.0f, -1.0f, 0.0f));
-		mesh->BuildVertices(device, commandList, vertices.data(), (UINT)vertices.size(), (size_t)sizeof(WidgetVertex));
-		mesh->SetPrimitiveType(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
-		mMeshes[mesh->GetName()] = std::move(mesh);
-	}
-
-	{
-		std::vector<ParticleVertex> vertices;
-		std::unique_ptr<MeshGeometry> mesh = std::make_unique<MeshGeometry>("ParticlePoint"s);
-
-		vertices.emplace_back(XMFLOAT3(0.0f, 0.0f, 0.0f));
-		mesh->BuildVertices(device, commandList, vertices.data(), (UINT)vertices.size(), (size_t)sizeof(ParticleVertex));
-		mesh->SetPrimitiveType(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
-		mMeshes[mesh->GetName()] = std::move(mesh);
-	}
 }
 
 MeshGeometry* AssetManager::FindMesh(std::string&& name) const

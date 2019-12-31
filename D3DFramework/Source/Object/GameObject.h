@@ -3,7 +3,7 @@
 #include "Object.h"
 
 #define DEATH_Z -1000.0f
-#define GA 9.8f
+#define GA -9.8f
 
 class GameObject : public Object
 {
@@ -36,7 +36,7 @@ public:
 	inline void SetVisible(bool value) { mIsVisible = value; }
 	inline bool GetIsVisible() const { return mIsVisible; }
 
-	inline void SetPhysics(bool value) { mIsPhysics = value; mIsMovable = true; }
+	inline void SetPhysics(bool value) { mIsPhysics = value; }
 	inline bool GetIsPhysics() const { return mIsPhysics; }
 
 	inline void SetMass(float mass) { mMass = mass; mInvMass = 1.0f / mass; }
@@ -55,6 +55,9 @@ public:
 	inline const std::any& GetCollisionBounding() const { return mCollisionBounding; }
 	std::optional<DirectX::XMMATRIX> GetBoundingWorld() const;
 
+	inline void SetObjectIndex(UINT index) { mObjectIndex = index; }
+	inline UINT GetObjectIndex() const { return mObjectIndex; }
+
 protected:
 	class Material* mMaterial = nullptr;
 	class MeshGeometry* mMesh = nullptr;
@@ -72,6 +75,7 @@ protected:
 private:
 	RenderLayer mRenderLayer = RenderLayer::Opaque;
 
+	UINT mObjectIndex = 0;
 	bool mIsVisible = true;
 	bool mIsPhysics = false;
 };

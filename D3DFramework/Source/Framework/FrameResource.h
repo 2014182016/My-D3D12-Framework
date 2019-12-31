@@ -10,7 +10,8 @@
 struct FrameResource
 {
 public:
-	FrameResource(ID3D12Device* device, UINT passCount, UINT objectCount, UINT lightCount, UINT materialCount, UINT widgetCount)
+	FrameResource(ID3D12Device* device, UINT passCount, UINT objectCount, UINT lightCount, UINT materialCount,
+		UINT widgetCount, UINT particleCount)
 	{
 		ThrowIfFailed(device->CreateCommandAllocator(
 			D3D12_COMMAND_LIST_TYPE_DIRECT,
@@ -22,6 +23,7 @@ public:
 		mMaterialBufferPool = std::make_unique<BufferMemoryPool<MaterialData>>(device, materialCount, false);
 		mDebugPool = std::make_unique<BufferMemoryPool<DebugConstants>>(device, objectCount, true);
 		mWidgetPool = std::make_unique<BufferMemoryPool<WidgetConstants>>(device, widgetCount, true);
+		mParticlePool = std::make_unique<BufferMemoryPool<ParticleConstants>>(device, particleCount, true);
 	}
 	FrameResource(const FrameResource& rhs) = delete;
 	FrameResource& operator=(const FrameResource& rhs) = delete;
@@ -44,4 +46,8 @@ public:
 	std::unique_ptr<BufferMemoryPool<MaterialData>> mMaterialBufferPool = nullptr;
 	std::unique_ptr<BufferMemoryPool<DebugConstants>> mDebugPool = nullptr;
 	std::unique_ptr<BufferMemoryPool<WidgetConstants>> mWidgetPool = nullptr;
+	std::unique_ptr<BufferMemoryPool<ParticleConstants>> mParticlePool = nullptr;
+
+	std::vector<std::unique_ptr<UploadBuffer<WidgetVertex>>> mWidgetVBs;
+	std::vector<std::unique_ptr<UploadBuffer<ParticleVertex>>> mParticleVBs;
 };
