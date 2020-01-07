@@ -36,29 +36,13 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
-    <FxCompile Include="Shaders\Line.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4.0</ShaderModel>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4.0</ShaderModel>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
+    <FxCompile Include="Shaders\Opaque.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </FxCompile>
-    <FxCompile Include="Shaders\CollisionDebug.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4.0</ShaderModel>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4.0</ShaderModel>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
+    <FxCompile Include="Shaders\LightingPass.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </FxCompile>
-    <FxCompile Include="Shaders\Default.hlsl">
+    <FxCompile Include="Shaders\Forward.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -67,6 +51,9 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Shaders\MapDebug.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="Shaders\Particle.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
@@ -127,14 +114,13 @@
   <ItemGroup>
     <ClCompile Include="Source\Component\Component.cpp" />
     <ClCompile Include="Source\Component\Material.cpp" />
-    <ClCompile Include="Source\Component\MeshGeometry.cpp" />
+    <ClCompile Include="Source\Component\Mesh.cpp" />
     <ClCompile Include="Source\Component\Sound.cpp" />
     <ClCompile Include="Source\Component\Widget.cpp" />
     <ClCompile Include="Source\Framework\AssetManager.cpp" />
     <ClCompile Include="Source\Framework\Camera.cpp" />
     <ClCompile Include="Source\Framework\CubeRenderTarget.cpp" />
     <ClCompile Include="Source\Framework\D3DApp.cpp" />
-    <ClCompile Include="Source\Framework\D3DDebug.cpp" />
     <ClCompile Include="Source\Framework\D3DFramework.cpp" />
     <ClCompile Include="Source\Framework\D3DUtil.cpp" />
     <ClCompile Include="Source\Framework\DDSTextureLoader.cpp">
@@ -154,11 +140,10 @@
     </ClCompile>
     <ClCompile Include="Source\Framework\ShadowMap.cpp" />
     <ClCompile Include="Source\Framework\WinApp.cpp" />
+    <ClCompile Include="Source\Object\Billboard.cpp" />
     <ClCompile Include="Source\Object\DirectionalLight.cpp" />
     <ClCompile Include="Source\Object\GameObject.cpp" />
     <ClCompile Include="Source\Object\Light.cpp" />
-    <ClCompile Include="Source\Object\MovingDirectionalLight.cpp" />
-    <ClCompile Include="Source\Object\MovingObject.cpp" />
     <ClCompile Include="Source\Object\Object.cpp" />
     <ClCompile Include="Source\Object\Particle.cpp" />
     <ClCompile Include="Source\Object\PointLight.cpp" />
@@ -169,7 +154,7 @@
   <ItemGroup>
     <ClInclude Include="Source\Component\Component.h" />
     <ClInclude Include="Source\Component\Material.h" />
-    <ClInclude Include="Source\Component\MeshGeometry.h" />
+    <ClInclude Include="Source\Component\Mesh.h" />
     <ClInclude Include="Source\Component\Sound.h" />
     <ClInclude Include="Source\Component\Widget.h" />
     <ClInclude Include="Source\Framework\AssetManager.h" />
@@ -177,7 +162,6 @@
     <ClInclude Include="Source\Framework\Camera.h" />
     <ClInclude Include="Source\Framework\CubeRenderTarget.h" />
     <ClInclude Include="Source\Framework\D3DApp.h" />
-    <ClInclude Include="Source\Framework\D3DDebug.h" />
     <ClInclude Include="Source\Framework\D3DFramework.h" />
     <ClInclude Include="Source\Framework\D3DUtil.h" />
     <ClInclude Include="Source\Framework\d3dx12.h" />
@@ -187,6 +171,7 @@
     <ClInclude Include="Source\Framework\GameTimer.h" />
     <ClInclude Include="Source\Framework\GeometryGenerator.h" />
     <ClInclude Include="Source\Framework\InputManager.h" />
+    <ClInclude Include="Source\Framework\Interfaces.h" />
     <ClInclude Include="Source\Framework\ObjectPool.hpp" />
     <ClInclude Include="Source\Framework\Octree.h" />
     <ClInclude Include="Source\Framework\pch.h" />
@@ -195,11 +180,10 @@
     <ClInclude Include="Source\Framework\Timer.hpp" />
     <ClInclude Include="Source\Framework\UploadBuffer.h" />
     <ClInclude Include="Source\Framework\WinApp.h" />
+    <ClInclude Include="Source\Object\Billboard.h" />
     <ClInclude Include="Source\Object\DirectionalLight.h" />
     <ClInclude Include="Source\Object\GameObject.h" />
     <ClInclude Include="Source\Object\Light.h" />
-    <ClInclude Include="Source\Object\MovingDirectionalLight.h" />
-    <ClInclude Include="Source\Object\MovingObject.h" />
     <ClInclude Include="Source\Object\Object.h" />
     <ClInclude Include="Source\Object\Particle.h" />
     <ClInclude Include="Source\Object\PointLight.h" />

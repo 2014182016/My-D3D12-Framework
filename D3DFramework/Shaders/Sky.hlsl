@@ -28,8 +28,8 @@ VertexOut VS(VertexIn vin)
 
 float4 PS(VertexOut pin) : SV_Target
 {
-	if (gCurrentSkyCubeMapIndex == -1)
-		return gAmbientLight;
+	if (gCurrentSkyCubeMapIndex == DISABLED)
+		return float4(0.0f, 0.0f, 0.0f, 1.0f);
 	return gCubeMaps[gCurrentSkyCubeMapIndex].Sample(gsamLinearWrap, pin.PosL);
 }
 

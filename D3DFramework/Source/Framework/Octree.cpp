@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "Octree.h"
 #include "GameObject.h"
-#include "MeshGeometry.h"
+#include "Mesh.h"
 #include "Enums.h"
 
 using namespace DirectX;
@@ -493,7 +493,7 @@ void Octree::GetChildObjectList(std::list<std::shared_ptr<class GameObject>>& ob
 	}
 }
 
-void Octree::DestroyObject()
+void Octree::DestroyObjects()
 {
 	mObjectList.remove_if([](std::shared_ptr<GameObject>& obj)->bool
 	{ return obj->GetIsDestroyesd(); });
@@ -505,7 +505,7 @@ void Octree::DestroyObject()
 	{
 		if (mChildNodes[i] != nullptr)
 		{
-			mChildNodes[i]->DestroyObject();
+			mChildNodes[i]->DestroyObjects();
 		}
 	}
 }

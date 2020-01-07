@@ -1,15 +1,12 @@
 #include "pch.h"
 #include "GameObject.h"
-#include "MeshGeometry.h"
-#include "D3DFramework.h"
+#include "Mesh.h"
 
 using namespace DirectX;
 
 GameObject::GameObject(std::string&& name) : Object(std::move(name)) { }
 
 GameObject::~GameObject() { }
-
-
 void GameObject::WorldUpdate()
 {
 	__super::WorldUpdate();
@@ -171,6 +168,13 @@ bool GameObject::IsInFrustum(const DirectX::BoundingFrustum& camFrustum) const
 				return true;
 			break;
 		}
+		case CollisionType::Point:
+		{
+			XMFLOAT3 pos = GetPosition();
+			XMVECTOR vecPos = XMLoadFloat3(&pos);
+			if(camFrustum.Contains(vecPos) != DirectX::DISJOINT)
+				return true;
+		}
 		default:
 			return true;
 		}
@@ -312,4 +316,9 @@ void GameObject::AddImpulse(float impulseX, float impulseY, float impulseZ)
 	mAcceleration.x = impulseX * mInvMass;
 	mAcceleration.y = impulseY * mInvMass;
 	mAcceleration.z = impulseZ * mInvMass;
+}
+
+void GameObject::Render(ID3D12GraphicsCommandList* commandList)
+{
+	mMesh->Render(commandList);
 }

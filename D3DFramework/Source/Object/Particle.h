@@ -2,10 +2,11 @@
 
 #include "Object.h"
 #include "ObjectPool.hpp"
+#include "../Framework/Interfaces.h"
 
 #define GA -9.8f
 
-class Particle : public Object
+class Particle : public Object, public Renderable
 {
 private:
 	struct ParticleData
@@ -19,15 +20,12 @@ private:
 	};
 
 public:
-	Particle(std::string&& name, UINT maxParticleNum);
+	Particle(std::string&& name, ID3D12Device* device, ID3D12GraphicsCommandList* commandList, UINT maxParticleNum);
 	virtual ~Particle();
 
 public:
 	virtual void Tick(float deltaTime) override;
-
-public:
-	// 동적 정점 버퍼를 사용하기 위해 만드는 임시 메쉬
-	void BuildParticleMesh(ID3D12Device* device, ID3D12GraphicsCommandList* commandList);
+	virtual void Render(ID3D12GraphicsCommandList* commandList);
 
 public:
 	inline UINT GetMaxParticleNum() const { return mMaxParticleNum; }
@@ -52,20 +50,13 @@ public:
 	inline void SetActive(bool value) { mIsActive = value; }
 	inline bool GetIsActive() const { return mIsActive; }
 
-	inline void SetEnabledLighting(bool value) { mEnabledLighting = value; }
 	inline void SetFacingCamera(bool value) { mFacingCamera = value; }
 	inline void SetEnabledGravity(bool value) { mEnabledGravity = value; }
-	inline void SetVisibility(bool value) { mIsVisible = value; }
+	inline void SetEnabledInfinite(bool value) { mIsInfinite = value; }
+	inline void SetInfinite(bool value) { mIsInfinite = value; }
 	inline bool GetIsFacingCamera() const { return mFacingCamera; }
-	inline bool GetIsVisible() const { return mIsVisible; }
 	inline float GetLifeTime() const { return mLifeTime; }
 
-	inline void SetMaterial(class Material* material) { mMaterial = material; }
-	inline class Material* GetMaterial() { return mMaterial; }
-	inline class MeshGeometry* GetMesh() { return mMesh.get(); }
-
-	inline void SetParticleIndex(UINT index) { mParticleIndex = index; }
-	inline UINT GetParticleIndex() const { return mParticleIndex; }
 	inline const std::list<ParticleData*>& GetParticleDatas() const { return mParticleDatas; }
 
 private:
@@ -90,15 +81,10 @@ protected:
 private:
 	std::unique_ptr<ObjectPool<ParticleData>> mParitlcePool;
 	std::list<ParticleData*> mParticleDatas;
-
-	UINT mParticleIndex = 0;
+	std::unique_ptr<class Mesh> mParticleMesh;
 
 	bool mIsActive = true;
-	bool mEnabledLighting = false;
 	bool mEnabledGravity = false;
 	bool mFacingCamera = true;
-	bool mIsVisible = true;
-
-	class Material* mMaterial = nullptr;
-	class std::unique_ptr<MeshGeometry> mMesh;
+	bool mIsInfinite = false;
 };

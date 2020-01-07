@@ -7,6 +7,7 @@ enum class Option : int
 	Debug_Collision = 0,
 	Debug_Octree,
 	Debug_Light,
+	Debug_GBuffer,
 	Wireframe,
 	Fullscreen,
 	Fog,
@@ -28,6 +29,7 @@ enum class CollisionType : int
 	AABB = 0,
 	OBB,
 	Sphere,
+	Point,
 	Complex,
 	None
 };

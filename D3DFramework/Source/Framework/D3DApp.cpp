@@ -12,7 +12,6 @@ D3DApp::D3DApp(HINSTANCE hInstance, int screenWidth, int screenHeight, std::wstr
 	objCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
 	passCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(PassConstants));
 	widgetCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(WidgetConstants));
-	debugCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(DebugConstants));
 	particleCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(ParticleConstants));
 }
 
@@ -60,7 +59,7 @@ void D3DApp::OnDestroy()
 void D3DApp::CreateRtvAndDsvDescriptorHeaps()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc;
-	rtvHeapDesc.NumDescriptors = SWAP_CHAIN_BUFFER_COUNT;
+	rtvHeapDesc.NumDescriptors = SWAP_CHAIN_BUFFER_COUNT + DEFERRED_BUFFER_COUNT;
 	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	rtvHeapDesc.NodeMask = 0;
@@ -98,6 +97,8 @@ void D3DApp::OnResize(int screenWidth, int screenHeight)
 	// 리소스를 새로 만들기 위해 기존의 리소스를 해제한다.
 	for (int i = 0; i < SWAP_CHAIN_BUFFER_COUNT; ++i)
 		mSwapChainBuffer[i].Reset();
+	for (int i = 0; i < DEFERRED_BUFFER_COUNT; ++i)
+		mDeferredBuffer[i].Reset();
 	mDepthStencilBuffer.Reset();
 
 	// SwapChain을 Resize한다.
@@ -117,17 +118,42 @@ void D3DApp::OnResize(int screenWidth, int screenHeight)
 		rtvHeapHandle.Offset(1, mRtvDescriptorSize);
 	}
 
-	D3D12_RESOURCE_DESC depthStencilDesc;
-	depthStencilDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	depthStencilDesc.Alignment = 0;
-	depthStencilDesc.Width = mScreenWidth;
-	depthStencilDesc.Height = mScreenHeight;
-	depthStencilDesc.DepthOrArraySize = 1;
-	depthStencilDesc.MipLevels = 1;
+	D3D12_RESOURCE_DESC defferedBufferDesc;
+	ZeroMemory(&defferedBufferDesc, sizeof(defferedBufferDesc));
+	defferedBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	defferedBufferDesc.Alignment = 0;
+	defferedBufferDesc.SampleDesc.Count = GetOptionEnabled(Option::Msaa) ? 4 : 1;
+	defferedBufferDesc.SampleDesc.Quality = GetOptionEnabled(Option::Msaa) ? (m4xMsaaQuality - 1) : 0;
+	defferedBufferDesc.MipLevels = 1;
+	defferedBufferDesc.DepthOrArraySize = 1;
+	defferedBufferDesc.Width = mScreenWidth;
+	defferedBufferDesc.Height = mScreenHeight;
+	defferedBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	defferedBufferDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+	D3D12_RENDER_TARGET_VIEW_DESC defferedBufferRtvDesc;
+	ZeroMemory(&defferedBufferRtvDesc, sizeof(defferedBufferRtvDesc));
+	defferedBufferRtvDesc.Texture2D.MipSlice = 0;
+	defferedBufferRtvDesc.Texture2D.PlaneSlice = 0;
+	defferedBufferRtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+	for (UINT i = 0; i < DEFERRED_BUFFER_COUNT; ++i)
+	{
+		defferedBufferDesc.Format = mDeferredBufferFormats[i];
+		ThrowIfFailed(md3dDevice->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+			D3D12_HEAP_FLAG_NONE,
+			&defferedBufferDesc,
+			D3D12_RESOURCE_STATE_RENDER_TARGET,
+			nullptr,
+			IID_PPV_ARGS(mDeferredBuffer[i].GetAddressOf())));
+		md3dDevice->CreateRenderTargetView(mDeferredBuffer[i].Get(), &defferedBufferRtvDesc, rtvHeapHandle);
+		rtvHeapHandle.Offset(1, mRtvDescriptorSize);
+	}
+
+	D3D12_RESOURCE_DESC depthStencilDesc = defferedBufferDesc;
 	depthStencilDesc.Format = mDepthStencilFormat;
 	depthStencilDesc.SampleDesc.Count = GetOptionEnabled(Option::Msaa) ? 4 : 1;
 	depthStencilDesc.SampleDesc.Quality = GetOptionEnabled(Option::Msaa) ? (m4xMsaaQuality - 1) : 0;
-	depthStencilDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 	depthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
@@ -360,7 +386,7 @@ ID3D12Resource* D3DApp::GetCurrentBackBuffer()const
 	return mSwapChainBuffer[mCurrentBackBuffer].Get();
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE D3DApp::GetCurrentBackBufferView()const
+D3D12_CPU_DESCRIPTOR_HANDLE D3DApp::GetCurrentBackBufferView() const
 {
 	return CD3DX12_CPU_DESCRIPTOR_HANDLE(
 		mRtvHeap->GetCPUDescriptorHandleForHeapStart(),
@@ -368,11 +394,11 @@ D3D12_CPU_DESCRIPTOR_HANDLE D3DApp::GetCurrentBackBufferView()const
 		mRtvDescriptorSize);
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE D3DApp::GetMsaaBackBufferView()const
+D3D12_CPU_DESCRIPTOR_HANDLE D3DApp::GetDefferedBufferView(UINT index) const
 {
 	return CD3DX12_CPU_DESCRIPTOR_HANDLE(
 		mRtvHeap->GetCPUDescriptorHandleForHeapStart(),
-		SWAP_CHAIN_BUFFER_COUNT,
+		SWAP_CHAIN_BUFFER_COUNT + index,
 		mRtvDescriptorSize);
 }
 
@@ -463,22 +489,23 @@ void D3DApp::CreateRootSignature(UINT textureNum, UINT cubeTextureNum, UINT shad
 
 	std::array<CD3DX12_ROOT_PARAMETER, ROOT_PARAMETER_NUM> slotRootParameter;
 
-	CD3DX12_DESCRIPTOR_RANGE texTable[3];
-	texTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, textureNum, mRootParameterInfos[RP_TEXTURE].first, mRootParameterInfos[RP_TEXTURE].second);
-	texTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, shadowMapNum, mRootParameterInfos[RP_SHADOWMAP].first, mRootParameterInfos[RP_SHADOWMAP].second);
-	texTable[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, cubeTextureNum, mRootParameterInfos[RP_CUBEMAP].first, mRootParameterInfos[RP_CUBEMAP].second);
+	CD3DX12_DESCRIPTOR_RANGE texTable[4];
+	texTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, textureNum, mRootParameterInfos[RP_TEXTURE].mShaderRegister, mRootParameterInfos[RP_TEXTURE].mRegisterSpace);
+	texTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, shadowMapNum, mRootParameterInfos[RP_SHADOWMAP].mShaderRegister, mRootParameterInfos[RP_SHADOWMAP].mRegisterSpace);
+	texTable[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, cubeTextureNum, mRootParameterInfos[RP_CUBEMAP].mShaderRegister, mRootParameterInfos[RP_CUBEMAP].mRegisterSpace);
+	texTable[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, DEFERRED_BUFFER_COUNT + 1, mRootParameterInfos[RP_G_BUFFER].mShaderRegister, mRootParameterInfos[RP_G_BUFFER].mRegisterSpace);
 
 	// 퍼포먼스 TIP: 가장 자주 사용하는 것을 앞에 놓는다.
-	slotRootParameter[RP_OBJECT].InitAsConstantBufferView(mRootParameterInfos[RP_OBJECT].first, mRootParameterInfos[RP_OBJECT].second); // Object 상수 버퍼
-	slotRootParameter[RP_PASS].InitAsConstantBufferView(mRootParameterInfos[RP_PASS].first, mRootParameterInfos[RP_PASS].second); // Pass 상수 버퍼
-	slotRootParameter[RP_LIGHT].InitAsShaderResourceView(mRootParameterInfos[RP_LIGHT].first, mRootParameterInfos[RP_LIGHT].second); // Lights
-	slotRootParameter[RP_MATERIAL].InitAsShaderResourceView(mRootParameterInfos[RP_MATERIAL].first, mRootParameterInfos[RP_MATERIAL].second); // Materials
+	slotRootParameter[RP_OBJECT].InitAsConstantBufferView(mRootParameterInfos[RP_OBJECT].mShaderRegister, mRootParameterInfos[RP_OBJECT].mRegisterSpace); // Object 상수 버퍼
+	slotRootParameter[RP_PASS].InitAsConstantBufferView(mRootParameterInfos[RP_PASS].mShaderRegister, mRootParameterInfos[RP_PASS].mRegisterSpace); // Pass 상수 버퍼
+	slotRootParameter[RP_LIGHT].InitAsShaderResourceView(mRootParameterInfos[RP_LIGHT].mShaderRegister, mRootParameterInfos[RP_LIGHT].mRegisterSpace); // Lights
+	slotRootParameter[RP_MATERIAL].InitAsShaderResourceView(mRootParameterInfos[RP_MATERIAL].mShaderRegister, mRootParameterInfos[RP_MATERIAL].mRegisterSpace); // Materials
 	slotRootParameter[RP_TEXTURE].InitAsDescriptorTable(1, &texTable[0], D3D12_SHADER_VISIBILITY_PIXEL); // Textures
 	slotRootParameter[RP_SHADOWMAP].InitAsDescriptorTable(1, &texTable[1], D3D12_SHADER_VISIBILITY_PIXEL); // Shadow Maps
 	slotRootParameter[RP_CUBEMAP].InitAsDescriptorTable(1, &texTable[2], D3D12_SHADER_VISIBILITY_PIXEL); // CubeTextures
-	slotRootParameter[RP_WIDGET].InitAsConstantBufferView(mRootParameterInfos[RP_WIDGET].first, mRootParameterInfos[RP_WIDGET].second); // Widget
-	slotRootParameter[RP_PARTICLE].InitAsConstantBufferView(mRootParameterInfos[RP_PARTICLE].first, mRootParameterInfos[RP_PARTICLE].second); // Particle
-	slotRootParameter[RP_COLLISIONDEBUG].InitAsConstantBufferView(mRootParameterInfos[RP_COLLISIONDEBUG].first, mRootParameterInfos[RP_COLLISIONDEBUG].second); // Collision Debug
+	slotRootParameter[RP_G_BUFFER].InitAsDescriptorTable(1, &texTable[3], D3D12_SHADER_VISIBILITY_PIXEL); // G-Buffer
+	slotRootParameter[RP_WIDGET].InitAsConstantBufferView(mRootParameterInfos[RP_WIDGET].mShaderRegister, mRootParameterInfos[RP_WIDGET].mRegisterSpace); // Widget
+	slotRootParameter[RP_PARTICLE].InitAsConstantBufferView(mRootParameterInfos[RP_PARTICLE].mShaderRegister, mRootParameterInfos[RP_PARTICLE].mRegisterSpace); // Particle
 
 	auto staticSamplers = GetStaticSamplers();
 
@@ -508,7 +535,7 @@ void D3DApp::CreateRootSignature(UINT textureNum, UINT cubeTextureNum, UINT shad
 void D3DApp::CreateDescriptorHeaps(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum)
 {
 	D3D12_DESCRIPTOR_HEAP_DESC cbvSrvUavDescriptorHeap = {};
-	cbvSrvUavDescriptorHeap.NumDescriptors = textureNum + cubeTextureNum + shadowMapNum;
+	cbvSrvUavDescriptorHeap.NumDescriptors = textureNum + cubeTextureNum + shadowMapNum + DEFERRED_BUFFER_COUNT + 1;
 	cbvSrvUavDescriptorHeap.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	cbvSrvUavDescriptorHeap.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&cbvSrvUavDescriptorHeap, IID_PPV_ARGS(&mCbvSrvUavDescriptorHeap)));
@@ -555,6 +582,25 @@ void D3DApp::CreateDescriptorHeaps(UINT textureNum, UINT cubeTextureNum, UINT sh
 		// next descriptor
 		hDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
 	}
+
+	mDeferredBufferHeapIndex = textureNum + cubeTextureNum;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	for (UINT i = 0; i < DEFERRED_BUFFER_COUNT; ++i)
+	{
+		srvDesc.Texture2D.MipLevels = 1;
+		srvDesc.Format = mDeferredBufferFormats[i];
+
+		// G-Buffer에 사용되는 렌더 타겟들에 대한 SRV를 생성한다.
+		md3dDevice->CreateShaderResourceView(mDeferredBuffer[i].Get(), &srvDesc, hDescriptor);
+
+		// next descriptor
+		hDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
+	}
+
+	srvDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+	// G-Buffer에 사용되는 깊이 버퍼에 대한 SRV를 생성한다.
+	md3dDevice->CreateShaderResourceView(mDepthStencilBuffer.Get(), &srvDesc, hDescriptor);
+	hDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
 }
 
 void D3DApp::CreateShadersAndInputLayout()
@@ -562,50 +608,48 @@ void D3DApp::CreateShadersAndInputLayout()
 	// Direct3D에게 각 정점의 성분을 알려주는 InputLayout과
 	// 셰이더를 컴파일한다.
 
-	// 셰이더에서 사용할 define을 설정한다.
-	const D3D_SHADER_MACRO alphaTestDefines[] =
-	{
-		"ALPHA_TEST", "1",
-		NULL, NULL
-	};
-
 	const D3D_SHADER_MACRO skyReflectionDefines[] =
 	{
-		"ALPHA_TEST", "1",
-		//"SKY_REFLECTION", "1",
+		"SKY_REFLECTION", "1",
 		NULL, NULL
 	};
 
-	mShaders["StandardVS"] = D3DUtil::CompileShader(L"Shaders\\Default.hlsl", nullptr, "VS", "vs_5_1");
-	mShaders["OpaquePS"] = D3DUtil::CompileShader(L"Shaders\\Default.hlsl", skyReflectionDefines, "PS", "ps_5_1");
+	mShaders["ForwardVS"] = D3DUtil::CompileShader(L"Shaders\\Forward.hlsl", nullptr, "VS", "vs_5_1");
+	mShaders["ForwardPS"] = D3DUtil::CompileShader(L"Shaders\\Forward.hlsl", nullptr, "PS", "ps_5_1");
+
+	mShaders["OpaqueVS"] = D3DUtil::CompileShader(L"Shaders\\Opaque.hlsl", nullptr, "VS", "vs_5_1");
+	mShaders["OpaquePS"] = D3DUtil::CompileShader(L"Shaders\\Opaque.hlsl", nullptr, "PS", "ps_5_1");
 
 	mShaders["WireframeVS"] = D3DUtil::CompileShader(L"Shaders\\Wireframe.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["WireframePS"] = D3DUtil::CompileShader(L"Shaders\\Wireframe.hlsl", nullptr, "PS", "ps_5_1");
-
-	mShaders["CollisionDebugVS"] = D3DUtil::CompileShader(L"Shaders\\CollisionDebug.hlsl", nullptr, "VS", "vs_5_1");
-	mShaders["CollisionDebugPS"] = D3DUtil::CompileShader(L"Shaders\\CollisionDebug.hlsl", nullptr, "PS", "ps_5_1");
-
-	mShaders["LineVS"] = D3DUtil::CompileShader(L"Shaders\\Line.hlsl", nullptr, "VS", "vs_5_1");
-	mShaders["LinePS"] = D3DUtil::CompileShader(L"Shaders\\Line.hlsl", nullptr, "PS", "ps_5_1");
 
 	mShaders["SkyVS"] = D3DUtil::CompileShader(L"Shaders\\Sky.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["SkyPS"] = D3DUtil::CompileShader(L"Shaders\\Sky.hlsl", nullptr, "PS", "ps_5_1");
 
 	mShaders["ShadowMapVS"] = D3DUtil::CompileShader(L"Shaders\\ShadowMap.hlsl", nullptr, "VS", "vs_5_1");
-	mShaders["ShadowMapPS"] = D3DUtil::CompileShader(L"Shaders\\ShadowMap.hlsl", alphaTestDefines, "PS", "ps_5_1");
+	mShaders["ShadowMapPS"] = D3DUtil::CompileShader(L"Shaders\\ShadowMap.hlsl", nullptr, "PS", "ps_5_1");
 
 	mShaders["WidgetVS"] = D3DUtil::CompileShader(L"Shaders\\Widget.hlsl", nullptr, "VS", "vs_5_1");
-	mShaders["WidgetPS"] = D3DUtil::CompileShader(L"Shaders\\Widget.hlsl", alphaTestDefines, "PS", "ps_5_1");
+	mShaders["WidgetPS"] = D3DUtil::CompileShader(L"Shaders\\Widget.hlsl", nullptr, "PS", "ps_5_1");
 
 	mShaders["ParticleVS"] = D3DUtil::CompileShader(L"Shaders\\Particle.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["ParticleGS"] = D3DUtil::CompileShader(L"Shaders\\Particle.hlsl", nullptr, "GS", "gs_5_1");
-	mShaders["ParticlePS"] = D3DUtil::CompileShader(L"Shaders\\Particle.hlsl", alphaTestDefines, "PS", "ps_5_1");
-
-	mShaders["AlphaTestedPS"] = D3DUtil::CompileShader(L"Shaders\\Default.hlsl", alphaTestDefines, "PS", "ps_5_1");
+	mShaders["ParticlePS"] = D3DUtil::CompileShader(L"Shaders\\Particle.hlsl", nullptr, "PS", "ps_5_1");
 
 	mShaders["BillboardVS"] = D3DUtil::CompileShader(L"Shaders\\Billboard.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["BillboardGS"] = D3DUtil::CompileShader(L"Shaders\\Billboard.hlsl", nullptr, "GS", "gs_5_1");
-	mShaders["BillboardPS"] = D3DUtil::CompileShader(L"Shaders\\Billboard.hlsl", alphaTestDefines, "PS", "ps_5_1");
+	mShaders["BillboardPS"] = D3DUtil::CompileShader(L"Shaders\\Billboard.hlsl", nullptr, "PS", "ps_5_1");
+
+	mShaders["DiffuseMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "DiffuseMapDebugPS", "ps_5_1");
+	mShaders["SpecularMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "SpecularMapDebugPS", "ps_5_1");
+	mShaders["RoughnessMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "RoughnessMapDebugPS", "ps_5_1");
+	mShaders["NormalMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "NormalMapDebugPS", "ps_5_1");
+	mShaders["DepthMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "DepthMapDebugPS", "ps_5_1");
+	mShaders["PositionMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "PositionMapDebugPS", "ps_5_1");
+	mShaders["ShadowMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "ShadowMapDebugPS", "ps_5_1");
+
+	// mShaders["LightingPassCS"] = D3DUtil::CompileShader(L"Shaders\\LightingPass.hlsl", nullptr, "CS", "cs_5_1");
+	mShaders["LightingPassPS"] = D3DUtil::CompileShader(L"Shaders\\LightingPass.hlsl", nullptr, "PS", "ps_5_1");
 
 	mDefaultLayout =
 	{
@@ -627,11 +671,6 @@ void D3DApp::CreateShadersAndInputLayout()
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-	};
-
-	mCollisionDebugLayout =
-	{
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 	};
 
 	mLineLayout =
@@ -656,117 +695,58 @@ void D3DApp::CreatePSOs()
 	// 호환되는지 미리 검증할 수 있으며 드라이버는 하드웨어 상태의 프로그래밍을
 	// 위한 모든 코드를 미리 생성할 수 있기 때문이다.
 
-	// PSO for opaque objects.
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaquePsoDesc;
-	ZeroMemory(&opaquePsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
-	opaquePsoDesc.InputLayout = { mDefaultLayout.data(), (UINT)mDefaultLayout.size() };
-	opaquePsoDesc.pRootSignature = mRootSignature.Get();
+	// PSO for Forward
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC forwardPsoDesc;
+	ZeroMemory(&forwardPsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
+	forwardPsoDesc.InputLayout = { mDefaultLayout.data(), (UINT)mDefaultLayout.size() };
+	forwardPsoDesc.pRootSignature = mRootSignature.Get();
+	forwardPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["ForwardVS"]->GetBufferPointer()),
+		mShaders["ForwardVS"]->GetBufferSize()
+	};
+	forwardPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["ForwardPS"]->GetBufferPointer()),
+		mShaders["ForwardPS"]->GetBufferSize()
+	};
+	forwardPsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+	forwardPsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	forwardPsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+	forwardPsoDesc.SampleMask = UINT_MAX;
+	forwardPsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	forwardPsoDesc.NumRenderTargets = 1;
+	forwardPsoDesc.RTVFormats[0] = mBackBufferFormat;
+	forwardPsoDesc.SampleDesc.Count = 1;
+	forwardPsoDesc.SampleDesc.Quality = 0;
+	forwardPsoDesc.DSVFormat = mDepthStencilFormat;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&forwardPsoDesc, IID_PPV_ARGS(&mPSOs["Forward"])));
+
+
+	// PSO for G-Buffer
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC gBufferPsoDesc = forwardPsoDesc;
+	gBufferPsoDesc.NumRenderTargets = DEFERRED_BUFFER_COUNT;
+	for (UINT i = 0; i < DEFERRED_BUFFER_COUNT; ++i)
+	{
+		gBufferPsoDesc.RTVFormats[i] = mDeferredBufferFormats[i];
+	}
+
+	// PSO for Opaque
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaquePsoDesc = gBufferPsoDesc;
 	opaquePsoDesc.VS =
 	{
-		reinterpret_cast<BYTE*>(mShaders["StandardVS"]->GetBufferPointer()),
-		mShaders["StandardVS"]->GetBufferSize()
+		reinterpret_cast<BYTE*>(mShaders["OpaqueVS"]->GetBufferPointer()),
+		mShaders["OpaqueVS"]->GetBufferSize()
 	};
 	opaquePsoDesc.PS =
 	{
 		reinterpret_cast<BYTE*>(mShaders["OpaquePS"]->GetBufferPointer()),
 		mShaders["OpaquePS"]->GetBufferSize()
 	};
-	opaquePsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-	opaquePsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-	opaquePsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-	opaquePsoDesc.SampleMask = UINT_MAX;
-	opaquePsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	opaquePsoDesc.NumRenderTargets = 1;
-	opaquePsoDesc.RTVFormats[0] = mBackBufferFormat;
-	opaquePsoDesc.SampleDesc.Count = 1;
-	opaquePsoDesc.SampleDesc.Quality = 0;
-	opaquePsoDesc.DSVFormat = mDepthStencilFormat;
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&mPSOs["Opaque"])));
 
-
-	// PSO for Wireframe 
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaqueWireframePsoDesc = opaquePsoDesc;
-	opaqueWireframePsoDesc.VS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["WireframeVS"]->GetBufferPointer()),
-		mShaders["WireframeVS"]->GetBufferSize()
-	};
-	opaqueWireframePsoDesc.PS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["WireframePS"]->GetBufferPointer()),
-		mShaders["WireframePS"]->GetBufferSize()
-	};
-	opaqueWireframePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
-	opaqueWireframePsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaqueWireframePsoDesc, IID_PPV_ARGS(&mPSOs["Wireframe"])));
-
-
-	// PSO for Debug
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC collisionDebugPsoDesc = opaqueWireframePsoDesc;
-	collisionDebugPsoDesc.InputLayout = { mCollisionDebugLayout.data(), (UINT)mCollisionDebugLayout.size() };
-	collisionDebugPsoDesc.VS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["CollisionDebugVS"]->GetBufferPointer()),
-		mShaders["CollisionDebugVS"]->GetBufferSize()
-	};
-	collisionDebugPsoDesc.PS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["CollisionDebugPS"]->GetBufferPointer()),
-		mShaders["CollisionDebugPS"]->GetBufferSize()
-	};
-	collisionDebugPsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&collisionDebugPsoDesc, IID_PPV_ARGS(&mPSOs["CollisionDebug"])));
-
-
-	// PSO for Line
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC linePsoDesc = collisionDebugPsoDesc;
-	linePsoDesc.InputLayout = { mLineLayout.data(), (UINT)mLineLayout.size() };
-	linePsoDesc.VS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["LineVS"]->GetBufferPointer()),
-		mShaders["LineVS"]->GetBufferSize()
-	};
-	linePsoDesc.PS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["LinePS"]->GetBufferPointer()),
-		mShaders["LinePS"]->GetBufferSize()
-	};
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&linePsoDesc, IID_PPV_ARGS(&mPSOs["Line"])));
-
-
-	// PSO for Transparent
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC transparentPsoDesc = opaquePsoDesc;
-	D3D12_RENDER_TARGET_BLEND_DESC transparencyBlendDesc;
-	transparencyBlendDesc.BlendEnable = true;
-	transparencyBlendDesc.LogicOpEnable = false;
-	transparencyBlendDesc.SrcBlend = D3D12_BLEND_SRC_ALPHA;
-	transparencyBlendDesc.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
-	transparencyBlendDesc.BlendOp = D3D12_BLEND_OP_ADD;
-	transparencyBlendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;
-	transparencyBlendDesc.DestBlendAlpha = D3D12_BLEND_ZERO;
-	transparencyBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
-	transparencyBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
-	transparencyBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-	transparentPsoDesc.BlendState.RenderTarget[0] = transparencyBlendDesc;
-	// 불투명한 물체끼리 색상이 누적되어 보이게 하려면 깊이 쓰기를 비활성화하거나 불투명한 물체를 정렬하여 그려야 한다.
-	// D3D12_DEPTH_WRITE_MASK_ZERO는 깊이 기록만 비활성화할 뿐 깊이 읽기와 깊이 판정은 여전히 활성화한다.
-	transparentPsoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&transparentPsoDesc, IID_PPV_ARGS(&mPSOs["Transparent"])));
-
-
-	// PSO for AlphaTested
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC alphaTestedPsoDesc = opaquePsoDesc;
-	alphaTestedPsoDesc.PS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["AlphaTestedPS"]->GetBufferPointer()),
-		mShaders["AlphaTestedPS"]->GetBufferSize()
-	};
-	alphaTestedPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&alphaTestedPsoDesc, IID_PPV_ARGS(&mPSOs["AlphaTested"])));
-
-
 	// PSO for Billborad
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC billboardPsoDesc = opaquePsoDesc;
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC billboardPsoDesc = gBufferPsoDesc;
 	billboardPsoDesc.VS =
 	{
 		reinterpret_cast<BYTE*>(mShaders["BillboardVS"]->GetBufferPointer()),
@@ -789,8 +769,9 @@ void D3DApp::CreatePSOs()
 	billboardPsoDesc.BlendState.AlphaToCoverageEnable = GetOptionEnabled(Option::Msaa);
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&billboardPsoDesc, IID_PPV_ARGS(&mPSOs["Billborad"])));
 
+
 	// PSO for Particle
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC particlePsoDesc = opaquePsoDesc;
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC particlePsoDesc = forwardPsoDesc;
 	particlePsoDesc.InputLayout = { mParticleLayout.data(), (UINT)mParticleLayout.size() };
 	particlePsoDesc.VS =
 	{
@@ -808,35 +789,62 @@ void D3DApp::CreatePSOs()
 		mShaders["ParticlePS"]->GetBufferSize()
 	};
 	particlePsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
+	particlePsoDesc.BlendState.AlphaToCoverageEnable = GetOptionEnabled(Option::Msaa);
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&particlePsoDesc, IID_PPV_ARGS(&mPSOs["Particle"])));
 
 
-	// PSO for Widget
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC widgetPsoDesc = opaquePsoDesc;
-	widgetPsoDesc.InputLayout = { mWidgetLayout.data(), (UINT)mWidgetLayout.size() };
-	widgetPsoDesc.VS =
+	// PSO for AlphaTested
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC alphaTestedPsoDesc = gBufferPsoDesc;
+	alphaTestedPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&alphaTestedPsoDesc, IID_PPV_ARGS(&mPSOs["AlphaTested"])));
+
+
+	// PSO for Wireframe 
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaqueWireframePsoDesc = forwardPsoDesc;
+	opaqueWireframePsoDesc.VS =
 	{
-		reinterpret_cast<BYTE*>(mShaders["WidgetVS"]->GetBufferPointer()),
-		mShaders["WidgetVS"]->GetBufferSize()
+		reinterpret_cast<BYTE*>(mShaders["WireframeVS"]->GetBufferPointer()),
+		mShaders["WireframeVS"]->GetBufferSize()
 	};
-	widgetPsoDesc.PS =
+	opaqueWireframePsoDesc.PS =
 	{
-		reinterpret_cast<BYTE*>(mShaders["WidgetPS"]->GetBufferPointer()),
-		mShaders["WidgetPS"]->GetBufferSize()
+		reinterpret_cast<BYTE*>(mShaders["WireframePS"]->GetBufferPointer()),
+		mShaders["WireframePS"]->GetBufferSize()
 	};
-	widgetPsoDesc.DepthStencilState.DepthEnable = false;
-	widgetPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&widgetPsoDesc, IID_PPV_ARGS(&mPSOs["Widget"])));
+	opaqueWireframePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
+	opaqueWireframePsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaqueWireframePsoDesc, IID_PPV_ARGS(&mPSOs["Wireframe"])));
+
+
+	// PSO for Transparent
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC transparentPsoDesc = forwardPsoDesc;
+	D3D12_RENDER_TARGET_BLEND_DESC transparencyBlendDesc;
+	transparencyBlendDesc.BlendEnable = true;
+	transparencyBlendDesc.LogicOpEnable = false;
+	transparencyBlendDesc.SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	transparencyBlendDesc.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+	transparencyBlendDesc.BlendOp = D3D12_BLEND_OP_ADD;
+	transparencyBlendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;
+	transparencyBlendDesc.DestBlendAlpha = D3D12_BLEND_ZERO;
+	transparencyBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	transparencyBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
+	transparencyBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+	transparentPsoDesc.BlendState.RenderTarget[0] = transparencyBlendDesc;
+	// 불투명한 물체끼리 색상이 누적되어 보이게 하려면 깊이 쓰기를 비활성화하거나 불투명한 물체를 정렬하여 그려야 한다.
+	// D3D12_DEPTH_WRITE_MASK_ZERO는 깊이 기록만 비활성화할 뿐 깊이 읽기와 깊이 판정은 여전히 활성화한다.
+	transparentPsoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&transparentPsoDesc, IID_PPV_ARGS(&mPSOs["Transparent"])));
 
 
 	// PSO for Sky
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC skyPsoDesc = opaquePsoDesc;
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC skyPsoDesc = forwardPsoDesc;
 	// 케메라는 하늘 구 내부에 있으므로 후면 선별을 끈다.
 	skyPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	// 깊이 함수가 LESS가 아니라 LESS_EQUAL로 설정한다.
 	// 이렇게 하지 않으면, 깊이 버퍼를 1로 지우는 경우 z = 1(NDC)에서
 	// 정규화된 깊이 값이 깊이 판정에 실패한다.
 	skyPsoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+	skyPsoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
 	skyPsoDesc.VS =
 	{
 		reinterpret_cast<BYTE*>(mShaders["SkyVS"]->GetBufferPointer()),
@@ -851,7 +859,7 @@ void D3DApp::CreatePSOs()
 
 
 	// PSO for Shadow
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC smapPsoDesc = opaquePsoDesc;
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC smapPsoDesc = forwardPsoDesc;
 	// Bias = (float)DepthBias * r + SlopeScaledDepthBias * MaxDepthSlope;
 	// 여기서 r은 깊이 버퍼 형식을 float32로 변환했을 때, 표현 가능한 0보다 큰 최솟값이다.
 	// 24비트 깊이 버퍼의 경우 r = 1 /2^24이다.
@@ -875,6 +883,95 @@ void D3DApp::CreatePSOs()
 	smapPsoDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
 	smapPsoDesc.NumRenderTargets = 0;
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&smapPsoDesc, IID_PPV_ARGS(&mPSOs["ShadowMap"])));
+
+
+	// PSO for Widget
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC widgetPsoDesc = forwardPsoDesc;
+	widgetPsoDesc.InputLayout = { mWidgetLayout.data(), (UINT)mWidgetLayout.size() };
+	widgetPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["WidgetVS"]->GetBufferPointer()),
+		mShaders["WidgetVS"]->GetBufferSize()
+	};
+	widgetPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["WidgetPS"]->GetBufferPointer()),
+		mShaders["WidgetPS"]->GetBufferSize()
+	};
+	widgetPsoDesc.DepthStencilState.DepthEnable = false;
+	widgetPsoDesc.DepthStencilState.StencilEnable = false;
+	widgetPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&widgetPsoDesc, IID_PPV_ARGS(&mPSOs["Widget"])));
+
+
+	// PSO for DiffuseMapDebug
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC diffuseMapDebugPsoDesc = widgetPsoDesc;
+	diffuseMapDebugPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["DiffuseMapDebugPS"]->GetBufferPointer()),
+		mShaders["DiffuseMapDebugPS"]->GetBufferSize()
+	};
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&diffuseMapDebugPsoDesc, IID_PPV_ARGS(&mPSOs["DiffuseMapDebug"])));
+
+
+	// PSO for SpecularMapDebug
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC specularMapDebugPsoDesc = widgetPsoDesc;
+	specularMapDebugPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["SpecularMapDebugPS"]->GetBufferPointer()),
+		mShaders["SpecularMapDebugPS"]->GetBufferSize()
+	};
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&specularMapDebugPsoDesc, IID_PPV_ARGS(&mPSOs["SpecularMapDebug"])));
+
+
+	// PSO for RoughnessMapDebug
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC roughnessMapDebugDebugPsoDesc = widgetPsoDesc;
+	roughnessMapDebugDebugPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["RoughnessMapDebugPS"]->GetBufferPointer()),
+		mShaders["RoughnessMapDebugPS"]->GetBufferSize()
+	};
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&roughnessMapDebugDebugPsoDesc, IID_PPV_ARGS(&mPSOs["RoughnessMapDebug"])));
+
+
+	// PSO for NormalMapDebug
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC normalMapDebuggPsoDesc = widgetPsoDesc;
+	normalMapDebuggPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["NormalMapDebugPS"]->GetBufferPointer()),
+		mShaders["NormalMapDebugPS"]->GetBufferSize()
+	};
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&normalMapDebuggPsoDesc, IID_PPV_ARGS(&mPSOs["NormalMapDebug"])));
+
+
+	// PSO for DepthMapDebug
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC depthMapDebugPsoDesc = widgetPsoDesc;
+	depthMapDebugPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["DepthMapDebugPS"]->GetBufferPointer()),
+		mShaders["DepthMapDebugPS"]->GetBufferSize()
+	};
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&depthMapDebugPsoDesc, IID_PPV_ARGS(&mPSOs["DepthMapDebug"])));
+
+
+	// PSO for ShadowMapDebug
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowMapDebugPsoDesc = widgetPsoDesc;
+	shadowMapDebugPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["ShadowMapDebugPS"]->GetBufferPointer()),
+		mShaders["ShadowMapDebugPS"]->GetBufferSize()
+	};
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&shadowMapDebugPsoDesc, IID_PPV_ARGS(&mPSOs["ShadowMapDebug"])));
+
+
+	// PSO for LightingPass
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC lightingPassPsoDesc = widgetPsoDesc;
+	lightingPassPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["LightingPassPS"]->GetBufferPointer()),
+		mShaders["LightingPassPS"]->GetBufferSize()
+	};
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&lightingPassPsoDesc, IID_PPV_ARGS(&mPSOs["LightingPass"])));
 }
 
 void D3DApp::SetGamma(float gamma)

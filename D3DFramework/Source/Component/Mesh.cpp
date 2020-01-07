@@ -1,15 +1,15 @@
 #include "pch.h"
-#include "MeshGeometry.h"
+#include "Mesh.h"
 #include "D3DUtil.h"
 #include "Enums.h"
 
 using namespace DirectX;
 
-MeshGeometry::MeshGeometry(std::string&& name) : Component(std::move(name)) { }
+Mesh::Mesh(std::string&& name) : Component(std::move(name)) { }
 
-MeshGeometry::~MeshGeometry() { }
+Mesh::~Mesh() { }
 
-void MeshGeometry::BuildVertices(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+void Mesh::BuildVertices(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 	void* vertices, UINT vertexCount, UINT vertexStride)
 {
 	const UINT vbByteSize = vertexCount * vertexStride;
@@ -26,7 +26,7 @@ void MeshGeometry::BuildVertices(ID3D12Device* device, ID3D12GraphicsCommandList
 	mVertexCount = vertexCount;
 }
 
-void MeshGeometry::BuildIndices(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
+void Mesh::BuildIndices(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 	std::uint16_t* indices, UINT indexCount, UINT indexStride)
 {
 	const UINT ibByteSize = indexCount * indexStride;
@@ -43,7 +43,7 @@ void MeshGeometry::BuildIndices(ID3D12Device* device, ID3D12GraphicsCommandList*
 	mIndexCount = indexCount;
 }
 
-void MeshGeometry::BuildCollisionBound(XMFLOAT3* points, size_t vertexCount, size_t stride, CollisionType type)
+void Mesh::BuildCollisionBound(XMFLOAT3* points, size_t vertexCount, size_t stride, CollisionType type)
 {
 	// 충돌 타입에 따라 충돌 Bound를 생성한다.
 	mCollisionType = type;
@@ -73,7 +73,7 @@ void MeshGeometry::BuildCollisionBound(XMFLOAT3* points, size_t vertexCount, siz
 	}
 }
 
-void MeshGeometry::SetDynamicVertexBuffer(ID3D12Resource* vb, UINT vertexCount, UINT vertexStride)
+void Mesh::SetDynamicVertexBuffer(ID3D12Resource* vb, UINT vertexCount, UINT vertexStride)
 {
 	const UINT vbByteSize = vertexCount * vertexStride;
 
@@ -84,7 +84,7 @@ void MeshGeometry::SetDynamicVertexBuffer(ID3D12Resource* vb, UINT vertexCount, 
 	mVertexCount = vertexCount;
 }
 
-void MeshGeometry::Render(ID3D12GraphicsCommandList* commandList, UINT instanceCount, bool isIndexed) const
+void Mesh::Render(ID3D12GraphicsCommandList* commandList, UINT instanceCount, bool isIndexed) const
 {
 	commandList->IASetPrimitiveTopology(mPrimitiveType);
 	commandList->IASetVertexBuffers(0, 1, &mVertexBufferView);
@@ -94,7 +94,7 @@ void MeshGeometry::Render(ID3D12GraphicsCommandList* commandList, UINT instanceC
 		if (mVertexCount == 0 || mIndexCount == 0)
 		{
 #if defined(DEBUG) || defined(_DEBUG)
-			std::cout << ToString() << " MeshGeometry wasn't Initialize" << std::endl;
+			std::cout << ToString() << " Mesh wasn't Initialize" << std::endl;
 #endif
 			return;
 		}
@@ -108,7 +108,7 @@ void MeshGeometry::Render(ID3D12GraphicsCommandList* commandList, UINT instanceC
 		if (mVertexCount == 0)
 		{
 #if defined(DEBUG) || defined(_DEBUG)
-			std::cout << ToString() << " MeshGeometry wasn't Initialize" << std::endl;
+			std::cout << ToString() << " Mesh wasn't Initialize" << std::endl;
 #endif
 			return;
 		}
@@ -118,13 +118,13 @@ void MeshGeometry::Render(ID3D12GraphicsCommandList* commandList, UINT instanceC
 	}
 }
 
-void MeshGeometry::DisposeUploaders()
+void Mesh::DisposeUploaders()
 {
 	mVertexBufferUploader = nullptr;
 	mIndexBufferUploader = nullptr;
 }
 
-void MeshGeometry::SetCollisionBoundingAsAABB(DirectX::XMFLOAT3 extents)
+void Mesh::SetCollisionBoundingAsAABB(DirectX::XMFLOAT3 extents)
 {
 	mCollisionType = CollisionType::AABB;
 
@@ -133,7 +133,7 @@ void MeshGeometry::SetCollisionBoundingAsAABB(DirectX::XMFLOAT3 extents)
 	mCollisionBounding = std::move(aabb);
 }
 
-void MeshGeometry::SetCollisionBoundingAsOBB(DirectX::XMFLOAT3 extents)
+void Mesh::SetCollisionBoundingAsOBB(DirectX::XMFLOAT3 extents)
 {
 	mCollisionType = CollisionType::OBB;
 
@@ -142,7 +142,7 @@ void MeshGeometry::SetCollisionBoundingAsOBB(DirectX::XMFLOAT3 extents)
 	mCollisionBounding = std::move(obb);
 }
 
-void MeshGeometry::SetCollisionBoundingAsSphere(float radius)
+void Mesh::SetCollisionBoundingAsSphere(float radius)
 {
 	mCollisionType = CollisionType::Sphere;
 

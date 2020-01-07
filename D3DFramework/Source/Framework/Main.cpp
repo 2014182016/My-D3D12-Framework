@@ -11,7 +11,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PSTR cmdLine, in
 
 	try
 	{
-		D3DFramework framework(hInstance, 800, 600, L"D3DFramework");
+		D3DFramework framework(hInstance, 1280, 900, L"D3DFramework");
 		if (!framework.Initialize())
 			return 0;
 

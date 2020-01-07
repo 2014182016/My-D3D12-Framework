@@ -1,7 +1,3 @@
-//***************************************************************************************
-// Default.hlsl by Frank Luna (C) 2015 All Rights Reserved.
-//***************************************************************************************
-
 #include "Common.hlsl"
 
 struct VertexIn
@@ -16,8 +12,7 @@ struct VertexIn
 struct VertexOut
 {
 	float4 mPosH      : SV_POSITION;
-	float4 mShadowPosH: POSITION0;
-    float3 mPosW      : POSITION1;
+    float4 mPosW      : POSITION0;
     float3 mNormalW   : NORMAL;
 	float3 mTangentW  : TANGENT;
 	float3 mBinormalW : BINORMAL;
@@ -33,7 +28,7 @@ VertexOut VS(VertexIn vin)
 	
     // World Space로 변환한다.
     float4 posW = mul(float4(vin.mPosL, 1.0f), gObjWorld);
-    vout.mPosW = posW.xyz;
+    vout.mPosW = posW;
 
 	// 동차 절단 공간으로 변환한다.
 	vout.mPosH = mul(posW, gViewProj);
@@ -46,9 +41,6 @@ VertexOut VS(VertexIn vin)
 	
 	// 출력 정점 특성들은 이후 삼각형을 따라 보간된다.
 	vout.mTexC = mul(float4(vin.mTexC, 0.0f, 1.0f), matData.mMatTransform).xy;
-
-	// 현재 정점을 광원의 텍스처 공간으로 변환한다.
-	vout.mShadowPosH = mul(posW, gLights[0].mShadowTransform);
 	
     return vout;
 }
@@ -69,10 +61,8 @@ float4 PS(VertexOut pin) : SV_Target
 		diffuseAlbedo *= gTextureMaps[diffuseMapIndex].Sample(gsamAnisotropicWrap, pin.mTexC);
 	}
 
-#ifdef ALPHA_TEST
     // 텍스처 알파가 0.1보다 작으면 픽셀을 폐기한다. 
     clip(diffuseAlbedo.a - 0.1f);
-#endif
 
 	// 법선을 보간하면 단위 길이가 아니게 될 수 있으므로 다시 정규화한다.
     pin.mNormalW = normalize(pin.mNormalW);
@@ -95,12 +85,8 @@ float4 PS(VertexOut pin) : SV_Target
 	float distToEye = length(toEyeW);
 	toEyeW /= distToEye; // normalize
 
-    // Diffuse를 전반적으로 밝혀주는 Ambient항
-    float4 ambient = gAmbientLight * diffuseAlbedo;
-
-	// 다른 물체에 가려진 정도에 따라 shadowFactor로 픽셀을 어둡게 한다.
-	float3 shadowFactor = 1.0f;
-	shadowFactor = CalcShadowFactor(pin.mShadowPosH, 0);
+	// Diffuse를 전반적으로 밝혀주는 Ambient항
+	float4 ambient = gAmbientLight * diffuseAlbedo;
 
 	// roughness와 normal를 이용하여 shininess를 계산한다.
 	const float shininess = 1.0f - roughness;
@@ -108,8 +94,7 @@ float4 PS(VertexOut pin) : SV_Target
     Material mat = { diffuseAlbedo, specular, shininess };
 
 	// Lighting을 실시한다.
-    float4 directLight = ComputeLighting(gLights, mat, pin.mPosW,
-        bumpedNormalW, toEyeW, shadowFactor);
+    float4 directLight = ComputeShadowLighting(gLights, mat, pin.mPosW, bumpedNormalW, toEyeW);
 	float4 litColor = ambient + directLight;
 
 	// 분산 재질에서 알파를 가져온다.

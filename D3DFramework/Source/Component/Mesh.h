@@ -3,14 +3,14 @@
 #include "Component.h"
 #include "Enums.h"
 
-class MeshGeometry : public Component
+class Mesh : public Component
 {
 public:
-	// 이 구조체는 MeshGeometry가 대표하는 기하구조 그룹(메시)의 부분 구간, 부분 
+	// 이 구조체는 Mesh가 대표하는 기하구조 그룹(메시)의 부분 구간, 부분 
 	// 메시를 정의한다. 부분 메시는 하나의 정점/색인 버퍼에 여러 개의 기하구조가
 	// 들어 있는 경우에 쓰인다. 이 구조체는 정점/색인 버퍼에 저장된 메시의 부분
 	// 메시를 그리는 데 필요한 오프셋들과 자료를 제공한다.
-	struct SubmeshGeometry
+	struct SubMesh
 	{
 	public:
 		UINT mIndexCount = 0;
@@ -19,8 +19,8 @@ public:
 	};
 
 public:
-	MeshGeometry(std::string&& name);
-	virtual ~MeshGeometry();
+	Mesh(std::string&& name);
+	virtual ~Mesh();
 
 public:
 	void BuildVertices(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, void* vertices, UINT vertexCount, UINT vertexStride);
@@ -78,5 +78,5 @@ private:
 	// 한 MeshGeomoetry 인스턴스의 한 정점/색인 버퍼에 여러 개의 기하구조를
 	// 담을 수 있다. 부분 메시들을 개별적으로 그릴 수 있도록, 부분 메시 기하구조들을
 	// 컨테이너에 담아 둔다.
-	//std::unordered_map<std::string, SubmeshGeometry> mDrawArgs;
+	//std::unordered_map<std::string, SubMesh> mDrawArgs;
 };

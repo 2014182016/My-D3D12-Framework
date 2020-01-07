@@ -143,8 +143,7 @@ float3 ComputeSpotLight(Light light, Material mat, float3 pos, float3 normal, fl
 }
 
 float4 ComputeLighting(StructuredBuffer<Light> lights, Material mat,
-                       float3 pos, float3 normal, float3 toEye,
-                       float3 shadowFactor)
+                       float3 pos, float3 normal, float3 toEye, float3 shadowFactor)
 {
     float3 result = 0.0f;
 

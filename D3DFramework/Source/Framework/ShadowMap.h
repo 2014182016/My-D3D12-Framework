@@ -25,7 +25,8 @@ public:
 		CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
 		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv);
 	void OnResize(UINT newWidth, UINT newHeight);
-	void RenderSceneToShadowMap(ID3D12GraphicsCommandList* cmdList, const std::list<std::shared_ptr<class GameObject>>& objects);
+	void RenderSceneToShadowMap(ID3D12GraphicsCommandList* cmdList, 
+		const std::list<std::shared_ptr<class GameObject>>& objects, const DirectX::BoundingFrustum* frustum = nullptr);
 
 public:
 	inline UINT GetWidth() const { return mWidth; }

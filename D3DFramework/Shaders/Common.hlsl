@@ -26,11 +26,19 @@ struct MaterialData
 };
 
 Texture2D gTextureMaps[TEX_NUM] : register(t0, space0);
-Texture2D gShadowMap[LIGHT_NUM]: register(t0, space1);
+Texture2D gShadowMaps[LIGHT_NUM]: register(t0, space1);
 TextureCube gCubeMaps[CUBE_MAP_NUM] : register(t0, space2);
 
 StructuredBuffer<Light> gLights : register(t0, space3);
 StructuredBuffer<MaterialData> gMaterialData : register(t1, space3);
+
+Texture2D gDiffuseMap : register(t0, space4);
+Texture2D gSpecularAndRoughnessMap : register(t1, space4);
+Texture2D gNormalMap : register(t2, space4);
+Texture2D gPositonMap : register(t3, space4);
+Texture2D gDepthMap : register(t4, space4);
+
+RWTexture2D<float4> gRenderTarget : register(u0, space5);
 
 SamplerState gsamPointWrap        : register(s0);
 SamplerState gsamPointClamp       : register(s1);
@@ -94,12 +102,6 @@ cbuffer cbParticle : register(b3)
 	float gParticlePadding1;
 }
 
-cbuffer cbDebug : register(b4)
-{
-	float4x4 gDebugWorld;
-	float4 gDebugColor;
-}
-
 // 법선 맵 표본을 World Space로 변환한다.
 float3 NormalSampleToWorldSpace(float3 normalMapSample, float3 unitNormalW, float3 tangentW)
 {
@@ -152,7 +154,7 @@ float CalcShadowFactor(float4 shadowPosH, int shadowMapIndex)
 	float depth = shadowPosH.z;
 
 	uint width, height, numMips;
-	gShadowMap[shadowMapIndex].GetDimensions(0, width, height, numMips);
+	gShadowMaps[shadowMapIndex].GetDimensions(0, width, height, numMips);
 
 	// 텍셀 사이즈
 	float dx = 1.0f / (float)width;
@@ -169,7 +171,7 @@ float CalcShadowFactor(float4 shadowPosH, int shadowMapIndex)
 	for (int i = 0; i < 9; ++i)
 	{
 		// 4표본 PCF가 자동으로 수행된다.
-		percentLit += gShadowMap[shadowMapIndex].SampleCmpLevelZero(gsamShadow,
+		percentLit += gShadowMaps[shadowMapIndex].SampleCmpLevelZero(gsamShadow,
 			shadowPosH.xy + offsets[i], depth).r;
 	}
 
@@ -178,3 +180,32 @@ float CalcShadowFactor(float4 shadowPosH, int shadowMapIndex)
 	return percentLit / 9.0f;
 }
 
+float4 ComputeShadowLighting(StructuredBuffer<Light> lights, Material mat, float3 pos, float3 normal, float3 toEye)
+{
+	float3 result = 0.0f;
+
+	for (uint i = 0; i < LIGHT_NUM; ++i)
+	{
+		if (lights[i].mEnabled == 0)
+			continue;
+
+		// 다른 물체에 가려진 정도에 따라 shadowFactor로 픽셀을 어둡게 한다.
+		float4 shadowPosH = mul(float4(pos, 1.0f), gLights[i].mShadowTransform);
+		float3 shadowFactor = CalcShadowFactor(shadowPosH, i);
+
+		switch (lights[i].mType)
+		{
+		case DIRECTIONAL_LIGHT:
+			result += shadowFactor[i] * ComputeDirectionalLight(lights[i], mat, normal, toEye);
+			break;
+		case POINT_LIGHT:
+			result += shadowFactor[i] * ComputePointLight(lights[i], mat, pos, normal, toEye);
+			break;
+		case SPOT_LIGHT:
+			result += shadowFactor[i] * ComputeSpotLight(lights[i], mat, pos, normal, toEye);
+			break;
+		}
+	}
+
+	return float4(result, 0.0f);
+}

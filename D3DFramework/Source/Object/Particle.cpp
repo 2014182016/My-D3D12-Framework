@@ -1,24 +1,34 @@
 #include "pch.h"
 #include "Particle.h"
-#include "MeshGeometry.h"
+#include "Mesh.h"
 #include "Structures.h"
 
 using namespace std::literals;
 using namespace DirectX;
 
-Particle::Particle(std::string&& name, UINT maxParticleNum) : Object(std::move(name)) 
+Particle::Particle(std::string&& name, ID3D12Device* device, ID3D12GraphicsCommandList* commandList, UINT maxParticleNum) : Object(std::move(name))
 {
 	mMaxParticleNum = maxParticleNum;
 	mParitlcePool = std::make_unique<ObjectPool<ParticleData>>(maxParticleNum);
+
+	mParticleMesh = std::make_unique<Mesh>(GetName() + "Mesh"s + std::to_string(GetUID()));
+	mParticleMesh->SetPrimitiveType(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+	mMesh = mParticleMesh.get();
 }
 
 Particle::~Particle() { }
 
 void Particle::Tick(float deltaTime)
 {
-	mLifeTime -= deltaTime;
-	if (mLifeTime < 0.0f)
-		Destroy();
+	if (!mIsInfinite)
+	{
+		mLifeTime -= deltaTime;
+		if (mLifeTime < 0.0f)
+		{
+			Destroy();
+			return;
+		}
+	}
 
 	if (mIsActive)
 	{
@@ -92,8 +102,7 @@ void Particle::UpdateParticleData(float deltaTime)
 	UpdateNumFrames();
 }
 
-void Particle::BuildParticleMesh(ID3D12Device* device, ID3D12GraphicsCommandList* commandList)
+void Particle::Render(ID3D12GraphicsCommandList* commandList)
 {
-	mMesh = std::make_unique<MeshGeometry>(GetName() + "Mesh"s + std::to_string(mParticleIndex));
-	mMesh->SetPrimitiveType(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+	mMesh->Render(commandList, 1, false);
 }

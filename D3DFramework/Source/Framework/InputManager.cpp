@@ -74,6 +74,8 @@ void InputManager::OnKeyUp(unsigned int input)
 		D3DFramework::GetInstance()->SwitchOptionEnabled(Option::Debug_Octree);
 	else if (input == VK_F4)
 		D3DFramework::GetInstance()->SwitchOptionEnabled(Option::Debug_Light);
+	else if (input == VK_F5)
+		D3DFramework::GetInstance()->SwitchOptionEnabled(Option::Debug_GBuffer);
 }
 
 void InputManager::Tick(float deltaTime) 

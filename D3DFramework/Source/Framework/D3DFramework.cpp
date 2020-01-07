@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "D3DFramework.h"
 #include "AssetManager.h"
-#include "D3DDebug.h"
 #include "D3DUtil.h"
 #include "Structures.h"
 #include "FrameResource.h"
@@ -14,15 +13,13 @@
 
 #include "GameObject.h"
 #include "Material.h"
-#include "MeshGeometry.h"
+#include "Mesh.h"
 #include "DirectionalLight.h"
 #include "PointLight.h"
 #include "SpotLight.h"
 #include "Widget.h"
 #include "Particle.h"
-
-#include "MovingObject.h"
-#include "MovingDirectionalLight.h"
+#include "Billboard.h"
 
 using namespace DirectX;
 using namespace std::literals;
@@ -84,8 +81,8 @@ void D3DFramework::InitFramework()
 	mCamera->SetPosition(0.0f, 2.0f, -15.0f);
 
 	mShadowMap->Initialize(md3dDevice.Get());
-	D3DDebug::GetInstance()->Initialize(md3dDevice.Get());
 	AssetManager::GetInstance()->Initialize(md3dDevice.Get(), mCommandList.Get(), md3dSound.Get());
+	SetBackgroundColor(XMFLOAT4(Colors::LightSkyBlue));
 
 	CreateObjects();
 	CreateLights();
@@ -117,32 +114,13 @@ void D3DFramework::InitFramework()
 	}
 }
 
-void D3DFramework::CreateRtvAndDsvDescriptorHeaps()
-{
-	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc;
-	rtvHeapDesc.NumDescriptors = SWAP_CHAIN_BUFFER_COUNT;
-	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	rtvHeapDesc.NodeMask = 0;
-	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(
-		&rtvHeapDesc, IID_PPV_ARGS(mRtvHeap.GetAddressOf())));
-
-	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc;
-	dsvHeapDesc.NumDescriptors = 1 + 1;
-	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	dsvHeapDesc.NodeMask = 0;
-	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(
-		&dsvHeapDesc, IID_PPV_ARGS(mDsvHeap.GetAddressOf())));
-}
-
 void D3DFramework::CreateShadowMapResource(UINT textureNum, UINT cubeTextureNum)
 {
 	// 그림자 맵 서술자를 생성하기 위해 필요한 변수들을 설정한다.
 	auto srvCpuStart = mCbvSrvUavDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 	auto srvGpuStart = mCbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
 	auto dsvCpuStart = mDsvHeap->GetCPUDescriptorHandleForHeapStart();
-	mShadowMapHeapIndex = textureNum + cubeTextureNum;
+	mShadowMapHeapIndex = textureNum + cubeTextureNum + DEFERRED_BUFFER_COUNT + 1;
 	mShadowMap->BuildDescriptors(
 		CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, mShadowMapHeapIndex, mCbvSrvUavDescriptorSize),
 		CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, mShadowMapHeapIndex, mCbvSrvUavDescriptorSize),
@@ -181,80 +159,164 @@ void D3DFramework::Render()
 	// 테이블에 몇 개의 서술자가 있는지는 Root Signature에 설정되어 있다.
 	mCommandList->SetGraphicsRootDescriptorTable(RP_TEXTURE, mCbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
+	// 큐브 맵을 파이프라인에 바인딩한다.
 	CD3DX12_GPU_DESCRIPTOR_HANDLE skyTexDescriptor(mCbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 	skyTexDescriptor.Offset(mSkyCubeMapHeapIndex, mCbvSrvUavDescriptorSize);
 	mCommandList->SetGraphicsRootDescriptorTable(RP_CUBEMAP, skyTexDescriptor);
 
-	// Shadow Pass
-	// 그려진 그림자 깊이 맵을 쉐이더에 묶는다.
+	// G-Buffer에 사용될 렌더 타겟들을 파이프라인에 바인딩한다.
+	CD3DX12_GPU_DESCRIPTOR_HANDLE defferedBufferDescriptor(mCbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+	defferedBufferDescriptor.Offset(mDeferredBufferHeapIndex, mCbvSrvUavDescriptorSize);
+	mCommandList->SetGraphicsRootDescriptorTable(RP_G_BUFFER, defferedBufferDescriptor);
+
+	// 그림자 맵을 파이프라인에 바인딩한다.
 	CD3DX12_GPU_DESCRIPTOR_HANDLE shadowMapDescriptor(mCbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 	shadowMapDescriptor.Offset(mShadowMapHeapIndex, mCbvSrvUavDescriptorSize);
 	mCommandList->SetGraphicsRootDescriptorTable(RP_SHADOWMAP, shadowMapDescriptor);
-	
-	mCommandList->SetPipelineState(mPSOs["ShadowMap"].Get());
-	for (const auto& light : mLights)
-	{
-		if (light->IsUpdate())
-			mShadowMap->RenderSceneToShadowMap(mCommandList.Get(), mActualObjects);
-	}
-
-	// Default Pass
-	mCommandList->RSSetViewports(1, &mScreenViewport);
-	mCommandList->RSSetScissorRects(1, &mScissorRect);
-
-	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
-		GetCurrentBackBuffer(),
-		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-	// 후면 버퍼과 깊이 버퍼를 지운다. 
-	mCommandList->ClearRenderTargetView(GetCurrentBackBufferView(), (float*)&mBackBufferClearColor, 0, nullptr);
-	mCommandList->ClearDepthStencilView(GetDepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
-
-	// 그리기 위한 후면 버퍼과 깊이 버퍼를 지정한다.
-	mCommandList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
 
 	if (GetOptionEnabled(Option::Wireframe))
 	{
-		mCommandList->SetPipelineState(mPSOs["Wireframe"].Get());
-		for (const auto& list : mGameObjects)
-			RenderGameObject(mCommandList.Get(), list, &mWorldCamFrustum);
+		// 후면 버퍼를 그리기 위해 자원 상태를 전환한다.
+		mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
+			D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+		mCommandList->RSSetViewports(1, &mScreenViewport);
+		mCommandList->RSSetScissorRects(1, &mScissorRect);
+
+		// 후면 버퍼과 깊이 버퍼를 지운고, 파이프라인에 바인딩한다.
+		mCommandList->ClearRenderTargetView(GetCurrentBackBufferView(), (float*)&mBackBufferClearColor, 0, nullptr);
+		mCommandList->ClearDepthStencilView(GetDepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+		mCommandList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
+
+		mCommandList->SetPipelineState(mPSOs["Forward"].Get());
+		RenderGameObjects(mActualObjects, &mWorldCamFrustum);
+
+		// 와이어프레임으로 그려지는 것은 Deferred Rendering 및 라이팅이 필요없으므로 건너뛴다.
+		goto RenderingPassSkip;
 	}
-	else
+
+	// Shadow Pass ---------------------------------------------------------
+
 	{
+		mCommandList->SetPipelineState(mPSOs["ShadowMap"].Get());
+		mShadowMap->RenderSceneToShadowMap(mCommandList.Get(), mActualObjects);
+	}
+
+	// G-Buffer Pass ---------------------------------------------------------
+	
+	{
+		// 각 G-Buffer의 버퍼들과 깊이 버퍼를 사용하기 위해 자원 상태를를 전환한다.
+		CD3DX12_RESOURCE_BARRIER defferedBufferTransition[DEFERRED_BUFFER_COUNT];
+		for (int i = 0; i < DEFERRED_BUFFER_COUNT; i++)
+			defferedBufferTransition[i] = CD3DX12_RESOURCE_BARRIER::Transition(mDeferredBuffer[i].Get(),
+				D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		mCommandList->ResourceBarrier(DEFERRED_BUFFER_COUNT, defferedBufferTransition);
+		mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
+			D3D12_RESOURCE_STATE_DEPTH_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
+
+		mCommandList->RSSetViewports(1, &mScreenViewport);
+		mCommandList->RSSetScissorRects(1, &mScissorRect);
+
+		// 각 G-Buffer의 버퍼들과 깊이 버퍼를 지운고, 파이프라인에 바인딩한다.
+		for (int i = 0; i < DEFERRED_BUFFER_COUNT; i++)
+			mCommandList->ClearRenderTargetView(GetDefferedBufferView(i), (float*)&mBackBufferClearColor, 0, nullptr);
+		mCommandList->ClearDepthStencilView(GetDepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+		mCommandList->OMSetRenderTargets(DEFERRED_BUFFER_COUNT, &GetDefferedBufferView(0), true, &GetDepthStencilView());
+
 		mCommandList->SetPipelineState(mPSOs["Opaque"].Get());
-		RenderGameObject(mCommandList.Get(), mGameObjects[(int)RenderLayer::Opaque], &mWorldCamFrustum);
+		RenderGameObjects(mGameObjects[(int)RenderLayer::Opaque], &mWorldCamFrustum);
 
 		mCommandList->SetPipelineState(mPSOs["AlphaTested"].Get());
-		RenderGameObject(mCommandList.Get(), mGameObjects[(int)RenderLayer::AlphaTested], &mWorldCamFrustum);
+		RenderGameObjects(mGameObjects[(int)RenderLayer::AlphaTested], &mWorldCamFrustum);
 
 		mCommandList->SetPipelineState(mPSOs["Billborad"].Get());
-		RenderGameObject(mCommandList.Get(), mGameObjects[(int)RenderLayer::Billborad], &mWorldCamFrustum);
+		RenderGameObjects(mGameObjects[(int)RenderLayer::Billborad], &mWorldCamFrustum);
+
+		// 각 G-Buffer의 버퍼들과 깊이 버퍼를 읽기 위해 자원 상태를를 전환한다.
+		for (int i = 0; i < DEFERRED_BUFFER_COUNT; i++)
+			defferedBufferTransition[i] = CD3DX12_RESOURCE_BARRIER::Transition(mDeferredBuffer[i].Get(),
+				D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ);
+		mCommandList->ResourceBarrier(DEFERRED_BUFFER_COUNT, defferedBufferTransition);
+		mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
+			D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
+	}
+
+	// Lighting Pass ---------------------------------------------------------
+
+	{
+		// 후면 버퍼를 그리기 위해 자원 상태를 전환한다.
+		mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
+			D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+		// 후면 버퍼과 깊이 버퍼를 지운고, 파이프라인에 바인딩한다.
+		mCommandList->ClearRenderTargetView(GetCurrentBackBufferView(), (float*)&mBackBufferClearColor, 0, nullptr);
+		mCommandList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
+
+		mCommandList->SetPipelineState(mPSOs["LightingPass"].Get());
+		auto iter = mWidgets.begin();
+		std::advance(iter, 6);
+		auto currWidgetCB = mCurrentFrameResource->mWidgetPool->GetBuffer();
+		RenderObject((*iter).get(), currWidgetCB->GetResource()->GetGPUVirtualAddress(), RP_WIDGET, (*iter)->GetCBIndex(), widgetCBByteSize, false);
+	}
+
+	// Forward Pass ---------------------------------------------------------
+
+	{
+		mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
+			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
+
+		mCommandList->SetPipelineState(mPSOs["Particle"].Get());
+		RenderParticles();
+
+		mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
+			D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_DEPTH_READ));
 
 		mCommandList->SetPipelineState(mPSOs["Sky"].Get());
-		RenderGameObject(mCommandList.Get(), mGameObjects[(int)RenderLayer::Sky]);
+		RenderGameObjects(mGameObjects[(int)RenderLayer::Sky]);
 
 		mCommandList->SetPipelineState(mPSOs["Transparent"].Get());
-		RenderGameObject(mCommandList.Get(), mGameObjects[(int)RenderLayer::Transparent], &mWorldCamFrustum);
+		RenderGameObjects(mGameObjects[(int)RenderLayer::Transparent], &mWorldCamFrustum);
 	}
 
-	mCommandList->SetPipelineState(mPSOs["Particle"].Get());
-	RenderParticle(mCommandList.Get());
+RenderingPassSkip:
+
+	// Widget Pass ---------------------------------------------------------
+
+	{
+		mCommandList->SetPipelineState(mPSOs["Widget"].Get());
+		RenderWidgets();
 
 #if defined(DEBUG) || defined(_DEBUG)
-	if (GetOptionEnabled(Option::Debug_Collision) ||
-		GetOptionEnabled(Option::Debug_Octree) ||
-		GetOptionEnabled(Option::Debug_Light))
-	{
-		mCommandList->SetPipelineState(mPSOs["CollisionDebug"].Get());
-		RenderCollisionDebug(mCommandList.Get());
-	}
+		if (GetOptionEnabled(Option::Debug_GBuffer))
+		{
+			// 위젯의 0~4번째까지는 G-Buffer를 그리는 위젯이다.
+			auto iter = mWidgets.begin();
+			auto currWidgetCB = mCurrentFrameResource->mWidgetPool->GetBuffer();
 
-	mCommandList->SetPipelineState(mPSOs["Line"].Get());
-	D3DDebug::GetInstance()->RenderLine(mCommandList.Get(), mGameTimer->GetDeltaTime());
+			mCommandList->SetPipelineState(mPSOs["DiffuseMapDebug"].Get());
+			RenderObject((*iter).get(), currWidgetCB->GetResource()->GetGPUVirtualAddress(), RP_WIDGET, (*iter)->GetCBIndex(), widgetCBByteSize, false);
+			++iter;
+
+			mCommandList->SetPipelineState(mPSOs["SpecularMapDebug"].Get());
+			RenderObject((*iter).get(), currWidgetCB->GetResource()->GetGPUVirtualAddress(), RP_WIDGET, (*iter)->GetCBIndex(), widgetCBByteSize, false);
+			++iter;
+
+			mCommandList->SetPipelineState(mPSOs["RoughnessMapDebug"].Get());
+			RenderObject((*iter).get(), currWidgetCB->GetResource()->GetGPUVirtualAddress(), RP_WIDGET, (*iter)->GetCBIndex(), widgetCBByteSize, false);
+			++iter;
+
+			mCommandList->SetPipelineState(mPSOs["NormalMapDebug"].Get());
+			RenderObject((*iter).get(), currWidgetCB->GetResource()->GetGPUVirtualAddress(), RP_WIDGET, (*iter)->GetCBIndex(), widgetCBByteSize, false);
+			++iter;
+
+			mCommandList->SetPipelineState(mPSOs["DepthMapDebug"].Get());
+			RenderObject((*iter).get(), currWidgetCB->GetResource()->GetGPUVirtualAddress(), RP_WIDGET, (*iter)->GetCBIndex(), widgetCBByteSize, false);
+			++iter;
+
+			mCommandList->SetPipelineState(mPSOs["ShadowMapDebug"].Get());
+			RenderObject((*iter).get(), currWidgetCB->GetResource()->GetGPUVirtualAddress(), RP_WIDGET, (*iter)->GetCBIndex(), widgetCBByteSize, false);
+		}
 #endif
-
-	mCommandList->SetPipelineState(mPSOs["Widget"].Get());
-	RenderWidget(mCommandList.Get());
+	}
 
 	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
@@ -294,8 +356,8 @@ void D3DFramework::Tick(float deltaTime)
 
 	mWorldCamFrustum = mCamera->GetWorldCameraBounding();
 
-	DestroyObject();
-	DestroyParticle();
+	DestroyGameObjects();
+	DestroyParticles();
 
 	mOctreeRoot->Update(deltaTime);
 	UpdateObjectBuffer(deltaTime);
@@ -304,30 +366,6 @@ void D3DFramework::Tick(float deltaTime)
 	UpdateMainPassBuffer(deltaTime);
 	UpdateWidgetBuffer(deltaTime);
 	UpdateParticleBuffer(deltaTime);
-
-#if defined(DEBUG) || defined(_DEBUG)
-	if (GetOptionEnabled(Option::Debug_Collision) ||
-		GetOptionEnabled(Option::Debug_Octree) ||
-		GetOptionEnabled(Option::Debug_Light))
-	{
-		D3DDebug::GetInstance()->Reset();
-
-		if (GetOptionEnabled(Option::Debug_Collision))
-		{
-			UpdateDebugCollision(mCommandList.Get());
-		}
-		if (GetOptionEnabled(Option::Debug_Octree))
-		{
-			UpdateDebugOctree(mCommandList.Get());
-		}
-		if (GetOptionEnabled(Option::Debug_Light))
-		{
-			UpdateDebugLight(mCommandList.Get());
-		}
-
-		UpdateDebugBufferPool();
-	}
-#endif
 }
 
 
@@ -350,7 +388,7 @@ void D3DFramework::AddGameObject(std::shared_ptr<GameObject> object, RenderLayer
 	UpdateObjectBufferPool();
 }
 
-void D3DFramework::DestroyObject()
+void D3DFramework::DestroyGameObjects()
 {
 	for (auto& list : mGameObjects)
 	{
@@ -361,10 +399,10 @@ void D3DFramework::DestroyObject()
 	mActualObjects.remove_if([](const std::shared_ptr<Object>& obj)->bool
 	{ return obj->GetIsDestroyesd(); });
 
-	mOctreeRoot->DestroyObject();
+	mOctreeRoot->DestroyObjects();
 }
 
-void D3DFramework::DestroyParticle()
+void D3DFramework::DestroyParticles()
 {
 	for (auto iter = mParticles.begin(); iter != mParticles.end();)
 	{
@@ -372,7 +410,7 @@ void D3DFramework::DestroyParticle()
 		if (particle->GetIsDestroyesd())
 		{
 			auto& particleVBs = mCurrentFrameResource->mParticleVBs;
-			auto vbIter = particleVBs.begin() + particle->GetParticleIndex();
+			auto vbIter = particleVBs.begin() + particle->GetCBIndex();
 			particleVBs.erase(vbIter);
 			iter = mParticles.erase(iter);
 			continue;
@@ -394,9 +432,9 @@ void D3DFramework::UpdateObjectBuffer(float deltaTime)
 		{
 			obj->Tick(deltaTime);
 
-			if (objectIndex != obj->GetObjectIndex())
+			if (objectIndex != obj->GetCBIndex())
 			{
-				obj->SetObjectIndex(objectIndex);
+				obj->SetCBIndex(objectIndex);
 				obj->UpdateNumFrames();
 			}
 
@@ -496,19 +534,29 @@ void D3DFramework::UpdateMainPassBuffer(float deltaTime)
 
 void D3DFramework::UpdateWidgetBuffer(float deltaTime)
 {
+	// [0, 1]범위로 설정된 위젯의 정점 위치를 동차 좌표계의 [-1, 1]범위로 변환한다.
+	static std::function<float(float)> transformHomogenous = [](float x) { return x * 2.0f - 1.0f; };
+
 	auto currWidgetPool = mCurrentFrameResource->mWidgetPool->GetBuffer();
 	auto& currWidgetVBs = mCurrentFrameResource->mWidgetVBs;
+	UINT widgetIndex = 0;
+
 	for (const auto& widget : mWidgets)
 	{
 		widget->Tick(deltaTime);
+		if (widgetIndex != widget->GetCBIndex())
+		{
+			widget->SetCBIndex(widgetIndex);
+			widget->UpdateNumFrames();
+		}
+
 		if (widget->IsUpdate())
 		{
-			UINT index = widget->GetWidgetIndex();
 			WidgetConstants widgetConstants;
 
 			if(widget->GetMaterial())
 				widgetConstants.mMaterialIndex = widget->GetMaterial()->GetMaterialIndex();
-			currWidgetPool->CopyData(index, widgetConstants);
+			currWidgetPool->CopyData(widgetIndex, widgetConstants);
 
 			float posX = (float)widget->GetPosX();
 			float posY = (float)widget->GetPosY();
@@ -517,13 +565,10 @@ void D3DFramework::UpdateWidgetBuffer(float deltaTime)
 			float anchorX = widget->GetAnchorX();
 			float anchorY = widget->GetAnchorY();
 
-			float minX = anchorX + ((float)posX / mScreenWidth);
-			float minY = anchorY + ((float)posY / mScreenHeight);
-			float maxX = anchorX + ((float)posX + float(width) / mScreenWidth);
-			float maxY = anchorY + ((float)posY + float(height) / mScreenHeight);
-
-			// [0, 1]범위로 설정된 위젯의 정점 위치를 동차 좌표계의 [-1, 1]범위로 변환한다.
-			std::function<float(float)> transformHomogenous = [](float x) { return x * 2.0f - 1.0f; };
+			float minX = anchorX + (posX / mScreenWidth);
+			float minY = anchorY + (posY / mScreenHeight);
+			float maxX = anchorX + ((posX + width) / mScreenWidth);
+			float maxY = anchorY + ((posY + height) / mScreenHeight);
 
 			minX = transformHomogenous(minX);
 			minY = transformHomogenous(minY);
@@ -531,12 +576,11 @@ void D3DFramework::UpdateWidgetBuffer(float deltaTime)
 			maxY = transformHomogenous(maxY);
 
 			WidgetVertex vertices[4];
-			vertices[0] = WidgetVertex(XMFLOAT3(minX, minY, 0.0f), XMFLOAT2(0.0f, 0.0f));
-			vertices[1] = WidgetVertex(XMFLOAT3(minX, maxY, 0.0f), XMFLOAT2(0.0f, 1.0f));
-			vertices[2] = WidgetVertex(XMFLOAT3(maxX, minY, 0.0f), XMFLOAT2(1.0f, 0.0f));
-			vertices[3] = WidgetVertex(XMFLOAT3(maxX, maxY, 0.0f), XMFLOAT2(1.0f, 1.0f));
+			vertices[0] = WidgetVertex(XMFLOAT3(minX, minY, 0.0f), XMFLOAT2(0.0f, 1.0f));
+			vertices[1] = WidgetVertex(XMFLOAT3(minX, maxY, 0.0f), XMFLOAT2(0.0f, 0.0f));
+			vertices[2] = WidgetVertex(XMFLOAT3(maxX, minY, 0.0f), XMFLOAT2(1.0f, 1.0f));
+			vertices[3] = WidgetVertex(XMFLOAT3(maxX, maxY, 0.0f), XMFLOAT2(1.0f, 0.0f));
 
-			UINT widgetIndex = widget->GetWidgetIndex();
 			for (int i = 0; i < 4; ++i)
 				currWidgetVBs[widgetIndex]->CopyData(i, vertices[i]);
 			widget->GetMesh()->SetDynamicVertexBuffer(currWidgetVBs[widgetIndex]->GetResource(),
@@ -544,6 +588,7 @@ void D3DFramework::UpdateWidgetBuffer(float deltaTime)
 
 			widget->DecreaseNumFrames();
 		}
+		++widgetIndex;
 	}
 }
 
@@ -556,10 +601,10 @@ void D3DFramework::UpdateParticleBuffer(float deltaTime)
 	for (const auto& particle : mParticles)
 	{
 		particle->Tick(deltaTime);
-		if (particleIndex != particle->GetParticleIndex())
+		if (particleIndex != particle->GetCBIndex())
 		{
+			particle->SetCBIndex(particleIndex);
 			particle->UpdateNumFrames();
-			particle->SetParticleIndex(particleIndex);
 		}
 
 		if (particle->IsUpdate())
@@ -591,102 +636,24 @@ void D3DFramework::UpdateParticleBuffer(float deltaTime)
 	}
 }
 
-void D3DFramework::UpdateDebugCollision(ID3D12GraphicsCommandList* cmdList)
-{
-	std::vector<DebugConstants>& aabbConstatns = D3DDebug::GetInstance()->GetDebugConstants((int)DebugType::AABB);
-	std::vector<DebugConstants>& obbConstatns = D3DDebug::GetInstance()->GetDebugConstants((int)DebugType::OBB);
-	std::vector<DebugConstants>& sphereConstatns = D3DDebug::GetInstance()->GetDebugConstants((int)DebugType::Sphere);
-
-	// GameObject를 디버깅하기 위한 데이터를 저장한다.
-	for (const auto& list : mGameObjects)
-	{
-		for (const auto& obj : list)
-		{
-			auto boundingWorld = obj->GetBoundingWorld();
-			if (!boundingWorld.has_value())
-				continue;
-
-			bool isInFrustum = obj->IsInFrustum(mWorldCamFrustum);
-			if (!isInFrustum)
-				continue;
-
-			XMFLOAT4X4 boundingWorld4x4f;
-			XMStoreFloat4x4(&boundingWorld4x4f, XMMatrixTranspose(boundingWorld.value()));
-
-			switch (obj->GetCollisionType())
-			{
-			case CollisionType::AABB:
-				aabbConstatns.emplace_back(DebugConstants(std::move(boundingWorld4x4f), (DirectX::XMFLOAT4)DirectX::Colors::Red));
-				break;
-			case CollisionType::OBB:
-				obbConstatns.emplace_back(DebugConstants(std::move(boundingWorld4x4f), (DirectX::XMFLOAT4)DirectX::Colors::Red));
-				break;
-			case CollisionType::Sphere:
-				sphereConstatns.emplace_back(DebugConstants(std::move(boundingWorld4x4f), (DirectX::XMFLOAT4)DirectX::Colors::Red));
-				break;
-			}
-		}
-	}
-}
-
-void D3DFramework::UpdateDebugOctree(ID3D12GraphicsCommandList* cmdList)
-{
-	std::vector<DebugConstants>& octreeConstatns = D3DDebug::GetInstance()->GetDebugConstants((int)DebugType::Octree);
-
-	// OctTree를 디버깅하기 위한 데이터를 저장한다.
-	std::vector<DirectX::XMFLOAT4X4> worlds;
-	mOctreeRoot->GetBoundingWorlds(worlds);
-	for (const auto& world : worlds)
-	{
-		octreeConstatns.emplace_back(DebugConstants(std::move(world), (DirectX::XMFLOAT4)DirectX::Colors::Green));
-	}
-}
-
-void D3DFramework::UpdateDebugLight(ID3D12GraphicsCommandList* cmdList)
-{
-	std::vector<DebugConstants>& lightConstatns = D3DDebug::GetInstance()->GetDebugConstants((int)DebugType::Light);
-
-	// Light를 디버깅하기 위한 데이터를 저장한다.
-	for (const auto& light : mLights)
-	{
-		XMFLOAT3 pos = light->GetPosition();
-		XMFLOAT3 rot = light->GetRotation();
-		XMMATRIX translation = XMMatrixTranslation(pos.x, pos.y, pos.z);
-		XMMATRIX rotation = XMMatrixRotationRollPitchYaw(rot.x, rot.y, rot.z);
-		XMMATRIX worldMat = XMMatrixMultiply(rotation, translation);
-		XMFLOAT4X4 world;
-		XMStoreFloat4x4(&world, XMMatrixTranspose(worldMat));
-
-		lightConstatns.emplace_back(DebugConstants(std::move(world), (DirectX::XMFLOAT4)DirectX::Colors::Yellow));
-	}
-}
-
-void D3DFramework::UpdateDebugBufferPool()
-{
-	auto debugPool = mCurrentFrameResource->mDebugPool.get();
-	UINT debugDataCount = D3DDebug::GetInstance()->GetDebugDataCount();
-	if (debugDataCount > debugPool->GetBufferCount())
-		debugPool->Resize(debugDataCount * 2);
-}
-
 void D3DFramework::UpdateObjectBufferPool()
 {
-	UINT gameObjectNum = 0;
+	UINT allObjectCount = 0;
+
 	for (const auto& list : mGameObjects)
-		gameObjectNum += (UINT)list.size();
+		allObjectCount += (UINT)list.size();
 
 	if (mCurrentFrameResource)
 	{
 		auto currObjectPool = mCurrentFrameResource->mObjectPool.get();
-		if (currObjectPool->GetBufferCount() < gameObjectNum)
-			currObjectPool->Resize(gameObjectNum * 2);
+		if (currObjectPool->GetBufferCount() < allObjectCount)
+			currObjectPool->Resize(allObjectCount * 2);
 	}
 }
 
 void D3DFramework::CreateObjects()
 {
 	std::shared_ptr<GameObject> object;
-	UINT objectIndex = 0;
 	
 	object = std::make_shared<GameObject>("Sky"s);
 	object->SetScale(5000.0f, 5000.0f, 5000.0f);
@@ -694,7 +661,6 @@ void D3DFramework::CreateObjects()
 	object->SetMesh(AssetManager::GetInstance()->FindMesh("SkySphere"s));
 	object->SetRenderLayer(RenderLayer::Sky);
 	object->SetCollisionEnabled(false);
-	object->SetObjectIndex(objectIndex++);
 	AddGameObject(object, object->GetRenderLayer());
 
 	object = std::make_shared<GameObject>("Floor0"s);
@@ -702,16 +668,7 @@ void D3DFramework::CreateObjects()
 	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tile0"s));
 	object->SetMesh(AssetManager::GetInstance()->FindMesh("Cube_AABB"s));
 	object->SetRenderLayer(RenderLayer::Opaque);
-	object->SetObjectIndex(objectIndex++);
-	AddGameObject(object, object->GetRenderLayer());
-
-	object = std::make_shared<MovingObject>("MovingObject0");
-	object->SetPosition(5.0f, 50.0f, 5.0f);
-	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Default"s));
-	object->SetMesh(AssetManager::GetInstance()->FindMesh("Cube_AABB"s));
-	object->SetPhysics(true);
-	object->SetMass(10.0f);
-	object->SetObjectIndex(objectIndex++);
+	object->SetCollisionEnabled(true);
 	AddGameObject(object, object->GetRenderLayer());
 
 	for (int i = 0; i < 5; ++i)
@@ -721,7 +678,7 @@ void D3DFramework::CreateObjects()
 		object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Brick0"s));
 		object->SetMesh(AssetManager::GetInstance()->FindMesh("Cylinder"s));
 		object->SetRenderLayer(RenderLayer::Opaque);
-		object->SetObjectIndex(objectIndex++);
+		object->SetCollisionEnabled(true);
 		AddGameObject(object, object->GetRenderLayer());
 
 		object = std::make_shared<GameObject>("ColumnRight"s + std::to_string(i));
@@ -729,7 +686,7 @@ void D3DFramework::CreateObjects()
 		object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Brick0"s));
 		object->SetMesh(AssetManager::GetInstance()->FindMesh("Cylinder"s));
 		object->SetRenderLayer(RenderLayer::Opaque);
-		object->SetObjectIndex(objectIndex++);
+		object->SetCollisionEnabled(true);
 		AddGameObject(object, object->GetRenderLayer());
 
 		object = std::make_shared<GameObject>("SphereLeft"s + std::to_string(i));
@@ -737,7 +694,7 @@ void D3DFramework::CreateObjects()
 		object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Mirror0"s));
 		object->SetMesh(AssetManager::GetInstance()->FindMesh("Sphere"s));
 		object->SetRenderLayer(RenderLayer::Transparent);
-		object->SetObjectIndex(objectIndex++);
+		object->SetCollisionEnabled(true);
 		AddGameObject(object, object->GetRenderLayer());
 
 		object = std::make_shared<GameObject>("SphereRight"s + std::to_string(i));
@@ -745,7 +702,7 @@ void D3DFramework::CreateObjects()
 		object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Mirror0"s));
 		object->SetMesh(AssetManager::GetInstance()->FindMesh("Sphere"s));
 		object->SetRenderLayer(RenderLayer::Transparent);
-		object->SetObjectIndex(objectIndex++);
+		object->SetCollisionEnabled(true);
 		AddGameObject(object, object->GetRenderLayer());
 	}
 }
@@ -766,37 +723,82 @@ void D3DFramework::CreateLights()
 void D3DFramework::CreateWidgets()
 {
 	std::shared_ptr<Widget> widget;
-	UINT widgetIndex = 0;
 
-	widget = std::make_shared<Widget>("Widget0"s);
-	widget->SetSize(400, 300);
+	widget = std::make_shared<Widget>("DiffuseMapDebug"s, md3dDevice.Get(), mCommandList.Get());
+	widget->SetPosition(0, -120);
+	widget->SetSize(160, 120);
+	widget->SetAnchor(0.0f, 1.0f);
+	widget->SetMaterial(AssetManager::GetInstance()->FindMaterial("Default"s));
+	widget->SetVisible(false);
+	mWidgets.push_back(std::move(widget));
+
+	widget = std::make_shared<Widget>("SpecularMapDebug"s, md3dDevice.Get(), mCommandList.Get());
+	widget->SetPosition(160, -120);
+	widget->SetSize(160, 120);
+	widget->SetAnchor(0.0f, 1.0f);
+	widget->SetMaterial(AssetManager::GetInstance()->FindMaterial("Default"s));
+	widget->SetVisible(false);
+	mWidgets.push_back(std::move(widget));
+
+	widget = std::make_shared<Widget>("RoughnessMapDebug"s, md3dDevice.Get(), mCommandList.Get());
+	widget->SetPosition(320, -120);
+	widget->SetSize(160, 120);
+	widget->SetAnchor(0.0f, 1.0f);
+	widget->SetMaterial(AssetManager::GetInstance()->FindMaterial("Default"s));
+	widget->SetVisible(false);
+	mWidgets.push_back(std::move(widget));
+
+	widget = std::make_shared<Widget>("NormalMapDebug"s, md3dDevice.Get(), mCommandList.Get());
+	widget->SetPosition(480, -120);
+	widget->SetSize(160, 120);
+	widget->SetAnchor(0.0f, 1.0f);
+	widget->SetMaterial(AssetManager::GetInstance()->FindMaterial("Default"s));
+	widget->SetVisible(false);
+	mWidgets.push_back(std::move(widget));
+
+	widget = std::make_shared<Widget>("DetphMapDebug"s, md3dDevice.Get(), mCommandList.Get());
+	widget->SetPosition(640, -120);
+	widget->SetSize(160, 120);
+	widget->SetAnchor(0.0f, 1.0f);
+	widget->SetMaterial(AssetManager::GetInstance()->FindMaterial("Default"s));
+	widget->SetVisible(false);
+	mWidgets.push_back(std::move(widget));
+
+	widget = std::make_shared<Widget>("ShadowMapDebug"s, md3dDevice.Get(), mCommandList.Get());
+	widget->SetPosition(960, -120);
+	widget->SetSize(160, 120);
+	widget->SetAnchor(0.0f, 1.0f);
+	widget->SetMaterial(AssetManager::GetInstance()->FindMaterial("Default"s));
+	widget->SetVisible(false);
+	mWidgets.push_back(std::move(widget));
+
+	widget = std::make_shared<Widget>("RenderTarget"s, md3dDevice.Get(), mCommandList.Get());
+	widget->SetSize(mScreenWidth, mScreenHeight);
 	widget->SetAnchor(0.0f, 0.0f);
-	widget->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tile0"s));
-	widget->BuildWidgetMesh(md3dDevice.Get(), mCommandList.Get());
-	widget->SetWidgetIndex(widgetIndex++);
-	//mWidgets.push_back(std::move(widget));
+	widget->SetMaterial(AssetManager::GetInstance()->FindMaterial("Default"s));
+	widget->SetVisible(false);
+	mWidgets.push_back(std::move(widget));
 }
 
 void D3DFramework::CreateParticles()
 {
 	std::shared_ptr<Particle> particle;
-	UINT particleIndex = 0;
 
-	particle = std::make_shared<Particle>("Particle0"s, 500);
+	/*
+	particle = std::make_shared<Particle>("Particle0"s, md3dDevice.Get(), mCommandList.Get(), 500);
 	particle->SetPosition(0.0f, 5.0f, 0.0f);
 	particle->SetSpawnDistanceRange(XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 1.0f));
 	particle->SetVelocityRange(XMFLOAT3(-10.0f, -10.0f, -10.0f), XMFLOAT3(10.0f, 10.0f, 10.0f));
 	particle->SetColorRange(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
 	particle->SetSizeRange(XMFLOAT2(2.0f, 2.0f));
-	particle->SetSpawnTimeRange(1.0f, 2.0f);
+	particle->SetSpawnTimeRange(0.1f, 0.2f);
 	particle->SetLifeTimeRange(1.5f, 3.0f);
 	particle->SetLifeTime(10.0f);
 	particle->SetBurstNum(5);
 	particle->SetEnabledGravity(true);
 	particle->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tree0"s));
-	particle->BuildParticleMesh(md3dDevice.Get(), mCommandList.Get());
-	particle->SetParticleIndex(particleIndex++);
 	mParticles.push_back(std::move(particle));
+	*/
 }
 
 void D3DFramework::CreateFrameResources()
@@ -827,15 +829,27 @@ void D3DFramework::CreateFrameResources()
 	}
 }
 
-void D3DFramework::RenderGameObject(ID3D12GraphicsCommandList* cmdList, const std::list<std::shared_ptr<GameObject>>& gameObjects, BoundingFrustum* frustum) const
+void D3DFramework::RenderObject(Renderable* obj, D3D12_GPU_VIRTUAL_ADDRESS addressStarat, 
+	UINT rootParameterIndex, UINT cbIndex, UINT strideCBByteSize, bool visibleCheck) const
+{
+	if (visibleCheck)
+	{
+		if (obj->GetMesh() == nullptr || !obj->GetIsVisible())
+			return;
+	}
+
+	D3D12_GPU_VIRTUAL_ADDRESS cbAddress = addressStarat + cbIndex * strideCBByteSize;
+	mCommandList->SetGraphicsRootConstantBufferView(rootParameterIndex, cbAddress);
+
+	obj->Render(mCommandList.Get());
+}
+
+void D3DFramework::RenderGameObjects(const std::list<std::shared_ptr<GameObject>>& gameObjects, const BoundingFrustum* frustum) const
 {
 	auto currObjectCB = mCurrentFrameResource->mObjectPool->GetBuffer();
 
 	for (const auto& obj : gameObjects)
 	{
-		if (obj->GetMesh() == nullptr || !obj->GetIsVisible())
-			continue;
-
 		if (frustum != nullptr)
 		{
 			bool isInFrustum = obj->IsInFrustum(*frustum);
@@ -844,79 +858,27 @@ void D3DFramework::RenderGameObject(ID3D12GraphicsCommandList* cmdList, const st
 				continue;
 		}
 
-		auto objCBAddressStart = currObjectCB->GetResource()->GetGPUVirtualAddress();
-		D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = objCBAddressStart + obj->GetObjectIndex() * objCBByteSize;
-		cmdList->SetGraphicsRootConstantBufferView(RP_OBJECT, objCBAddress);
-
-		obj->GetMesh()->Render(cmdList);
+		RenderObject(obj.get(), currObjectCB->GetResource()->GetGPUVirtualAddress(), RP_OBJECT, obj->GetCBIndex(), objCBByteSize);
 	}
 }
 
-void D3DFramework::RenderCollisionDebug(ID3D12GraphicsCommandList* cmdList)
+void D3DFramework::RenderWidgets() const
 {
-	// 디버그하기 위한 데이터를 업데이트한다.
-	auto debugPool = mCurrentFrameResource->mDebugPool.get();
-
-	UINT debugCBIndex = 0;
-	for (int i = 0; i < (int)DebugType::Count; ++i)
-	{
-		const std::vector<DebugConstants>& currConstants = D3DDebug::GetInstance()->GetDebugConstants(i);
-		if (currConstants.size() == 0)
-			continue;
-
-		for (const auto& constant : currConstants)
-		{
-			// 디버그 데이터를 버퍼에 업데이트한다.
-			debugPool->GetBuffer()->CopyData(debugCBIndex, constant);
-
-			auto debugCBAddressStart = debugPool->GetBuffer()->GetResource()->GetGPUVirtualAddress();
-			D3D12_GPU_VIRTUAL_ADDRESS debugCBAddress = debugCBAddressStart + debugCBIndex * debugCBByteSize;
-			mCommandList->SetGraphicsRootConstantBufferView(RP_COLLISIONDEBUG, debugCBAddress);
-
-			D3DDebug::GetInstance()->GetDebugMesh(i)->Render(mCommandList.Get());
-
-			++debugCBIndex;
-		}
-	}
-}
-
-void D3DFramework::RenderWidget(ID3D12GraphicsCommandList* cmdList)
-{
-	auto widgetPool = mCurrentFrameResource->mWidgetPool.get();
-	UINT widgetIndex = 0;
+	auto currWidgetCB = mCurrentFrameResource->mWidgetPool->GetBuffer();
 
 	for (const auto& widget : mWidgets)
 	{
-		if (!widget->GetIsVisible())
-			continue;
-
-		auto widgetAddressStart = widgetPool->GetBuffer()->GetResource()->GetGPUVirtualAddress();
-		D3D12_GPU_VIRTUAL_ADDRESS widgetCBAddress = widgetAddressStart + widgetIndex * widgetCBByteSize;
-		mCommandList->SetGraphicsRootConstantBufferView(RP_WIDGET, widgetCBAddress);
-
-		widget->GetMesh()->Render(cmdList);
-
-		++widgetIndex;
+		RenderObject(widget.get(), currWidgetCB->GetResource()->GetGPUVirtualAddress(), RP_WIDGET, widget->GetCBIndex(), widgetCBByteSize);
 	}
 }
 
-void D3DFramework::RenderParticle(ID3D12GraphicsCommandList* cmdList)
+void D3DFramework::RenderParticles() const
 {
-	auto particlePool = mCurrentFrameResource->mParticlePool.get();
-	UINT particleIndex = 0;
+	auto currParticleCB = mCurrentFrameResource->mParticlePool->GetBuffer();
 
 	for (const auto& particle : mParticles)
 	{
-		if (!particle->GetIsVisible())
-			continue;
-
-		auto particleAddressStart = particlePool->GetBuffer()->GetResource()->GetGPUVirtualAddress();
-		D3D12_GPU_VIRTUAL_ADDRESS particleCBAddress = particleAddressStart + particleIndex * particleCBByteSize;
-		mCommandList->SetGraphicsRootConstantBufferView(RP_PARTICLE, particleCBAddress);
-
-		particle->GetMesh()->Render(cmdList, 1, false);
-
-		++particleIndex;
+		RenderObject(particle.get(), currParticleCB->GetResource()->GetGPUVirtualAddress(), RP_PARTICLE, particle->GetCBIndex(), particleCBByteSize);
 	}
 }
 
@@ -939,11 +901,6 @@ GameObject* D3DFramework::Picking(int screenX, int screenY, float distance) cons
 	rayDir = XMVector3TransformNormal(rayDir, invView);
 	rayDir = XMVector3Normalize(rayDir);
 
-#if defined(DEBUG) || defined(_DEBUG)
-	XMVECTOR rayEnd = rayOrigin + rayDir * distance;
-	D3DDebug::GetInstance()->DrawLine(rayOrigin, rayEnd);
-#endif
-	
 	bool nearestHit = false;
 	float nearestDist = FLT_MAX;
 	GameObject* hitObj = nullptr;

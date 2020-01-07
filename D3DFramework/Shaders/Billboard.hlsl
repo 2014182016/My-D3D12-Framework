@@ -19,10 +19,17 @@ struct VertexOut
 struct GeoOut
 {
 	float4 mPosH      : SV_POSITION;
-	float4 mShadowPosH: POSITION0;
-	float3 mPosW      : POSITION1;
-	float3 mNormalW   : NORMAL;
+	float4 mPosW      : POSITION0;
+	float3 mNormal    : NORMAL;
 	float2 mTexC      : TEXCOORD;
+};
+
+struct PixelOut
+{
+	float4 mDiffuse  : SV_TARGET0;
+	float4 mSpecularAndRoughness : SV_TARGET1;
+	float4 mNormal   : SV_TARGET2;
+	float4 mPosition : SV_TARGET3;
 };
 
 VertexOut VS(VertexIn vin)
@@ -75,76 +82,43 @@ void GS(point VertexOut gin[1], // Primitive는 Point이므로 들어오는 정점은 하나�
 	for (int i = 0; i < 4; ++i)
 	{
 		gout.mPosH = mul(v[i], gViewProj);
-		gout.mPosW = v[i].xyz;
-		gout.mNormalW = look;
+		gout.mPosW = v[i];
+		gout.mNormal = look;
 		gout.mTexC = texC[i];
-
-		// 현재 정점을 광원의 텍스처 공간으로 변환한다.
-		gout.mShadowPosH = mul(v[i], gLights[0].mShadowTransform);
 
 		triStream.Append(gout);
 	}
 }
 
-float4 PS(GeoOut pin) : SV_Target
+PixelOut PS(GeoOut pin) : SV_Target
 {
+	PixelOut pout = (PixelOut)0.0f;
+
 	// 이 픽셀에 사용할 Material Data를 가져온다.
 	MaterialData matData = gMaterialData[gObjMaterialIndex];
 	float4 diffuseAlbedo = matData.mDiffuseAlbedo;
 	float3 specular = matData.mSpecular;
 	float roughness = matData.mRoughness;
 	uint diffuseMapIndex = matData.mDiffuseMapIndex;
-	uint normalMapIndex = matData.mNormalMapIndex;
 
 	// 텍스처 배열의 텍스처를 동적으로 조회한다.
-	diffuseAlbedo *= gTextureMaps[diffuseMapIndex].Sample(gsamAnisotropicWrap, pin.mTexC);
+	if (diffuseMapIndex != DISABLED)
+	{
+		diffuseAlbedo *= gTextureMaps[diffuseMapIndex].Sample(gsamAnisotropicWrap, pin.mTexC);
+	}
 
-#ifdef ALPHA_TEST
 	// 텍스처 알파가 0.1보다 작으면 픽셀을 폐기한다. 
 	clip(diffuseAlbedo.a - 0.1f);
-#endif
 
 	// 법선을 보간하면 단위 길이가 아니게 될 수 있으므로 다시 정규화한다.
-	pin.mNormalW = normalize(pin.mNormalW);
+	pin.mNormal = normalize(pin.mNormal);
 
-	// 조명되는 픽셀에서 눈으로의 벡터
-	float3 toEyeW = gEyePosW - pin.mPosW;
-	float distToEye = length(toEyeW);
-	toEyeW /= distToEye; // normalize
+	pout.mDiffuse = diffuseAlbedo;
+	pout.mSpecularAndRoughness = float4(specular, roughness);
+	pout.mNormal = float4(pin.mNormal, 1.0f);
+	pout.mPosition = pin.mPosW;
 
-	// Diffuse를 전반적으로 밝혀주는 Ambient항
-	float4 ambient = gAmbientLight * diffuseAlbedo;
-
-	// roughness와 normal를 이용하여 shininess를 계산한다.
-	const float shininess = 1.0f - roughness;
-
-	// 다른 물체에 가려진 정도에 따라 shadowFactor로 픽셀을 어둡게 한다.
-	float3 shadowFactor = float3(1.0f, 1.0f, 1.0f);
-	/*
-	for (int i = 0; i < LIGHT_NUM; ++i)
-	{
-		// shadowFactor[i] = CalcShadowFactor(pin.mShadowPosH, i);
-		// shadowFactor[i] *= diffuseAlbedo.a;
-		shadowFactor[i] = float3(1.0f, 1.0f, 1.0f);
-	}
-	*/
-
-	// Lighting을 실시한다.
-	Material mat = { diffuseAlbedo, specular, shininess };
-	float4 directLight = ComputeLighting(gLights, mat, pin.mPosW,
-		pin.mNormalW, toEyeW, shadowFactor);
-
-	float4 litColor = ambient + directLight;
-
-#ifdef FOG
-	// 거리에 따라 안개 색상을 선형 감쇠로 계산한다.
-	float fogAmount = saturate((distToEye - gFogStart) / gFogRange);
-	litColor = lerp(litColor, gFogColor, fogAmount);
-#endif
-
-	litColor.a = diffuseAlbedo.a;
-
-	return litColor;
+	return pout;
 }
 
 

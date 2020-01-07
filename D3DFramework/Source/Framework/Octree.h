@@ -16,7 +16,7 @@ public:
 	// Update함수는 Object의 Tick함수 이전에 불려져야 한다.
 	void Update(float deltaTime); 
 
-	void DestroyObject();
+	void DestroyObjects();
 
 public:
 	inline Octree* GetParent() const { return mParent; }

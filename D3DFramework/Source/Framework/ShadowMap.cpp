@@ -47,7 +47,8 @@ void ShadowMap::OnResize(UINT newWidth, UINT newHeight)
 	}
 }
 
-void ShadowMap::RenderSceneToShadowMap(ID3D12GraphicsCommandList* cmdList, const std::list<std::shared_ptr<GameObject>>& objects)
+void ShadowMap::RenderSceneToShadowMap(ID3D12GraphicsCommandList* cmdList, 
+	const std::list<std::shared_ptr<GameObject>>& objects, const DirectX::BoundingFrustum* frustum)
 {
 	cmdList->RSSetViewports(1, &mViewport);
 	cmdList->RSSetScissorRects(1, &mScissorRect);
@@ -64,7 +65,7 @@ void ShadowMap::RenderSceneToShadowMap(ID3D12GraphicsCommandList* cmdList, const
 	// 반드시 활성 PSO의 렌더 대상 개수도 0으로 지정해야 함을 주의하기 바란다.
 	cmdList->OMSetRenderTargets(0, nullptr, false, &mhCpuDsv);
 
-	D3DFramework::GetInstance()->RenderGameObject(cmdList, objects);
+	D3DFramework::GetInstance()->RenderGameObjects(objects, frustum);
 
 	// 텍스처를 다시 읽을 수 있도록 리소스를 GENERIC_READ로 바꾸어 준다.
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mShadowMap.Get(),

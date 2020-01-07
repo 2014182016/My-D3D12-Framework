@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "AssetManager.h"
 #include "Material.h"
-#include "MeshGeometry.h"
+#include "Mesh.h"
 #include "D3DUtil.h"
 #include "Structures.h"
 #include "Sound.h"
@@ -71,7 +71,7 @@ void AssetManager::LoadWaves(IDirectSound8* d3dSound)
 		LoadWave(d3dSound, soundInfo);
 }
 
-void AssetManager::LoadObj(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, MeshInfo modelInfo)
+void AssetManager::LoadObj(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, const MeshInfo& modelInfo)
 {
 	std::vector<XMFLOAT3> positions;
 	std::vector<XMFLOAT2> texcoords;
@@ -235,7 +235,7 @@ void AssetManager::LoadObj(ID3D12Device* device, ID3D12GraphicsCommandList* comm
 	fileName.erase(fileName.size() - 4, 4); // fileName에서 obj 포맷 string을 지운다.
 	ObjToH3d(vertices, indices, fileName); // obj파일은 h3d파일로 변환한다.
 
-	std::unique_ptr<MeshGeometry> mesh = std::make_unique<MeshGeometry>(std::move(meshName));
+	std::unique_ptr<Mesh> mesh = std::make_unique<Mesh>(std::move(meshName));
 	mesh->BuildVertices(device, commandList, (void*)vertices.data(),(UINT)vertices.size(), (UINT)sizeof(Vertex));
 	mesh->BuildIndices(device, commandList, indices.data(), (UINT)indices.size(), (UINT)sizeof(std::uint16_t));
 
@@ -245,7 +245,7 @@ void AssetManager::LoadObj(ID3D12Device* device, ID3D12GraphicsCommandList* comm
 	mMeshes[mesh->GetName()] = std::move(mesh);
 }
 
-void AssetManager::LoadH3d(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, MeshInfo modelInfo)
+void AssetManager::LoadH3d(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, const MeshInfo& modelInfo)
 {
 	std::vector<Vertex> vertices;
 	std::vector<std::uint16_t> indices;
@@ -293,7 +293,7 @@ void AssetManager::LoadH3d(ID3D12Device* device, ID3D12GraphicsCommandList* comm
 
 	fin.close();
 
-	std::unique_ptr<MeshGeometry> mesh = std::make_unique<MeshGeometry>(std::move(meshName));
+	std::unique_ptr<Mesh> mesh = std::make_unique<Mesh>(std::move(meshName));
 	mesh->BuildVertices(device, commandList, (void*)vertices.data(), (UINT)vertices.size(), (UINT)sizeof(Vertex));
 	mesh->BuildIndices(device, commandList, indices.data(), (UINT)indices.size(), (UINT)sizeof(std::uint16_t));
 
@@ -385,7 +385,7 @@ void AssetManager::CalculateTBN(const VertexBasic& v1, const VertexBasic& v2, co
 	XMStoreFloat3(&binormal, binormalVec);
 }
 
-void AssetManager::LoadWave(IDirectSound8* d3dSound, SoundInfo soundInfo)
+void AssetManager::LoadWave(IDirectSound8* d3dSound, const SoundInfo& soundInfo)
 {
 	auto[objectName, fileName, soundType] = soundInfo;
 
@@ -533,7 +533,7 @@ void AssetManager::BuildGeometry(ID3D12Device* device, ID3D12GraphicsCommandList
 		LoadObj(device, commandList, objInfo);
 }
 
-MeshGeometry* AssetManager::FindMesh(std::string&& name) const
+Mesh* AssetManager::FindMesh(std::string&& name) const
 {
 	auto iter = mMeshes.find(name);
 
@@ -611,7 +611,7 @@ Texture* AssetManager::FindCubeTexture(std::string&& name) const
 
 ID3D12Resource* AssetManager::GetTextureResource(UINT index) const
 {
-	std::string texName = mTexInfos[index].first;
+	std::string texName = mTexInfos[index].mName;
 	auto tex = mTextures.find(texName);
 
 	return tex->second->mResource.Get();
@@ -619,7 +619,7 @@ ID3D12Resource* AssetManager::GetTextureResource(UINT index) const
 
 ID3D12Resource* AssetManager::GetCubeTextureResource(UINT index) const
 {
-	std::string cubeTexName = mCubeTexInfos[index].first;
+	std::string cubeTexName = mCubeTexInfos[index].mName;
 	auto tex = mCubeTextures.find(cubeTexName);
 
 	return tex->second->mResource.Get();

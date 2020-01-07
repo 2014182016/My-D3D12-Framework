@@ -5,12 +5,30 @@
 
 #define DISABLED -1
 
-using TextureInfo = std::pair<std::string, std::wstring>;
-using MeshInfo = std::tuple<std::string, std::wstring, CollisionType>;
-using SoundInfo = std::tuple<std::string, std::string, SoundType>;
 
 class AssetManager
 {
+public:
+	struct TextureInfo
+	{
+		std::string mName;
+		std::wstring mFileName;
+	};
+
+	struct MeshInfo
+	{
+		std::string mName;
+		std::wstring mFileName;
+		CollisionType mCollisionType;
+	};
+
+	struct SoundInfo
+	{
+		std::string mName;
+		std::string mFileName;
+		SoundType mSoundType;
+	};
+
 public:
 	AssetManager();
 	AssetManager& operator=(const AssetManager& rhs) = delete;
@@ -22,7 +40,7 @@ public:
 	void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, IDirectSound8* d3dSound);
 
 	// 해당 value를 찾기 위한 함수
-	class MeshGeometry* FindMesh(std::string&& name) const;
+	class Mesh* FindMesh(std::string&& name) const;
 	class Material* FindMaterial(std::string&& name) const;
 	class Sound* FindSound(std::string&& name) const;
 	struct Texture* FindTexture(std::string&& name) const;
@@ -33,7 +51,7 @@ public:
 	ID3D12Resource* GetCubeTextureResource(UINT index) const;
 
 public:
-	inline const std::unordered_map<std::string, std::unique_ptr<class MeshGeometry>>& GetMeshes() const { return mMeshes; }
+	inline const std::unordered_map<std::string, std::unique_ptr<class Mesh>>& GetMeshes() const { return mMeshes; }
 	inline const std::unordered_map<std::string, std::unique_ptr<class Material>>& GetMaterials() const { return mMaterials; }
 	inline const std::unordered_map<std::string, std::unique_ptr<struct Texture>>& GetTextures() const { return mTextures; }
 	inline const std::unordered_map<std::string, std::unique_ptr<struct Texture>>& GetCubeTextures() const { return mCubeTextures; }
@@ -42,9 +60,9 @@ public:
 private:
 	void LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList);
 	void LoadWaves(IDirectSound8* d3dSound);
-	void LoadObj(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, MeshInfo modelInfo);
-	void LoadH3d(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, MeshInfo modelInfo);
-	void LoadWave(IDirectSound8* d3dSound, SoundInfo soundInfo);
+	void LoadObj(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, const MeshInfo& modelInfo);
+	void LoadH3d(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, const MeshInfo& modelInfo);
+	void LoadWave(IDirectSound8* d3dSound,const SoundInfo& soundInfo);
 	void ObjToH3d(const std::vector<struct Vertex>& vertices, const std::vector<std::uint16_t> indices, std::wstring fileName) const;
 	void CalculateTBN(const struct VertexBasic& v1, const struct VertexBasic& v2, const struct VertexBasic& v3,
 		DirectX::XMFLOAT3& normal, DirectX::XMFLOAT3& tangent, DirectX::XMFLOAT3& binormal);
@@ -55,7 +73,7 @@ private:
 	static inline AssetManager* instance = nullptr;
 	static inline bool isInitialized = false;
 
-	std::unordered_map<std::string, std::unique_ptr<class MeshGeometry>> mMeshes;
+	std::unordered_map<std::string, std::unique_ptr<class Mesh>> mMeshes;
 	std::unordered_map<std::string, std::unique_ptr<class Material>> mMaterials;
 	std::unordered_map<std::string, std::unique_ptr<struct Texture>> mTextures;
 	std::unordered_map<std::string, std::unique_ptr<struct Texture>> mCubeTextures;

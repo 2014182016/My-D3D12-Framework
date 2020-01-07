@@ -17,15 +17,15 @@ public:
 public:
 	virtual bool Initialize() override;
 	virtual void OnDestroy() override; 
-	virtual void CreateRtvAndDsvDescriptorHeaps() override;
 	virtual void OnResize(int screenWidth, int screenHeight) override;
 	virtual void Tick(float deltaTime) override;
 	virtual void Render() override;
 
 public:
 	void InitFramework();
-
-	void RenderGameObject(ID3D12GraphicsCommandList* cmdList, const std::list<std::shared_ptr<class GameObject>>& gameObjects, DirectX::BoundingFrustum* frustum = nullptr) const;
+	void RenderObject(class Renderable* obj, D3D12_GPU_VIRTUAL_ADDRESS addressStarat, 
+		UINT rootParameterIndex, UINT cbIndex, UINT strideCBByteSize, bool visibleCheck = true) const;
+	void RenderGameObjects(const std::list<std::shared_ptr<class GameObject>>& gameObjects, const DirectX::BoundingFrustum* frustum = nullptr) const;
 	class GameObject* Picking(int screenX, int screenY, float distance = 1000.0f) const;
 
 public:
@@ -50,19 +50,13 @@ private:
 	void UpdateWidgetBuffer(float deltaTime);
 	void UpdateParticleBuffer(float deltaTime);
 
-	void UpdateDebugCollision(ID3D12GraphicsCommandList* cmdList);
-	void UpdateDebugOctree(ID3D12GraphicsCommandList* cmdList);
-	void UpdateDebugLight(ID3D12GraphicsCommandList* cmdList);
-
-	void UpdateDebugBufferPool();
 	void UpdateObjectBufferPool();
 
-	void RenderCollisionDebug(ID3D12GraphicsCommandList* cmdList);
-	void RenderWidget(ID3D12GraphicsCommandList* cmdList);
-	void RenderParticle(ID3D12GraphicsCommandList* cmdList);
+	void RenderWidgets() const;
+	void RenderParticles() const;
 
-	void DestroyObject();
-	void DestroyParticle();
+	void DestroyGameObjects();
+	void DestroyParticles();
 
 private:
 	static inline D3DFramework* instance = nullptr;

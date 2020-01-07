@@ -21,7 +21,6 @@ public:
 		mObjectPool = std::make_unique<BufferMemoryPool<ObjectConstants>>(device, objectCount, true);
 		mLightBufferPool = std::make_unique<BufferMemoryPool<LightData>>(device, lightCount, false);
 		mMaterialBufferPool = std::make_unique<BufferMemoryPool<MaterialData>>(device, materialCount, false);
-		mDebugPool = std::make_unique<BufferMemoryPool<DebugConstants>>(device, objectCount, true);
 		mWidgetPool = std::make_unique<BufferMemoryPool<WidgetConstants>>(device, widgetCount, true);
 		mParticlePool = std::make_unique<BufferMemoryPool<ParticleConstants>>(device, particleCount, true);
 	}
@@ -44,7 +43,6 @@ public:
 	std::unique_ptr<BufferMemoryPool<ObjectConstants>> mObjectPool = nullptr;
 	std::unique_ptr<BufferMemoryPool<LightData>> mLightBufferPool = nullptr;
 	std::unique_ptr<BufferMemoryPool<MaterialData>> mMaterialBufferPool = nullptr;
-	std::unique_ptr<BufferMemoryPool<DebugConstants>> mDebugPool = nullptr;
 	std::unique_ptr<BufferMemoryPool<WidgetConstants>> mWidgetPool = nullptr;
 	std::unique_ptr<BufferMemoryPool<ParticleConstants>> mParticlePool = nullptr;
 

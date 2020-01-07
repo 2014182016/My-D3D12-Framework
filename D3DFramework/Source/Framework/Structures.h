@@ -49,15 +49,6 @@ struct WidgetConstants
 	float mPadding2;
 };
 
-struct DebugConstants
-{
-	DebugConstants() = default;
-	DebugConstants(DirectX::XMFLOAT4X4 boundingWorld, DirectX::XMFLOAT4 color)
-		: mBoundingWorld(boundingWorld), mColor(color) { }
-
-	DirectX::XMFLOAT4X4 mBoundingWorld = DirectX::Identity4x4f();
-	DirectX::XMFLOAT4 mColor;
-};
 
 struct LightData
 {
@@ -209,13 +200,6 @@ struct ParticleVertex
 	DirectX::XMFLOAT4 mColor;
 	DirectX::XMFLOAT3 mNormal;
 	DirectX::XMFLOAT2 mSize;
-};
-
-struct DebugVertex
-{
-	DebugVertex() = default;
-	DebugVertex(DirectX::XMFLOAT3 pos) : mPosition(pos) { }
-	DirectX::XMFLOAT3 mPosition;
 };
 
 struct LineVertex

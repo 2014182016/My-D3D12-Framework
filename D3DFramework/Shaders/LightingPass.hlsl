@@ -1,0 +1,82 @@
+#include "Common.hlsl"
+
+struct VertexOut
+{
+	float4 mPosH : SV_POSITION;
+	float2 mTexC : TEXCOORD;
+};
+
+float4 PS(VertexOut pin) : SV_Target
+{
+	int3 texcoord = int3(pin.mPosH.xy, 0);
+	float4 diffuseAlbedo = gDiffuseMap.Load(texcoord);
+
+	// diffuse의 alpha값이 0.1이하라면 픽셀을 버린다
+	// 리턴되는 값은 후면버퍼의 clear color값이다.
+	if(diffuseAlbedo.a < 0.1f)
+		return float4(diffuseAlbedo.rgb, 1.0f);
+
+	float4 specularAndroughness = gSpecularAndRoughnessMap.Load(texcoord);
+	float3 specular = specularAndroughness.rgb;
+	float roughness = specularAndroughness.a;
+	float3 normal = gNormalMap.Load(texcoord).rgb;
+	float depth = gDepthMap.Load(texcoord).r;
+	float4 posW = gPositonMap.Load(texcoord);
+
+	// 조명되는 픽셀에서 눈으로의 벡터
+	float3 toEyeW = gEyePosW - posW.xyz;
+	float distToEye = length(toEyeW);
+	toEyeW /= distToEye; // normalize
+
+	// Diffuse를 전반적으로 밝혀주는 Ambient항
+	float4 ambient = gAmbientLight * diffuseAlbedo;
+
+	// roughness와 normal를 이용하여 shininess를 계산한다.
+	const float shininess = 1.0f - roughness;
+	Material mat = { diffuseAlbedo, specular, shininess };
+
+	// Lighting을 실시한다.
+	float4 directLight = ComputeShadowLighting(gLights, mat, posW.xyz, normal, toEyeW);
+	float4 litColor = ambient + directLight;
+
+	// 분산 재질에서 알파를 가져온다.
+	litColor.a = diffuseAlbedo.a;
+
+
+#ifdef SKY_REFLECTION
+	// Sky Cube Map으로 환경 매핑을 사용하여 픽셀에 입힌다.
+	if (gCurrentSkyCubeMapIndex != DISABLED)
+	{
+		float3 r = reflect(-toEyeW, normal);
+		float4 reflectionColor = gCubeMaps[gCurrentSkyCubeMapIndex].Sample(gsamLinearWrap, r);
+		float3 fresnelFactor = SchlickFresnel(specular, normal, r);
+		litColor.rgb += shininess * fresnelFactor * reflectionColor.rgb;
+	}
+#endif
+
+	if (gFogEnabled)
+	{
+		float fogAmount;
+
+		switch (gFogType)
+		{
+		case FOG_LINEAR:
+			// 거리에 따라 안개 색상을 선형 감쇠로 계산한다.
+			fogAmount = saturate((distToEye - gFogStart) / gFogRange);
+			litColor = lerp(litColor, gFogColor, fogAmount);
+			break;
+		case FOG_EXPONENTIAL:
+			// 지수적으로 멀리 있을수록 안개가 더 두꺼워진다.
+			fogAmount = exp(-distToEye * gFogDensity);
+			litColor = lerp(gFogColor, litColor, fogAmount);
+			break;
+		case FOG_EXPONENTIAL2:
+			// 매우 두꺼운 안개를 나타낸다.
+			fogAmount = exp(-pow(distToEye * gFogDensity, 2));
+			litColor = lerp(gFogColor, litColor, fogAmount);
+			break;
+		}
+	}
+
+	return litColor;
+}

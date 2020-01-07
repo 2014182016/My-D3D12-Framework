@@ -2,12 +2,7 @@
 
 #include "WinApp.h"
 
-// RootParamter¿« ShaderRegister, Register Space
-using RootParameterInfo = std::pair<UINT, UINT>;
-
 #define ROOT_PARAMETER_NUM 10
-
-// Root Parameter Index
 #define RP_OBJECT 0
 #define RP_PASS 1
 #define RP_LIGHT 2
@@ -15,12 +10,23 @@ using RootParameterInfo = std::pair<UINT, UINT>;
 #define RP_TEXTURE 4
 #define RP_SHADOWMAP 5
 #define RP_CUBEMAP 6
-#define RP_WIDGET 7
-#define RP_PARTICLE 8
-#define RP_COLLISIONDEBUG 9
+#define RP_G_BUFFER 7
+#define RP_WIDGET 8
+#define RP_PARTICLE 9
+
+#define DEFERRED_BUFFER_COUNT 4
 
 class D3DApp : public WinApp
 {
+public:
+	struct RootParameterInfo
+	{
+		RootParameterInfo(UINT shaderRegister, UINT registerSpace)
+			: mShaderRegister(shaderRegister), mRegisterSpace(registerSpace) { }
+		UINT mShaderRegister;
+		UINT mRegisterSpace;
+	};
+
 public:
 	D3DApp(HINSTANCE hInstance, int screenWidth, int screenHeight, std::wstring applicationName);
 	D3DApp(const D3DApp& rhs) = delete;
@@ -41,7 +47,7 @@ public:
 	void SetGamma(float gamma);
 
 	inline DirectX::XMFLOAT4 GetBackgroundColor() const { return mBackBufferClearColor; }
-	inline void SetBackgroundColor(DirectX::XMFLOAT4 color) { mBackBufferClearColor = color; }
+	inline void SetBackgroundColor(DirectX::XMFLOAT4 color) { mBackBufferClearColor = color; mBackBufferClearColor.w = 0.0f; }
 	void SetBackgroundColor(float r, float g, float b, float a);
 
 protected:
@@ -49,6 +55,7 @@ protected:
 	void CreateCommandObjects();
 	void CreateSwapChain();
 	void CreateSoundBuffer();
+	void CreateRtvAndDsvDescriptorHeaps();
 	void CreateRootSignature(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum);
 	void CreateDescriptorHeaps(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum);
 	void CreateShadersAndInputLayout();
@@ -58,16 +65,14 @@ protected:
 
 	ID3D12Resource* GetCurrentBackBuffer() const;
 	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView() const;
-	D3D12_CPU_DESCRIPTOR_HANDLE GetMsaaBackBufferView() const;
+	D3D12_CPU_DESCRIPTOR_HANDLE GetDefferedBufferView(UINT index) const;
 	D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilView() const;
 
-	virtual void CreateRtvAndDsvDescriptorHeaps();
-
+private:
 	void LogAdapters();
 	void LogAdapterOutputs(IDXGIAdapter* adapter);
 	void LogOutputDisplayModes(IDXGIOutput* output, DXGI_FORMAT format);
 
-private:
 	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> GetStaticSamplers();
 
 protected:
@@ -85,6 +90,7 @@ protected:
 	int mCurrentBackBuffer = 0;
 	Microsoft::WRL::ComPtr<ID3D12Resource> mSwapChainBuffer[SWAP_CHAIN_BUFFER_COUNT];
 	Microsoft::WRL::ComPtr<ID3D12Resource> mDepthStencilBuffer;
+	Microsoft::WRL::ComPtr<ID3D12Resource> mDeferredBuffer[DEFERRED_BUFFER_COUNT];
 
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mRtvHeap;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mDsvHeap;
@@ -102,7 +108,6 @@ protected:
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mBillboardLayout;
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mWidgetLayout;
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mLineLayout;
-	std::vector<D3D12_INPUT_ELEMENT_DESC> mCollisionDebugLayout;
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mParticleLayout;
 
 	D3D12_VIEWPORT mScreenViewport;
@@ -111,21 +116,19 @@ protected:
 	UINT objCBByteSize = 0;
 	UINT passCBByteSize = 0;
 	UINT widgetCBByteSize = 0;
-	UINT debugCBByteSize = 0;
 	UINT particleCBByteSize = 0;
 
 	UINT mCurrentSkyCubeMapIndex = 0;
 	UINT mSkyCubeMapHeapIndex = 0;
 	UINT mShadowMapHeapIndex = 0;
+	UINT mDeferredBufferHeapIndex = 0;
+	UINT mLightingPassHeapIndex = 0;
 
 	UINT m4xMsaaQuality = 0;
 	UINT mRtvDescriptorSize = 0;
 	UINT mDsvDescriptorSize = 0;
 	UINT mCbvSrvUavDescriptorSize = 0;
 
-	D3D_DRIVER_TYPE md3dDriverType = D3D_DRIVER_TYPE_HARDWARE;
-	DXGI_FORMAT mBackBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-	DXGI_FORMAT mDepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 	DirectX::XMFLOAT4 mBackBufferClearColor = (DirectX::XMFLOAT4)DirectX::Colors::LightSteelBlue;
 
 private:
@@ -138,9 +141,21 @@ private:
 		RootParameterInfo(0,0), // Textures
 		RootParameterInfo(0,1), // ShadowMaps
 		RootParameterInfo(0,2), // CubeMaps
+		RootParameterInfo(0,4), // G-Buffer
 		RootParameterInfo(2,0), // Widget
 		RootParameterInfo(3,0), // Particle
-		RootParameterInfo(4,0), // CollisionDebug
 	};
+
+	const std::array<DXGI_FORMAT, DEFERRED_BUFFER_COUNT> mDeferredBufferFormats =
+	{
+		DXGI_FORMAT_R8G8B8A8_UNORM, // Diffuse
+		DXGI_FORMAT_R8G8B8A8_UNORM, // Specular And Roughness
+		DXGI_FORMAT_R32G32B32A32_FLOAT, // Normal
+		DXGI_FORMAT_R32G32B32A32_FLOAT, // Position
+	};
+
+	const D3D_DRIVER_TYPE md3dDriverType = D3D_DRIVER_TYPE_HARDWARE;
+	const DXGI_FORMAT mBackBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+	const DXGI_FORMAT mDepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 };
 

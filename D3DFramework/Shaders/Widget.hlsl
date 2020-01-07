@@ -40,10 +40,8 @@ float4 PS(VertexOut pin) : SV_Target
 		diffuseAlbedo *= gTextureMaps[diffuseMapIndex].Sample(gsamAnisotropicWrap, pin.mTexC);
 	}
 
-#ifdef ALPHA_TEST
 	// 텍스처 알파가 0.1보다 작으면 픽셀을 폐기한다. 
 	clip(diffuseAlbedo.a - 0.1f);
-#endif
 
 	return diffuseAlbedo;
 }
