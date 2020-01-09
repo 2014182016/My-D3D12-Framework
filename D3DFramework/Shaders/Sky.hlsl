@@ -26,6 +26,7 @@ VertexOut VS(VertexIn vin)
 	return vout;
 }
 
+[earlydepthstencil]
 float4 PS(VertexOut pin) : SV_Target
 {
 	if (gCurrentSkyCubeMapIndex == DISABLED)

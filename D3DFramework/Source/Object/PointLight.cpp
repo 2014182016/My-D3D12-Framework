@@ -4,17 +4,14 @@
 
 using namespace DirectX;
 
-PointLight::PointLight(std::string&& name) : Light(std::move(name))
+PointLight::PointLight(std::string&& name, ID3D12Device* device) : Light(std::move(name))
 {
 	mLightType = LightType::PointLight;
 }
 
 PointLight::~PointLight() { }
 
-void PointLight::SetLightData(LightData& lightData, const DirectX::BoundingSphere& sceneBounding)
+void PointLight::SetLightData(LightData& lightData)
 {
-	__super::SetLightData(lightData, sceneBounding);
-
-	lightData.mFalloffStart = mFalloffStart;
-	lightData.mFalloffEnd = mFalloffEnd;
+	__super::SetLightData(lightData);
 }

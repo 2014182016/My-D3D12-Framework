@@ -21,14 +21,14 @@ float4 SpecularMapDebugPS(VertexOut pin) : SV_Target
 	return float4(gSpecularAndRoughnessMap.Sample(gsamAnisotropicWrap, pin.mTexC).rgb, 1.0f);
 }
 
-float4 NormalMapDebugPS(VertexOut pin) : SV_Target
-{
-	return gNormalMap.Sample(gsamAnisotropicWrap, pin.mTexC);
-}
-
 float4 RoughnessMapDebugPS(VertexOut pin) : SV_Target
 {
 	return float4(gSpecularAndRoughnessMap.Sample(gsamAnisotropicWrap, pin.mTexC).aaa, 1.0f);
+}
+
+float4 NormalMapDebugPS(VertexOut pin) : SV_Target
+{
+	return gNormalMap.Sample(gsamAnisotropicWrap, pin.mTexC);
 }
 
 float4 DepthMapDebugPS(VertexOut pin) : SV_Target

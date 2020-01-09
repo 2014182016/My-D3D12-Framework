@@ -100,7 +100,7 @@ void CubeRenderTarget::BuildResource()
 		IID_PPV_ARGS(&mCubeMap)));
 }
 
-void CubeRenderTarget::RenderSceneToCubeMap(ID3D12GraphicsCommandList* cmdList, const std::list<std::shared_ptr<class GameObject>>& objects)
+void CubeRenderTarget::RenderSceneToCubeMap(ID3D12GraphicsCommandList* cmdList)
 {
 	cmdList->RSSetViewports(1, &mViewport);
 	cmdList->RSSetScissorRects(1, &mScissorRect);
@@ -118,7 +118,7 @@ void CubeRenderTarget::RenderSceneToCubeMap(ID3D12GraphicsCommandList* cmdList, 
 
 		cmdList->OMSetRenderTargets(1, &mhCpuRtv[i], true, &mhCpuDsv);
 
-		D3DFramework::GetInstance()->RenderGameObjects(objects);
+		D3DFramework::GetInstance()->RenderActualObjects(nullptr);
 	}
 
 	// 텍스처를 다시 읽을 수 있도록 리소스를 GENERIC_READ로 바꾸어 준다.

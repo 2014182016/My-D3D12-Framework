@@ -10,12 +10,6 @@ float4 PS(VertexOut pin) : SV_Target
 {
 	int3 texcoord = int3(pin.mPosH.xy, 0);
 	float4 diffuseAlbedo = gDiffuseMap.Load(texcoord);
-
-	// diffuse의 alpha값이 0.1이하라면 픽셀을 버린다
-	// 리턴되는 값은 후면버퍼의 clear color값이다.
-	if(diffuseAlbedo.a < 0.1f)
-		return float4(diffuseAlbedo.rgb, 1.0f);
-
 	float4 specularAndroughness = gSpecularAndRoughnessMap.Load(texcoord);
 	float3 specular = specularAndroughness.rgb;
 	float roughness = specularAndroughness.a;

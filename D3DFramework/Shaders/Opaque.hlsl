@@ -12,7 +12,7 @@ struct VertexIn
 struct VertexOut
 {
 	float4 mPosH      : SV_POSITION;
-	float4 mPosW      : POSITION0;
+	float3 mPosW      : POSITION0;
 	float3 mNormalW   : NORMAL;
 	float3 mTangentW  : TANGENT;
 	float3 mBinormalW : BINORMAL;
@@ -36,7 +36,7 @@ VertexOut VS(VertexIn vin)
 
 	// World Space로 변환한다.
 	float4 posW = mul(float4(vin.mPosL, 1.0f), gObjWorld);
-	vout.mPosW = posW;
+	vout.mPosW = posW.xyz;
 
 	// 동차 절단 공간으로 변환한다.
 	vout.mPosH = mul(posW, gViewProj);
@@ -53,7 +53,7 @@ VertexOut VS(VertexIn vin)
 	return vout;
 }
 
-PixelOut PS(VertexOut pin) : SV_Target
+PixelOut PS(VertexOut pin)
 {
 	PixelOut pout = (PixelOut)0.0f;
 
@@ -93,7 +93,7 @@ PixelOut PS(VertexOut pin) : SV_Target
 	pout.mDiffuse = diffuseAlbedo;
 	pout.mSpecularAndRoughness = float4(specular, roughness);
 	pout.mNormal = float4(bumpedNormalW, 1.0f);
-	pout.mPosition = pin.mPosW;
+	pout.mPosition = float4(pin.mPosW, 1.0f);
 
 	return pout;
 }

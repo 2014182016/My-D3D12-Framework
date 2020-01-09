@@ -12,7 +12,7 @@ struct VertexIn
 struct VertexOut
 {
 	float4 mPosH      : SV_POSITION;
-    float4 mPosW      : POSITION0;
+    float3 mPosW      : POSITION0;
     float3 mNormalW   : NORMAL;
 	float3 mTangentW  : TANGENT;
 	float3 mBinormalW : BINORMAL;
@@ -28,7 +28,7 @@ VertexOut VS(VertexIn vin)
 	
     // World Space로 변환한다.
     float4 posW = mul(float4(vin.mPosL, 1.0f), gObjWorld);
-    vout.mPosW = posW;
+    vout.mPosW = posW.xyz;
 
 	// 동차 절단 공간으로 변환한다.
 	vout.mPosH = mul(posW, gViewProj);

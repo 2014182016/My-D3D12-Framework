@@ -26,7 +26,7 @@ VertexOut VS(VertexIn vin)
 	float4 posW = mul(float4(vin.mPosL, 1.0f), gObjWorld);
 
 	// 동차 절단 공간으로 변환한다.
-	vout.mPosH = mul(posW, gLights[0].mViewProj);
+	vout.mPosH = mul(posW, gViewProj);
 
 	// 출력 정점 특성들은 이후 삼각형을 따라 보간된다.
 	vout.mTexC = mul(float4(vin.mTexC, 0.0f, 1.0f), matData.mMatTransform).xy;

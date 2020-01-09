@@ -71,7 +71,7 @@ void Object::SetPosition(float posX, float posY, float posZ)
 
 void Object::SetRotation(float rotX, float rotY, float rotZ)
 {
-	mPosition.x = rotX;
+	mRotation.x = rotX;
 	mRotation.y = rotY;
 	mRotation.z = rotZ;
 
@@ -164,6 +164,6 @@ void Object::WorldUpdate()
 	XMMATRIX scailing = XMMatrixScaling(mScale.x, mScale.y, mScale.z);
 
 	// S * R * T순으로 곱하여 world에 대입한다.
-	XMMATRIX world = XMMatrixMultiply(scailing, XMMatrixMultiply(rotation, translation));
+	XMMATRIX world = scailing * (rotation * translation);
 	XMStoreFloat4x4(&mWorld, world);
 }

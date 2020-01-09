@@ -15,6 +15,7 @@
 #define RP_PARTICLE 9
 
 #define DEFERRED_BUFFER_COUNT 4
+#define LIGHT_NUM 1
 
 class D3DApp : public WinApp
 {
@@ -47,7 +48,7 @@ public:
 	void SetGamma(float gamma);
 
 	inline DirectX::XMFLOAT4 GetBackgroundColor() const { return mBackBufferClearColor; }
-	inline void SetBackgroundColor(DirectX::XMFLOAT4 color) { mBackBufferClearColor = color; mBackBufferClearColor.w = 0.0f; }
+	inline void SetBackgroundColor(DirectX::XMFLOAT4 color) { mBackBufferClearColor = color; }
 	void SetBackgroundColor(float r, float g, float b, float a);
 
 protected:
@@ -55,7 +56,7 @@ protected:
 	void CreateCommandObjects();
 	void CreateSwapChain();
 	void CreateSoundBuffer();
-	void CreateRtvAndDsvDescriptorHeaps();
+	void CreateRtvAndDsvDescriptorHeaps(UINT shadowMapNum);
 	void CreateRootSignature(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum);
 	void CreateDescriptorHeaps(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum);
 	void CreateShadersAndInputLayout();
@@ -67,6 +68,7 @@ protected:
 	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView() const;
 	D3D12_CPU_DESCRIPTOR_HANDLE GetDefferedBufferView(UINT index) const;
 	D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilView() const;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GetCbvSrvUavDescriptorHandle(UINT index) const;
 
 private:
 	void LogAdapters();
@@ -157,5 +159,6 @@ private:
 	const D3D_DRIVER_TYPE md3dDriverType = D3D_DRIVER_TYPE_HARDWARE;
 	const DXGI_FORMAT mBackBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 	const DXGI_FORMAT mDepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	const DXGI_FORMAT mShadowMapFormat = DXGI_FORMAT_R24G8_TYPELESS;
 };
 

@@ -24,14 +24,15 @@ public:
 public:
 	void InitFramework();
 	void RenderObject(class Renderable* obj, D3D12_GPU_VIRTUAL_ADDRESS addressStarat, 
-		UINT rootParameterIndex, UINT cbIndex, UINT strideCBByteSize, bool visibleCheck = true) const;
-	void RenderGameObjects(const std::list<std::shared_ptr<class GameObject>>& gameObjects, const DirectX::BoundingFrustum* frustum = nullptr) const;
+		UINT rootParameterIndex, UINT strideCBByteSize, bool visibleCheck = true, DirectX::BoundingFrustum* frustum = nullptr) const;
+	void RenderObjects(const std::list<std::shared_ptr<class Renderable>>& list, D3D12_GPU_VIRTUAL_ADDRESS addressStarat,
+		UINT rootParameterIndex, UINT strideCBByteSize, bool visibleCheck = true, DirectX::BoundingFrustum* frustum = nullptr) const;
+	void RenderActualObjects(DirectX::BoundingFrustum* frustum = nullptr);
 	class GameObject* Picking(int screenX, int screenY, float distance = 1000.0f) const;
 
 public:
 	inline static D3DFramework* GetInstance() { return instance; }
 	inline class Camera* GetCamera() const { return mCamera.get(); }
-	inline std::list<std::shared_ptr<class GameObject>>& GetGameObjects(int layerIndex) { return mGameObjects.at(layerIndex); }
 
 private:
 	void CreateObjects();
@@ -52,9 +53,6 @@ private:
 
 	void UpdateObjectBufferPool();
 
-	void RenderWidgets() const;
-	void RenderParticles() const;
-
 	void DestroyGameObjects();
 	void DestroyParticles();
 
@@ -65,17 +63,17 @@ private:
 	struct FrameResource* mCurrentFrameResource = nullptr;
 	UINT mCurrentFrameResourceIndex = 0;
 
-	std::array<std::list<std::shared_ptr<class GameObject>>, (int)RenderLayer::Count> mGameObjects;
-	std::list<std::shared_ptr<class GameObject>> mActualObjects;
+	std::array<std::list<std::shared_ptr<class Renderable>>, (int)RenderLayer::Count> mRenderableObjects;
+	std::list<std::shared_ptr<class GameObject>> mGameObjects;
+	std::list<std::shared_ptr<class GameObject>> mActualObjects; // 충돌 및 그림자 맵에 사용된다.
 	std::list<std::shared_ptr<class Light>> mLights;
 	std::list<std::shared_ptr<class Widget>> mWidgets;
 	std::list<std::shared_ptr<class Particle>> mParticles;
 
-	DirectX::BoundingSphere mSceneBounds;
-	DirectX::BoundingFrustum mWorldCamFrustum;
-
 	std::unique_ptr<struct PassConstants> mMainPassCB;
-	std::unique_ptr<class ShadowMap> mShadowMap;
+	std::array<std::unique_ptr<struct PassConstants>, LIGHT_NUM> mShadowPassCB;
 	std::unique_ptr<class Camera> mCamera;
 	std::unique_ptr<class Octree> mOctreeRoot;
+
+	DirectX::BoundingFrustum mWorldCamFrustum;
 };

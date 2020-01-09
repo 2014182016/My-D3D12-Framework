@@ -27,6 +27,20 @@ public:
 	FrameResource(const FrameResource& rhs) = delete;
 	FrameResource& operator=(const FrameResource& rhs) = delete;
 	~FrameResource() { }
+
+public:
+	D3D12_GPU_VIRTUAL_ADDRESS GetPassVirtualAddress() const {
+		if (mPassPool->GetBuffer()) return mPassPool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0; }
+	D3D12_GPU_VIRTUAL_ADDRESS GetObjectVirtualAddress() const { 
+		if (mObjectPool->GetBuffer()) return mObjectPool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0; }
+	D3D12_GPU_VIRTUAL_ADDRESS GetLightVirtualAddress() const { 
+		if (mLightBufferPool->GetBuffer()) return mLightBufferPool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0; }
+	D3D12_GPU_VIRTUAL_ADDRESS GetMaterialVirtualAddress() const {
+		if (mMaterialBufferPool->GetBuffer()) return mMaterialBufferPool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0; }
+	D3D12_GPU_VIRTUAL_ADDRESS GetWidgetVirtualAddress() const { 
+		if (mWidgetPool->GetBuffer()) return mWidgetPool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0; }
+	D3D12_GPU_VIRTUAL_ADDRESS GetParticleVirtualAddress() const {
+		if (mParticlePool->GetBuffer()) return mParticlePool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0; }
  
 public:
 	// 명령 할당자는 GPU가 명령들을 다 처리한 후 재설정해야한다.

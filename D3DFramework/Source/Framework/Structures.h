@@ -52,15 +52,13 @@ struct WidgetConstants
 
 struct LightData
 {
-	DirectX::XMFLOAT4X4 mWorld = DirectX::Identity4x4f();
-	DirectX::XMFLOAT4X4 mViweProj = DirectX::Identity4x4f();
 	DirectX::XMFLOAT4X4 mShadowTransform = DirectX::Identity4x4f();
 	DirectX::XMFLOAT3 mStrength;
-	float mFalloffStart; // point/spot light only
-	DirectX::XMFLOAT3 mDirection; // directional/spot light only
-	float mFalloffEnd; // point/spot light only
-	DirectX::XMFLOAT3 mPosition; // point/spot light only
-	float mSpotPower; // spot light only
+	float mFalloffStart;
+	DirectX::XMFLOAT3 mDirection; 
+	float mFalloffEnd; 
+	DirectX::XMFLOAT3 mPosition; 
+	float mSpotAngle;
 	std::uint32_t mEnabled = false;
 	std::uint32_t mSelected = false;
 	std::uint32_t mType;
@@ -77,7 +75,7 @@ struct PassConstants
 	DirectX::XMFLOAT4X4 mInvViewProj = DirectX::Identity4x4f();
 	DirectX::XMFLOAT4X4 mIdentity = DirectX::Identity4x4f();
 	DirectX::XMFLOAT3 mEyePosW = { 0.0f, 0.0f, 0.0f };
-	std::uint32_t mCurrentSkyCubeMapIndex;
+	float mPadding1;
 	DirectX::XMFLOAT2 mRenderTargetSize = { 0.0f, 0.0f };
 	DirectX::XMFLOAT2 mInvRenderTargetSize = { 0.0f, 0.0f };
 	float mNearZ = 0.0f;
@@ -95,9 +93,9 @@ struct PassConstants
 	float mFogDensity = 0.0f; // Exponential Fog
 	std::uint32_t mFogEnabled = false;
 	std::uint32_t mFogType = (std::uint32_t)FogType::Exponential;
-	float mPadding0;
-	float mPadding1;
+	std::uint32_t mCurrentSkyCubeMapIndex;
 	float mPadding2;
+	float mPadding3;
 };
 
 struct MaterialData

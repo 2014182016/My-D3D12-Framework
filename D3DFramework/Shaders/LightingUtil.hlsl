@@ -4,9 +4,7 @@
 // Contains API for shader lighting.
 //***************************************************************************************
 
-#ifndef LIGHT_NUM
 #define LIGHT_NUM 1
-#endif
 
 #define DIRECTIONAL_LIGHT 0
 #define POINT_LIGHT 1
@@ -14,15 +12,13 @@
 
 struct Light
 {
-	float4x4 mWorld;
-	float4x4 mViewProj;
 	float4x4 mShadowTransform;
     float3 mStrength;
-    float mFalloffStart; // point/spot light only
-    float3 mDirection;   // directional/spot light only
-    float mFalloffEnd;   // point/spot light only
-    float3 mPosition;    // point light only
-    float mSpotPower;    // spot light only
+    float mFalloffStart;
+    float3 mDirection;   
+    float mFalloffEnd;   
+    float3 mPosition;    
+    float mSpotAngle;   
 	bool mEnabled;
 	bool mSelected;
 	uint mType;
@@ -121,8 +117,8 @@ float3 ComputeSpotLight(Light light, Material mat, float3 pos, float3 normal, fl
     float d = length(lightVec);
 
     // 범위 판정
-    if(d > light.mFalloffEnd)
-        return float3(0.0f, 0.0f, 0.0f);
+	if (d > light.mFalloffEnd)
+		return float3(0.0f, 0.0f, 0.0f);
 
     // 빛 벡터를 정규화한다.
     lightVec /= d;
@@ -135,17 +131,20 @@ float3 ComputeSpotLight(Light light, Material mat, float3 pos, float3 normal, fl
     float att = CalcAttenuation(d, light.mFalloffStart, light.mFalloffEnd);
     lightStrength *= att;
 
-    // 점적광 계수로 비례한다.
-    float spotFactor = pow(max(dot(-lightVec, light.mDirection), 0.0f), light.mSpotPower);
-    lightStrength *= spotFactor;
+	float minCos = cos(radians(light.mSpotAngle));
+	float maxCos = lerp(minCos, 1.0f, 0.5f);
+	float cosAngle = max(dot(-lightVec, light.mDirection), 0.0f);
+
+	// Angle에 따라 빛을 감쇠한다.
+	float spotIntensity = smoothstep(minCos, maxCos, cosAngle);
+    lightStrength *= spotIntensity;
 
     return BlinnPhong(lightStrength, lightVec, normal, toEye, mat);
 }
 
-float4 ComputeLighting(StructuredBuffer<Light> lights, Material mat,
-                       float3 pos, float3 normal, float3 toEye, float3 shadowFactor)
+float4 ComputeLighting(StructuredBuffer<Light> lights, Material mat, float3 pos, float3 normal, float3 toEye)
 {
-    float3 result = 0.0f;
+	float3 result = 0.0f;
 
 	for (uint i = 0; i < LIGHT_NUM; ++i)
 	{
@@ -155,7 +154,7 @@ float4 ComputeLighting(StructuredBuffer<Light> lights, Material mat,
 		switch (lights[i].mType)
 		{
 		case DIRECTIONAL_LIGHT:
-			result += shadowFactor[i] * ComputeDirectionalLight(lights[i], mat, normal, toEye);
+			result += ComputeDirectionalLight(lights[i], mat, normal, toEye);
 			break;
 		case POINT_LIGHT:
 			result += ComputePointLight(lights[i], mat, pos, normal, toEye);
@@ -166,5 +165,5 @@ float4 ComputeLighting(StructuredBuffer<Light> lights, Material mat,
 		}
 	}
 
-    return float4(result, 0.0f);
+	return float4(result, 0.0f);
 }

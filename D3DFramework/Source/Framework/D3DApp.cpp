@@ -56,7 +56,7 @@ void D3DApp::OnDestroy()
 	mSwapChain->SetFullscreenState(false, nullptr);
 }
 
-void D3DApp::CreateRtvAndDsvDescriptorHeaps()
+void D3DApp::CreateRtvAndDsvDescriptorHeaps(UINT shadowMapNum)
 {
 	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc;
 	rtvHeapDesc.NumDescriptors = SWAP_CHAIN_BUFFER_COUNT + DEFERRED_BUFFER_COUNT;
@@ -68,7 +68,7 @@ void D3DApp::CreateRtvAndDsvDescriptorHeaps()
 
 
 	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc;
-	dsvHeapDesc.NumDescriptors = 1 + 1;
+	dsvHeapDesc.NumDescriptors = 1 + shadowMapNum;
 	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	dsvHeapDesc.NodeMask = 0;
@@ -213,8 +213,8 @@ bool D3DApp::InitDirect3D()
 	CreateDevice();
 	CreateCommandObjects();
 	CreateSwapChain();
-	CreateRtvAndDsvDescriptorHeaps();
 	CreateSoundBuffer();
+	CreateRtvAndDsvDescriptorHeaps(LIGHT_NUM);
 	CreateShadersAndInputLayout();
 
 	// Alt-Enter를 비활성화한다.
@@ -402,9 +402,15 @@ D3D12_CPU_DESCRIPTOR_HANDLE D3DApp::GetDefferedBufferView(UINT index) const
 		mRtvDescriptorSize);
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE D3DApp::GetDepthStencilView()const
+D3D12_CPU_DESCRIPTOR_HANDLE D3DApp::GetDepthStencilView() const
 {
 	return mDsvHeap->GetCPUDescriptorHandleForHeapStart();
+}
+
+CD3DX12_GPU_DESCRIPTOR_HANDLE D3DApp::GetCbvSrvUavDescriptorHandle(UINT index) const
+{
+	return CD3DX12_GPU_DESCRIPTOR_HANDLE(mCbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart(),
+		index, mCbvSrvUavDescriptorSize);
 }
 
 void D3DApp::LogAdapters()
@@ -489,7 +495,7 @@ void D3DApp::CreateRootSignature(UINT textureNum, UINT cubeTextureNum, UINT shad
 
 	std::array<CD3DX12_ROOT_PARAMETER, ROOT_PARAMETER_NUM> slotRootParameter;
 
-	CD3DX12_DESCRIPTOR_RANGE texTable[4];
+	CD3DX12_DESCRIPTOR_RANGE texTable[5];
 	texTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, textureNum, mRootParameterInfos[RP_TEXTURE].mShaderRegister, mRootParameterInfos[RP_TEXTURE].mRegisterSpace);
 	texTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, shadowMapNum, mRootParameterInfos[RP_SHADOWMAP].mShaderRegister, mRootParameterInfos[RP_SHADOWMAP].mRegisterSpace);
 	texTable[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, cubeTextureNum, mRootParameterInfos[RP_CUBEMAP].mShaderRegister, mRootParameterInfos[RP_CUBEMAP].mRegisterSpace);
@@ -648,7 +654,6 @@ void D3DApp::CreateShadersAndInputLayout()
 	mShaders["PositionMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "PositionMapDebugPS", "ps_5_1");
 	mShaders["ShadowMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "ShadowMapDebugPS", "ps_5_1");
 
-	// mShaders["LightingPassCS"] = D3DUtil::CompileShader(L"Shaders\\LightingPass.hlsl", nullptr, "CS", "cs_5_1");
 	mShaders["LightingPassPS"] = D3DUtil::CompileShader(L"Shaders\\LightingPass.hlsl", nullptr, "PS", "ps_5_1");
 
 	mDefaultLayout =

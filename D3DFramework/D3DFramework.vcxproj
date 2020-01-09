@@ -138,7 +138,7 @@
     <ClCompile Include="Source\Framework\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="Source\Framework\ShadowMap.cpp" />
+    <ClCompile Include="Source\Framework\SimpleShadowMap.cpp" />
     <ClCompile Include="Source\Framework\WinApp.cpp" />
     <ClCompile Include="Source\Object\Billboard.cpp" />
     <ClCompile Include="Source\Object\DirectionalLight.cpp" />
@@ -175,7 +175,8 @@
     <ClInclude Include="Source\Framework\ObjectPool.hpp" />
     <ClInclude Include="Source\Framework\Octree.h" />
     <ClInclude Include="Source\Framework\pch.h" />
-    <ClInclude Include="Source\Framework\ShadowMap.h" />
+    <ClInclude Include="Source\Framework\SimpleShadowMap.h" />
+    <ClInclude Include="Source\Framework\StopWatch.h" />
     <ClInclude Include="Source\Framework\Structures.h" />
     <ClInclude Include="Source\Framework\Timer.hpp" />
     <ClInclude Include="Source\Framework\UploadBuffer.h" />

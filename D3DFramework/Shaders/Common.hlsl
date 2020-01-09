@@ -38,8 +38,6 @@ Texture2D gNormalMap : register(t2, space4);
 Texture2D gPositonMap : register(t3, space4);
 Texture2D gDepthMap : register(t4, space4);
 
-RWTexture2D<float4> gRenderTarget : register(u0, space5);
-
 SamplerState gsamPointWrap        : register(s0);
 SamplerState gsamPointClamp       : register(s1);
 SamplerState gsamLinearWrap       : register(s2);
@@ -67,10 +65,10 @@ cbuffer cbPass : register(b1)
     float4x4 gInvViewProj;
 	float4x4 gIdentity;
     float3 gEyePosW;
-	uint gCurrentSkyCubeMapIndex;
+	float gPadding1;
     float2 gRenderTargetSize;
     float2 gInvRenderTargetSize;
-    float gNearZ;
+    float gNearZ; 
     float gFarZ;
     float gTotalTime;
     float gDeltaTime;
@@ -81,9 +79,9 @@ cbuffer cbPass : register(b1)
 	float gFogDensity;
 	bool gFogEnabled;
 	uint gFogType;
-	float gPadding0;
-	float gPadding1;
+	uint gCurrentSkyCubeMapIndex;
 	float gPadding2;
+	float gPadding3;
 };
 
 cbuffer cbWidget : register(b2)
@@ -196,13 +194,13 @@ float4 ComputeShadowLighting(StructuredBuffer<Light> lights, Material mat, float
 		switch (lights[i].mType)
 		{
 		case DIRECTIONAL_LIGHT:
-			result += shadowFactor[i] * ComputeDirectionalLight(lights[i], mat, normal, toEye);
+			result += shadowFactor * ComputeDirectionalLight(lights[i], mat, normal, toEye);
 			break;
 		case POINT_LIGHT:
-			result += shadowFactor[i] * ComputePointLight(lights[i], mat, pos, normal, toEye);
+			result += ComputePointLight(lights[i], mat, pos, normal, toEye);
 			break;
 		case SPOT_LIGHT:
-			result += shadowFactor[i] * ComputeSpotLight(lights[i], mat, pos, normal, toEye);
+			result += shadowFactor * ComputeSpotLight(lights[i], mat, pos, normal, toEye);
 			break;
 		}
 	}

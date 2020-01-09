@@ -141,7 +141,7 @@ std::optional<XMMATRIX> GameObject::GetBoundingWorld() const
 	return {};
 }
 
-bool GameObject::IsInFrustum(const DirectX::BoundingFrustum& camFrustum) const
+bool GameObject::IsInFrustum(DirectX::BoundingFrustum* camFrustum) const
 {
 	if (mMesh)
 	{
@@ -150,21 +150,21 @@ bool GameObject::IsInFrustum(const DirectX::BoundingFrustum& camFrustum) const
 		case CollisionType::AABB:
 		{
 			const BoundingBox& aabb = std::any_cast<BoundingBox>(mCollisionBounding);
-			if (camFrustum.Contains(aabb) != DirectX::DISJOINT)
+			if ((*camFrustum).Contains(aabb) != DirectX::DISJOINT)
 				return true;
 			break;
 		}
 		case CollisionType::OBB:
 		{
 			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(mCollisionBounding);
-			if (camFrustum.Contains(obb) != DirectX::DISJOINT)
+			if ((*camFrustum).Contains(obb) != DirectX::DISJOINT)
 				return true;
 			break;
 		}
 		case CollisionType::Sphere:
 		{
 			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(mCollisionBounding);
-			if (camFrustum.Contains(sphere) != DirectX::DISJOINT)
+			if ((*camFrustum).Contains(sphere) != DirectX::DISJOINT)
 				return true;
 			break;
 		}
@@ -172,7 +172,7 @@ bool GameObject::IsInFrustum(const DirectX::BoundingFrustum& camFrustum) const
 		{
 			XMFLOAT3 pos = GetPosition();
 			XMVECTOR vecPos = XMLoadFloat3(&pos);
-			if(camFrustum.Contains(vecPos) != DirectX::DISJOINT)
+			if((*camFrustum).Contains(vecPos) != DirectX::DISJOINT)
 				return true;
 		}
 		default:

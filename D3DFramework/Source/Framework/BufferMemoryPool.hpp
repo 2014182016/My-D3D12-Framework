@@ -16,7 +16,6 @@ public:
 
 public:
 	inline UINT GetBufferCount() const { return mBufferCount; }
-
 	inline UploadBuffer<T>* GetBuffer() const { return mBuffer.get(); }
 
 private:

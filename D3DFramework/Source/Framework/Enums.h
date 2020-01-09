@@ -53,8 +53,10 @@ enum class RenderLayer : int
 	Opaque = 0,
 	AlphaTested,
 	Billborad,
-	Sky,
 	Transparent,
+	Particle,
+	Widget,
+	Sky,
 	Count,
 };
 

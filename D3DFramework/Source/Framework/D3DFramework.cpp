@@ -9,7 +9,7 @@
 #include "Camera.h"
 #include "InputManager.h"
 #include "Octree.h"
-#include "ShadowMap.h"
+#include "Interfaces.h"
 
 #include "GameObject.h"
 #include "Material.h"
@@ -33,15 +33,14 @@ D3DFramework::D3DFramework(HINSTANCE hInstance, int screenWidth, int screenHeigh
 	instance = this;
 
 	mMainPassCB = std::make_unique<PassConstants>();
+	for (UINT i = 0; i < LIGHT_NUM; ++i)
+		mShadowPassCB[i] = std::make_unique<PassConstants>();
+
 	mCamera = std::make_unique<Camera>();
-	mShadowMap = std::make_unique<ShadowMap>(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
 
 	BoundingBox octreeAABB = BoundingBox(XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(100.0f, 100.0f, 100.0f));
 	mOctreeRoot = std::make_unique<Octree>(octreeAABB);
 	mOctreeRoot->BuildTree();
-
-	mSceneBounds.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
-	mSceneBounds.Radius = sqrtf(10.0f*10.0f + 15.0f*15.0f);
 }
 
 D3DFramework::~D3DFramework() { }
@@ -66,7 +65,7 @@ void D3DFramework::OnResize(int screenWidth, int screenHeight)
 {
 	__super::OnResize(screenWidth, screenHeight);
 
-	mCamera->SetLens(0.25f*DirectX::XM_PI, GetAspectRatio(), 1.0f, 1000.0f);
+	mCamera->SetLens(60.0f, GetAspectRatio(), 1.0f, 1000.0f);
 
 	for (auto& widget : mWidgets)
 		widget->UpdateNumFrames();
@@ -80,9 +79,7 @@ void D3DFramework::InitFramework()
 	mCamera->SetListener(mListener.Get());
 	mCamera->SetPosition(0.0f, 2.0f, -15.0f);
 
-	mShadowMap->Initialize(md3dDevice.Get());
 	AssetManager::GetInstance()->Initialize(md3dDevice.Get(), mCommandList.Get(), md3dSound.Get());
-	SetBackgroundColor(XMFLOAT4(Colors::LightSkyBlue));
 
 	CreateObjects();
 	CreateLights();
@@ -92,7 +89,7 @@ void D3DFramework::InitFramework()
 
 	UINT textureNum = (UINT)AssetManager::GetInstance()->GetTextures().size();
 	UINT cubeTextureNum = (UINT)AssetManager::GetInstance()->GetCubeTextures().size();
-	UINT shadowMapNum = (UINT)mLights.size();
+	UINT shadowMapNum = (UINT)LIGHT_NUM;
 
 	CreateRootSignature(textureNum, cubeTextureNum, shadowMapNum);
 	CreateDescriptorHeaps(textureNum, cubeTextureNum, shadowMapNum);
@@ -107,11 +104,8 @@ void D3DFramework::InitFramework()
 	// 초기화가 끝날 때까지 기다린다.
 	FlushCommandQueue();
 
-	for (const auto& list : mGameObjects)
-	{
-		for (const auto& obj : list)
-			obj->BeginPlay();
-	}
+	for (const auto& obj : mGameObjects)
+		obj->BeginPlay();
 }
 
 void D3DFramework::CreateShadowMapResource(UINT textureNum, UINT cubeTextureNum)
@@ -121,10 +115,16 @@ void D3DFramework::CreateShadowMapResource(UINT textureNum, UINT cubeTextureNum)
 	auto srvGpuStart = mCbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
 	auto dsvCpuStart = mDsvHeap->GetCPUDescriptorHandleForHeapStart();
 	mShadowMapHeapIndex = textureNum + cubeTextureNum + DEFERRED_BUFFER_COUNT + 1;
-	mShadowMap->BuildDescriptors(
-		CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, mShadowMapHeapIndex, mCbvSrvUavDescriptorSize),
-		CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, mShadowMapHeapIndex, mCbvSrvUavDescriptorSize),
-		CD3DX12_CPU_DESCRIPTOR_HANDLE(dsvCpuStart, 1, mDsvDescriptorSize));
+
+	UINT i = 0;
+	for (const auto& light : mLights)
+	{
+		light->GetShadowMap()->BuildDescriptors(md3dDevice.Get(),
+			CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, mShadowMapHeapIndex + i, mCbvSrvUavDescriptorSize),
+			CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, mShadowMapHeapIndex + i, mCbvSrvUavDescriptorSize),
+			CD3DX12_CPU_DESCRIPTOR_HANDLE(dsvCpuStart, 1 + i, mDsvDescriptorSize));
+		++i;
+	}
 }
 
 void D3DFramework::Render()
@@ -144,35 +144,24 @@ void D3DFramework::Render()
 
 	mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
 
-	// 이 장면에 사용되는 Pass 상수 버퍼를 묶는다.
-	auto passCB = mCurrentFrameResource->mPassPool->GetBuffer()->GetResource();
-	mCommandList->SetGraphicsRootConstantBufferView(RP_PASS, passCB->GetGPUVirtualAddress());
-
 	// 구조적 버퍼는 힙을 생략하고 그냥 하나의 루트 서술자로 묶을 수 있다.
-	auto lightBuffer = mCurrentFrameResource->mLightBufferPool->GetBuffer()->GetResource();
-	mCommandList->SetGraphicsRootShaderResourceView(RP_LIGHT, lightBuffer->GetGPUVirtualAddress());
-
-	auto matBuffer = mCurrentFrameResource->mMaterialBufferPool->GetBuffer()->GetResource();
-	mCommandList->SetGraphicsRootShaderResourceView(RP_MATERIAL, matBuffer->GetGPUVirtualAddress());
+	mCommandList->SetGraphicsRootShaderResourceView(RP_LIGHT, mCurrentFrameResource->GetLightVirtualAddress());
+	mCommandList->SetGraphicsRootShaderResourceView(RP_MATERIAL, mCurrentFrameResource->GetMaterialVirtualAddress());
 
 	// 이 장면에 사용되는 모든 텍스처를 묶는다. 테이블의 첫 서술자만 묶으면
 	// 테이블에 몇 개의 서술자가 있는지는 Root Signature에 설정되어 있다.
 	mCommandList->SetGraphicsRootDescriptorTable(RP_TEXTURE, mCbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
 	// 큐브 맵을 파이프라인에 바인딩한다.
-	CD3DX12_GPU_DESCRIPTOR_HANDLE skyTexDescriptor(mCbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-	skyTexDescriptor.Offset(mSkyCubeMapHeapIndex, mCbvSrvUavDescriptorSize);
-	mCommandList->SetGraphicsRootDescriptorTable(RP_CUBEMAP, skyTexDescriptor);
+	mCommandList->SetGraphicsRootDescriptorTable(RP_CUBEMAP, GetCbvSrvUavDescriptorHandle(mSkyCubeMapHeapIndex));
 
 	// G-Buffer에 사용될 렌더 타겟들을 파이프라인에 바인딩한다.
-	CD3DX12_GPU_DESCRIPTOR_HANDLE defferedBufferDescriptor(mCbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-	defferedBufferDescriptor.Offset(mDeferredBufferHeapIndex, mCbvSrvUavDescriptorSize);
-	mCommandList->SetGraphicsRootDescriptorTable(RP_G_BUFFER, defferedBufferDescriptor);
+	mCommandList->SetGraphicsRootDescriptorTable(RP_G_BUFFER, GetCbvSrvUavDescriptorHandle(mDeferredBufferHeapIndex));
 
 	// 그림자 맵을 파이프라인에 바인딩한다.
-	CD3DX12_GPU_DESCRIPTOR_HANDLE shadowMapDescriptor(mCbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-	shadowMapDescriptor.Offset(mShadowMapHeapIndex, mCbvSrvUavDescriptorSize);
-	mCommandList->SetGraphicsRootDescriptorTable(RP_SHADOWMAP, shadowMapDescriptor);
+	mCommandList->SetGraphicsRootDescriptorTable(RP_SHADOWMAP, GetCbvSrvUavDescriptorHandle(mShadowMapHeapIndex));
+
+	// Wireframe Pass ---------------------------------------------------------
 
 	if (GetOptionEnabled(Option::Wireframe))
 	{
@@ -189,7 +178,7 @@ void D3DFramework::Render()
 		mCommandList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
 
 		mCommandList->SetPipelineState(mPSOs["Forward"].Get());
-		RenderGameObjects(mActualObjects, &mWorldCamFrustum);
+		RenderActualObjects(&mWorldCamFrustum);
 
 		// 와이어프레임으로 그려지는 것은 Deferred Rendering 및 라이팅이 필요없으므로 건너뛴다.
 		goto RenderingPassSkip;
@@ -199,12 +188,22 @@ void D3DFramework::Render()
 
 	{
 		mCommandList->SetPipelineState(mPSOs["ShadowMap"].Get());
-		mShadowMap->RenderSceneToShadowMap(mCommandList.Get(), mActualObjects);
+		UINT i = 0;
+		for (const auto& light : mLights)
+		{
+			D3D12_GPU_VIRTUAL_ADDRESS shadowPassCBAddress = mCurrentFrameResource->GetPassVirtualAddress() + (1 + i++) * passCBByteSize;
+			mCommandList->SetGraphicsRootConstantBufferView(RP_PASS, shadowPassCBAddress);
+
+			light->GetShadowMap()->RenderSceneToShadowMap(mCommandList.Get());
+		}
 	}
 
 	// G-Buffer Pass ---------------------------------------------------------
 	
 	{
+		// 이 장면에 사용되는 Pass 상수 버퍼를 묶는다.
+		mCommandList->SetGraphicsRootConstantBufferView(RP_PASS, mCurrentFrameResource->GetPassVirtualAddress());
+
 		// 각 G-Buffer의 버퍼들과 깊이 버퍼를 사용하기 위해 자원 상태를를 전환한다.
 		CD3DX12_RESOURCE_BARRIER defferedBufferTransition[DEFERRED_BUFFER_COUNT];
 		for (int i = 0; i < DEFERRED_BUFFER_COUNT; i++)
@@ -224,13 +223,13 @@ void D3DFramework::Render()
 		mCommandList->OMSetRenderTargets(DEFERRED_BUFFER_COUNT, &GetDefferedBufferView(0), true, &GetDepthStencilView());
 
 		mCommandList->SetPipelineState(mPSOs["Opaque"].Get());
-		RenderGameObjects(mGameObjects[(int)RenderLayer::Opaque], &mWorldCamFrustum);
+		RenderObjects(mRenderableObjects[(int)RenderLayer::Opaque], mCurrentFrameResource->GetObjectVirtualAddress(), RP_OBJECT, objCBByteSize, true, &mWorldCamFrustum);
 
 		mCommandList->SetPipelineState(mPSOs["AlphaTested"].Get());
-		RenderGameObjects(mGameObjects[(int)RenderLayer::AlphaTested], &mWorldCamFrustum);
+		RenderObjects(mRenderableObjects[(int)RenderLayer::AlphaTested], mCurrentFrameResource->GetObjectVirtualAddress(), RP_OBJECT, objCBByteSize, true, &mWorldCamFrustum);
 
 		mCommandList->SetPipelineState(mPSOs["Billborad"].Get());
-		RenderGameObjects(mGameObjects[(int)RenderLayer::Billborad], &mWorldCamFrustum);
+		RenderObjects(mRenderableObjects[(int)RenderLayer::Billborad], mCurrentFrameResource->GetObjectVirtualAddress(), RP_OBJECT, objCBByteSize, true, &mWorldCamFrustum);
 
 		// 각 G-Buffer의 버퍼들과 깊이 버퍼를 읽기 위해 자원 상태를를 전환한다.
 		for (int i = 0; i < DEFERRED_BUFFER_COUNT; i++)
@@ -253,9 +252,7 @@ void D3DFramework::Render()
 
 		mCommandList->SetPipelineState(mPSOs["LightingPass"].Get());
 		auto iter = mWidgets.begin();
-		std::advance(iter, 6);
-		auto currWidgetCB = mCurrentFrameResource->mWidgetPool->GetBuffer();
-		RenderObject((*iter).get(), currWidgetCB->GetResource()->GetGPUVirtualAddress(), RP_WIDGET, (*iter)->GetCBIndex(), widgetCBByteSize, false);
+		RenderObject((*iter).get(), mCurrentFrameResource->GetWidgetVirtualAddress(), RP_WIDGET, widgetCBByteSize, false);
 	}
 
 	// Forward Pass ---------------------------------------------------------
@@ -265,16 +262,16 @@ void D3DFramework::Render()
 			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
 
 		mCommandList->SetPipelineState(mPSOs["Particle"].Get());
-		RenderParticles();
+		RenderObjects(mRenderableObjects[(int)RenderLayer::Particle], mCurrentFrameResource->GetParticleVirtualAddress(), RP_PARTICLE, particleCBByteSize, true, &mWorldCamFrustum);
 
 		mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
 			D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_DEPTH_READ));
 
 		mCommandList->SetPipelineState(mPSOs["Sky"].Get());
-		RenderGameObjects(mGameObjects[(int)RenderLayer::Sky]);
+		RenderObjects(mRenderableObjects[(int)RenderLayer::Sky], mCurrentFrameResource->GetObjectVirtualAddress(), RP_OBJECT, objCBByteSize);
 
 		mCommandList->SetPipelineState(mPSOs["Transparent"].Get());
-		RenderGameObjects(mGameObjects[(int)RenderLayer::Transparent], &mWorldCamFrustum);
+		RenderObjects(mRenderableObjects[(int)RenderLayer::Transparent], mCurrentFrameResource->GetObjectVirtualAddress(), RP_OBJECT, objCBByteSize, true, &mWorldCamFrustum);
 	}
 
 RenderingPassSkip:
@@ -283,37 +280,37 @@ RenderingPassSkip:
 
 	{
 		mCommandList->SetPipelineState(mPSOs["Widget"].Get());
-		RenderWidgets();
+		RenderObjects(mRenderableObjects[(int)RenderLayer::Widget], mCurrentFrameResource->GetWidgetVirtualAddress(), RP_WIDGET, widgetCBByteSize);
 
 #if defined(DEBUG) || defined(_DEBUG)
 		if (GetOptionEnabled(Option::Debug_GBuffer))
 		{
-			// 위젯의 0~4번째까지는 G-Buffer를 그리는 위젯이다.
+			// 위젯의 1~5번째까지는 G-Buffer를 그리는 위젯이다.
 			auto iter = mWidgets.begin();
-			auto currWidgetCB = mCurrentFrameResource->mWidgetPool->GetBuffer();
+			++iter;
 
 			mCommandList->SetPipelineState(mPSOs["DiffuseMapDebug"].Get());
-			RenderObject((*iter).get(), currWidgetCB->GetResource()->GetGPUVirtualAddress(), RP_WIDGET, (*iter)->GetCBIndex(), widgetCBByteSize, false);
+			RenderObject((*iter).get(), mCurrentFrameResource->GetWidgetVirtualAddress(), RP_WIDGET, widgetCBByteSize, false);
 			++iter;
 
 			mCommandList->SetPipelineState(mPSOs["SpecularMapDebug"].Get());
-			RenderObject((*iter).get(), currWidgetCB->GetResource()->GetGPUVirtualAddress(), RP_WIDGET, (*iter)->GetCBIndex(), widgetCBByteSize, false);
+			RenderObject((*iter).get(), mCurrentFrameResource->GetWidgetVirtualAddress(), RP_WIDGET, widgetCBByteSize, false);
 			++iter;
 
 			mCommandList->SetPipelineState(mPSOs["RoughnessMapDebug"].Get());
-			RenderObject((*iter).get(), currWidgetCB->GetResource()->GetGPUVirtualAddress(), RP_WIDGET, (*iter)->GetCBIndex(), widgetCBByteSize, false);
+			RenderObject((*iter).get(), mCurrentFrameResource->GetWidgetVirtualAddress(), RP_WIDGET, widgetCBByteSize, false);
 			++iter;
 
 			mCommandList->SetPipelineState(mPSOs["NormalMapDebug"].Get());
-			RenderObject((*iter).get(), currWidgetCB->GetResource()->GetGPUVirtualAddress(), RP_WIDGET, (*iter)->GetCBIndex(), widgetCBByteSize, false);
+			RenderObject((*iter).get(), mCurrentFrameResource->GetWidgetVirtualAddress(), RP_WIDGET, widgetCBByteSize, false);
 			++iter;
 
 			mCommandList->SetPipelineState(mPSOs["DepthMapDebug"].Get());
-			RenderObject((*iter).get(), currWidgetCB->GetResource()->GetGPUVirtualAddress(), RP_WIDGET, (*iter)->GetCBIndex(), widgetCBByteSize, false);
+			RenderObject((*iter).get(), mCurrentFrameResource->GetWidgetVirtualAddress(), RP_WIDGET, widgetCBByteSize, false);
 			++iter;
 
 			mCommandList->SetPipelineState(mPSOs["ShadowMapDebug"].Get());
-			RenderObject((*iter).get(), currWidgetCB->GetResource()->GetGPUVirtualAddress(), RP_WIDGET, (*iter)->GetCBIndex(), widgetCBByteSize, false);
+			RenderObject((*iter).get(), mCurrentFrameResource->GetWidgetVirtualAddress(), RP_WIDGET, widgetCBByteSize, false);
 		}
 #endif
 	}
@@ -371,7 +368,8 @@ void D3DFramework::Tick(float deltaTime)
 
 void D3DFramework::AddGameObject(std::shared_ptr<GameObject> object, RenderLayer renderLayer)
 {
-	mGameObjects[(int)renderLayer].push_back(object);
+	mGameObjects.push_back(object);
+	mRenderableObjects[(int)renderLayer].push_back(object);
 
 	if (renderLayer == RenderLayer::Opaque || renderLayer == RenderLayer::Transparent || renderLayer == RenderLayer::AlphaTested)
 	{
@@ -390,11 +388,8 @@ void D3DFramework::AddGameObject(std::shared_ptr<GameObject> object, RenderLayer
 
 void D3DFramework::DestroyGameObjects()
 {
-	for (auto& list : mGameObjects)
-	{
-		list.remove_if([](const std::shared_ptr<Object>& obj)->bool
-		{ return obj->GetIsDestroyesd(); });
-	}
+	mGameObjects.remove_if([](const std::shared_ptr<Object>& obj)->bool
+	{ return obj->GetIsDestroyesd(); });
 
 	mActualObjects.remove_if([](const std::shared_ptr<Object>& obj)->bool
 	{ return obj->GetIsDestroyesd(); });
@@ -427,33 +422,40 @@ void D3DFramework::UpdateObjectBuffer(float deltaTime)
 	auto currObjectCB = mCurrentFrameResource->mObjectPool->GetBuffer();
 	UINT objectIndex = 0;
 
-	for(auto& list : mGameObjects)
-		for (auto& obj : list)
+	for (auto& obj : mGameObjects)
+	{
+		obj->Tick(deltaTime);
+
+		if (objectIndex != obj->GetCBIndex())
 		{
-			obj->Tick(deltaTime);
-
-			if (objectIndex != obj->GetCBIndex())
-			{
-				obj->SetCBIndex(objectIndex);
-				obj->UpdateNumFrames();
-			}
-
-			if (obj->IsUpdate())
-			{
-				// 오브젝트의 상수 버퍼를 업데이트한다.
-				ObjectConstants objConstants;
-				XMStoreFloat4x4(&objConstants.mWorld, XMMatrixTranspose(obj->GetWorld()));
-				objConstants.mMaterialIndex = obj->GetMaterial()->GetMaterialIndex();
-
-				currObjectCB->CopyData(objectIndex, objConstants);
-			}
-			++objectIndex;
+			obj->SetCBIndex(objectIndex);
+			obj->UpdateNumFrames();
 		}
+
+		if (obj->IsUpdate())
+		{
+			// 오브젝트의 상수 버퍼를 업데이트한다.
+			ObjectConstants objConstants;
+			XMStoreFloat4x4(&objConstants.mWorld, XMMatrixTranspose(obj->GetWorld()));
+			objConstants.mMaterialIndex = obj->GetMaterial()->GetMaterialIndex();
+
+			currObjectCB->CopyData(objectIndex, objConstants);
+		}
+		++objectIndex;
+	}
 }
 
 void D3DFramework::UpdateLightBuffer(float deltaTime)
 {
+	// NDC 공간 [-1, 1]^2을 텍스처 공간 [0, 1]^2으로 변환하는 행렬
+	static XMMATRIX toTextureTransform(
+		0.5f, 0.0f, 0.0f, 0.0f,
+		0.0f, -0.5f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.5f, 0.5f, 0.0f, 1.0f);
+
 	auto currLightBuffer = mCurrentFrameResource->mLightBufferPool->GetBuffer();
+	auto passCB = mCurrentFrameResource->mPassPool->GetBuffer();
 	UINT i = 0;
 	for (const auto& light : mLights)
 	{
@@ -461,9 +463,38 @@ void D3DFramework::UpdateLightBuffer(float deltaTime)
 		if (light->IsUpdate())
 		{
 			LightData lightData;
-			light->SetLightData(lightData, mSceneBounds);
+			light->SetLightData(lightData);
+
+			XMMATRIX view = light->GetView();
+			XMMATRIX proj = light->GetProj();
+			XMMATRIX shadowTransform = view * proj * toTextureTransform;
+			XMStoreFloat4x4(&lightData.mShadowTransform, XMMatrixTranspose(shadowTransform));
+
+			XMMATRIX invLightView = XMMatrixInverse(&XMMatrixDeterminant(view), view);
+			BoundingFrustum lightFrustum;
+			DirectX::BoundingFrustum::CreateFromMatrix(lightFrustum, proj);
+			lightFrustum.Transform(lightFrustum, invLightView);
+			light->GetShadowMap()->SetFrustum(lightFrustum);
+
+			XMMATRIX viewProj = XMMatrixMultiply(view, proj);
+			XMMATRIX invView = XMMatrixInverse(&XMMatrixDeterminant(view), view);
+			XMMATRIX invProj = XMMatrixInverse(&XMMatrixDeterminant(proj), proj);
+			XMMATRIX invViewProj = XMMatrixInverse(&XMMatrixDeterminant(viewProj), viewProj);
+
+			XMStoreFloat4x4(&mShadowPassCB[i]->mView, XMMatrixTranspose(view));
+			XMStoreFloat4x4(&mShadowPassCB[i]->mInvView, XMMatrixTranspose(invView));
+			XMStoreFloat4x4(&mShadowPassCB[i]->mProj, XMMatrixTranspose(proj));
+			XMStoreFloat4x4(&mShadowPassCB[i]->mInvProj, XMMatrixTranspose(invProj));
+			XMStoreFloat4x4(&mShadowPassCB[i]->mViewProj, XMMatrixTranspose(viewProj));
+			XMStoreFloat4x4(&mShadowPassCB[i]->mInvViewProj, XMMatrixTranspose(invViewProj));
+			mShadowPassCB[i]->mEyePosW = light->GetPosition();
+			mShadowPassCB[i]->mRenderTargetSize = XMFLOAT2((float)SHADOW_MAP_SIZE, (float)SHADOW_MAP_SIZE);
+			mShadowPassCB[i]->mInvRenderTargetSize = XMFLOAT2(1.0f / SHADOW_MAP_SIZE, 1.0f / SHADOW_MAP_SIZE);
+			mShadowPassCB[i]->mNearZ = 0.5f;
+			mShadowPassCB[i]->mFarZ = light->GetFalloffEnd();
 
 			currLightBuffer->CopyData(i, lightData);
+			passCB->CopyData(1 + i, *mShadowPassCB[i]);
 
 			light->DecreaseNumFrames();
 		}
@@ -638,10 +669,7 @@ void D3DFramework::UpdateParticleBuffer(float deltaTime)
 
 void D3DFramework::UpdateObjectBufferPool()
 {
-	UINT allObjectCount = 0;
-
-	for (const auto& list : mGameObjects)
-		allObjectCount += (UINT)list.size();
+	UINT allObjectCount = (UINT)mGameObjects.size();
 
 	if (mCurrentFrameResource)
 	{
@@ -670,6 +698,7 @@ void D3DFramework::CreateObjects()
 	object->SetRenderLayer(RenderLayer::Opaque);
 	object->SetCollisionEnabled(true);
 	AddGameObject(object, object->GetRenderLayer());
+
 
 	for (int i = 0; i < 5; ++i)
 	{
@@ -709,20 +738,37 @@ void D3DFramework::CreateObjects()
 
 void D3DFramework::CreateLights()
 {
-	std::shared_ptr<DirectionalLight> dirLight;
-	std::shared_ptr<PointLight> pointLight;
-	std::shared_ptr<SpotLight> spotLight;
+	std::shared_ptr<Light> light;
 
-	dirLight = std::make_shared<DirectionalLight>("DirectionalLight0"s);
-	dirLight->SetPosition(10.0f, 10.0f, -10.0f);
-	dirLight->SetStrength(0.8f, 0.8f, 0.8f);
-	dirLight->Rotate(45.0f, -45.0f, 0.0f);
-	mLights.push_back(std::move(dirLight));
+	light = std::make_shared<DirectionalLight>("DirectionalLight"s, md3dDevice.Get());
+	light->SetPosition(10.0f, 10.0f, -10.0f);
+	light->SetStrength(0.8f, 0.8f, 0.8f);
+	light->Rotate(45.0f, -45.0f, 0.0f);
+	light->SetFalloffStart(10.0f);
+	light->SetFalloffEnd(50.0f);
+	light->SetShadowMapSize(50.0f, 50.0f);
+	light->SetSpotAngle(45.0f);
+	mLights.push_back(std::move(light));
+
+	if ((UINT)mLights.size() != LIGHT_NUM)
+	{
+#if defined(DEBUG) || defined(_DEBUG)
+		std::cout << "Max Light Num Difference Error" << std::endl;
+#endif
+	}
 }
 
 void D3DFramework::CreateWidgets()
 {
 	std::shared_ptr<Widget> widget;
+
+	widget = std::make_shared<Widget>("RenderTarget"s, md3dDevice.Get(), mCommandList.Get());
+	widget->SetSize(mScreenWidth, mScreenHeight);
+	widget->SetAnchor(0.0f, 0.0f);
+	widget->SetMaterial(AssetManager::GetInstance()->FindMaterial("Default"s));
+	widget->SetVisible(false);
+	mRenderableObjects[(int)RenderLayer::Widget].push_back(widget);
+	mWidgets.push_back(std::move(widget));
 
 	widget = std::make_shared<Widget>("DiffuseMapDebug"s, md3dDevice.Get(), mCommandList.Get());
 	widget->SetPosition(0, -120);
@@ -730,6 +776,8 @@ void D3DFramework::CreateWidgets()
 	widget->SetAnchor(0.0f, 1.0f);
 	widget->SetMaterial(AssetManager::GetInstance()->FindMaterial("Default"s));
 	widget->SetVisible(false);
+	widget->SetRenderLayer(RenderLayer::Widget);
+	mRenderableObjects[(int)RenderLayer::Widget].push_back(widget);
 	mWidgets.push_back(std::move(widget));
 
 	widget = std::make_shared<Widget>("SpecularMapDebug"s, md3dDevice.Get(), mCommandList.Get());
@@ -738,6 +786,7 @@ void D3DFramework::CreateWidgets()
 	widget->SetAnchor(0.0f, 1.0f);
 	widget->SetMaterial(AssetManager::GetInstance()->FindMaterial("Default"s));
 	widget->SetVisible(false);
+	mRenderableObjects[(int)RenderLayer::Widget].push_back(widget);
 	mWidgets.push_back(std::move(widget));
 
 	widget = std::make_shared<Widget>("RoughnessMapDebug"s, md3dDevice.Get(), mCommandList.Get());
@@ -746,6 +795,7 @@ void D3DFramework::CreateWidgets()
 	widget->SetAnchor(0.0f, 1.0f);
 	widget->SetMaterial(AssetManager::GetInstance()->FindMaterial("Default"s));
 	widget->SetVisible(false);
+	mRenderableObjects[(int)RenderLayer::Widget].push_back(widget);
 	mWidgets.push_back(std::move(widget));
 
 	widget = std::make_shared<Widget>("NormalMapDebug"s, md3dDevice.Get(), mCommandList.Get());
@@ -754,6 +804,7 @@ void D3DFramework::CreateWidgets()
 	widget->SetAnchor(0.0f, 1.0f);
 	widget->SetMaterial(AssetManager::GetInstance()->FindMaterial("Default"s));
 	widget->SetVisible(false);
+	mRenderableObjects[(int)RenderLayer::Widget].push_back(widget);
 	mWidgets.push_back(std::move(widget));
 
 	widget = std::make_shared<Widget>("DetphMapDebug"s, md3dDevice.Get(), mCommandList.Get());
@@ -762,21 +813,16 @@ void D3DFramework::CreateWidgets()
 	widget->SetAnchor(0.0f, 1.0f);
 	widget->SetMaterial(AssetManager::GetInstance()->FindMaterial("Default"s));
 	widget->SetVisible(false);
+	mRenderableObjects[(int)RenderLayer::Widget].push_back(widget);
 	mWidgets.push_back(std::move(widget));
 
 	widget = std::make_shared<Widget>("ShadowMapDebug"s, md3dDevice.Get(), mCommandList.Get());
-	widget->SetPosition(960, -120);
+	widget->SetPosition(800, -120);
 	widget->SetSize(160, 120);
 	widget->SetAnchor(0.0f, 1.0f);
 	widget->SetMaterial(AssetManager::GetInstance()->FindMaterial("Default"s));
 	widget->SetVisible(false);
-	mWidgets.push_back(std::move(widget));
-
-	widget = std::make_shared<Widget>("RenderTarget"s, md3dDevice.Get(), mCommandList.Get());
-	widget->SetSize(mScreenWidth, mScreenHeight);
-	widget->SetAnchor(0.0f, 0.0f);
-	widget->SetMaterial(AssetManager::GetInstance()->FindMaterial("Default"s));
-	widget->SetVisible(false);
+	mRenderableObjects[(int)RenderLayer::Widget].push_back(widget);
 	mWidgets.push_back(std::move(widget));
 }
 
@@ -797,21 +843,19 @@ void D3DFramework::CreateParticles()
 	particle->SetBurstNum(5);
 	particle->SetEnabledGravity(true);
 	particle->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tree0"s));
+	particle->SetRenderLayer(RenderLayer::Particle);
+	mRenderableObjects[(int)RenderLayer::Particle].push_back(particle);
 	mParticles.push_back(std::move(particle));
 	*/
 }
 
 void D3DFramework::CreateFrameResources()
 {
-	UINT gameObjectNum = 0;
-	for (const auto& list : mGameObjects)
-		gameObjectNum += (UINT)list.size();
-
 	for (int i = 0; i < NUM_FRAME_RESOURCES; ++i)
 	{
 		mFrameResources[i] = std::make_unique<FrameResource>(md3dDevice.Get(),
-			1, gameObjectNum * 2, (UINT)mLights.size(), (UINT)AssetManager::GetInstance()->GetMaterials().size(),
-			(UINT)mWidgets.size(), (UINT)mParticles.size());
+			1 + LIGHT_NUM, (UINT)mGameObjects.size() * 2, LIGHT_NUM,
+			(UINT)AssetManager::GetInstance()->GetMaterials().size(), (UINT)mWidgets.size(), (UINT)mParticles.size());
 
 		mFrameResources[i]->mWidgetVBs.reserve((UINT)mWidgets.size());
 		for (const auto& widget : mWidgets)
@@ -830,56 +874,43 @@ void D3DFramework::CreateFrameResources()
 }
 
 void D3DFramework::RenderObject(Renderable* obj, D3D12_GPU_VIRTUAL_ADDRESS addressStarat, 
-	UINT rootParameterIndex, UINT cbIndex, UINT strideCBByteSize, bool visibleCheck) const
+	UINT rootParameterIndex, UINT strideCBByteSize, bool visibleCheck, BoundingFrustum* frustum) const
 {
+	if (obj->GetMesh() == nullptr)
+		return;
+
 	if (visibleCheck)
 	{
-		if (obj->GetMesh() == nullptr || !obj->GetIsVisible())
+		if (!obj->GetIsVisible())
 			return;
+
+		if (frustum != nullptr)
+		{
+			bool isInFrustum = obj->IsInFrustum(frustum);
+			if (!isInFrustum)
+				return;
+		}
 	}
 
-	D3D12_GPU_VIRTUAL_ADDRESS cbAddress = addressStarat + cbIndex * strideCBByteSize;
+	D3D12_GPU_VIRTUAL_ADDRESS cbAddress = addressStarat + obj->GetCBIndex() * strideCBByteSize;
 	mCommandList->SetGraphicsRootConstantBufferView(rootParameterIndex, cbAddress);
 
 	obj->Render(mCommandList.Get());
 }
 
-void D3DFramework::RenderGameObjects(const std::list<std::shared_ptr<GameObject>>& gameObjects, const BoundingFrustum* frustum) const
+void D3DFramework::RenderObjects(const std::list<std::shared_ptr<Renderable>>& list, D3D12_GPU_VIRTUAL_ADDRESS addressStarat,
+	UINT rootParameterIndex, UINT strideCBByteSize, bool visibleCheck, BoundingFrustum* frustum) const
+{
+	for (const auto& obj : list)
+		RenderObject(obj.get(), addressStarat, rootParameterIndex, strideCBByteSize, visibleCheck, frustum);
+}
+
+void D3DFramework::RenderActualObjects(DirectX::BoundingFrustum* frustum)
 {
 	auto currObjectCB = mCurrentFrameResource->mObjectPool->GetBuffer();
-
-	for (const auto& obj : gameObjects)
-	{
-		if (frustum != nullptr)
-		{
-			bool isInFrustum = obj->IsInFrustum(*frustum);
-			// 카메라 프러스텀 내에 있다면 그린다.
-			if (!isInFrustum)
-				continue;
-		}
-
-		RenderObject(obj.get(), currObjectCB->GetResource()->GetGPUVirtualAddress(), RP_OBJECT, obj->GetCBIndex(), objCBByteSize);
-	}
-}
-
-void D3DFramework::RenderWidgets() const
-{
-	auto currWidgetCB = mCurrentFrameResource->mWidgetPool->GetBuffer();
-
-	for (const auto& widget : mWidgets)
-	{
-		RenderObject(widget.get(), currWidgetCB->GetResource()->GetGPUVirtualAddress(), RP_WIDGET, widget->GetCBIndex(), widgetCBByteSize);
-	}
-}
-
-void D3DFramework::RenderParticles() const
-{
-	auto currParticleCB = mCurrentFrameResource->mParticlePool->GetBuffer();
-
-	for (const auto& particle : mParticles)
-	{
-		RenderObject(particle.get(), currParticleCB->GetResource()->GetGPUVirtualAddress(), RP_PARTICLE, particle->GetCBIndex(), particleCBByteSize);
-	}
+	D3D12_GPU_VIRTUAL_ADDRESS addressStarat = currObjectCB->GetResource()->GetGPUVirtualAddress();
+	for (const auto& obj : mActualObjects)
+		RenderObject(obj.get(), addressStarat, RP_OBJECT, objCBByteSize, true, frustum);
 }
 
 GameObject* D3DFramework::Picking(int screenX, int screenY, float distance) const

@@ -1,14 +1,14 @@
 //***************************************************************************************
-// ShadowMap.cpp by Frank Luna (C) 2011 All Rights Reserved.
+// SimpleShadowMap.cpp by Frank Luna (C) 2011 All Rights Reserved.
 //***************************************************************************************
 
 #include "pch.h"
-#include "ShadowMap.h"
+#include "SimpleShadowMap.h"
 #include "D3DUtil.h" 
 #include "GameObject.h"
 #include "D3DFramework.h"
 
-ShadowMap::ShadowMap(UINT width, UINT height)
+SimpleShadowMap::SimpleShadowMap(UINT width, UINT height)
 {
 	mWidth = width;
 	mHeight = height;
@@ -17,14 +17,7 @@ ShadowMap::ShadowMap(UINT width, UINT height)
 	mScissorRect = { 0, 0, (int)width, (int)height };
 }
 
-void ShadowMap::Initialize(ID3D12Device* device)
-{
-	md3dDevice = device;
-
-	BuildResource();
-}
-
-void ShadowMap::BuildDescriptors(CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
+void SimpleShadowMap::BuildDescriptors(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
 	                             CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
 	                             CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv)
 {
@@ -32,23 +25,22 @@ void ShadowMap::BuildDescriptors(CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
 	mhGpuSrv = hGpuSrv;
     mhCpuDsv = hCpuDsv;
 
-	BuildDescriptors();
+	BuildDescriptors(device);
 }
 
-void ShadowMap::OnResize(UINT newWidth, UINT newHeight)
+void SimpleShadowMap::OnResize(ID3D12Device* device, UINT width, UINT height)
 {
-	if((mWidth != newWidth) || (mHeight != newHeight))
+	if((mWidth != width) || (mHeight != height))
 	{
-		mWidth = newWidth;
-		mHeight = newHeight;
+		mWidth = width;
+		mHeight = height;
 
-		BuildResource();
-		BuildDescriptors();
+		BuildResource(device);
+		BuildDescriptors(device);
 	}
 }
 
-void ShadowMap::RenderSceneToShadowMap(ID3D12GraphicsCommandList* cmdList, 
-	const std::list<std::shared_ptr<GameObject>>& objects, const DirectX::BoundingFrustum* frustum)
+void SimpleShadowMap::RenderSceneToShadowMap(ID3D12GraphicsCommandList* cmdList)
 {
 	cmdList->RSSetViewports(1, &mViewport);
 	cmdList->RSSetScissorRects(1, &mScissorRect);
@@ -65,14 +57,14 @@ void ShadowMap::RenderSceneToShadowMap(ID3D12GraphicsCommandList* cmdList,
 	// 반드시 활성 PSO의 렌더 대상 개수도 0으로 지정해야 함을 주의하기 바란다.
 	cmdList->OMSetRenderTargets(0, nullptr, false, &mhCpuDsv);
 
-	D3DFramework::GetInstance()->RenderGameObjects(objects, frustum);
+	D3DFramework::GetInstance()->RenderActualObjects(&mLightFrustum);
 
 	// 텍스처를 다시 읽을 수 있도록 리소스를 GENERIC_READ로 바꾸어 준다.
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mShadowMap.Get(),
 		D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
 }
  
-void ShadowMap::BuildDescriptors()
+void SimpleShadowMap::BuildDescriptors(ID3D12Device* device)
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -82,17 +74,17 @@ void ShadowMap::BuildDescriptors()
 	srvDesc.Texture2D.MipLevels = 1;
 	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
     srvDesc.Texture2D.PlaneSlice = 0;
-    md3dDevice->CreateShaderResourceView(mShadowMap.Get(), &srvDesc, mhCpuSrv);
+	device->CreateShaderResourceView(mShadowMap.Get(), &srvDesc, mhCpuSrv);
 
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc;
 	dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
 	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
 	dsvDesc.Texture2D.MipSlice = 0;
-	md3dDevice->CreateDepthStencilView(mShadowMap.Get(), &dsvDesc, mhCpuDsv);
+	device->CreateDepthStencilView(mShadowMap.Get(), &dsvDesc, mhCpuDsv);
 }
 
-void ShadowMap::BuildResource()
+void SimpleShadowMap::BuildResource(ID3D12Device* device)
 {
 	mShadowMap.Reset();
 
@@ -115,11 +107,11 @@ void ShadowMap::BuildResource()
 	optClear.DepthStencil.Depth = 1.0f;
 	optClear.DepthStencil.Stencil = 0;
 
-	ThrowIfFailed(md3dDevice->CreateCommittedResource(
+	ThrowIfFailed(device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,
 		&texDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		&optClear,
-		IID_PPV_ARGS(&mShadowMap)));
+		IID_PPV_ARGS(mShadowMap.GetAddressOf())));
 }

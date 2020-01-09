@@ -19,7 +19,7 @@ struct VertexOut
 struct GeoOut
 {
 	float4 mPosH      : SV_POSITION;
-	float4 mPosW      : POSITION0;
+	float3 mPosW      : POSITION0;
 	float3 mNormal    : NORMAL;
 	float2 mTexC      : TEXCOORD;
 };
@@ -82,7 +82,7 @@ void GS(point VertexOut gin[1], // Primitive는 Point이므로 들어오는 정점은 하나�
 	for (int i = 0; i < 4; ++i)
 	{
 		gout.mPosH = mul(v[i], gViewProj);
-		gout.mPosW = v[i];
+		gout.mPosW = v[i].xyz;
 		gout.mNormal = look;
 		gout.mTexC = texC[i];
 
@@ -90,7 +90,7 @@ void GS(point VertexOut gin[1], // Primitive는 Point이므로 들어오는 정점은 하나�
 	}
 }
 
-PixelOut PS(GeoOut pin) : SV_Target
+PixelOut PS(GeoOut pin)
 {
 	PixelOut pout = (PixelOut)0.0f;
 
@@ -116,7 +116,7 @@ PixelOut PS(GeoOut pin) : SV_Target
 	pout.mDiffuse = diffuseAlbedo;
 	pout.mSpecularAndRoughness = float4(specular, roughness);
 	pout.mNormal = float4(pin.mNormal, 1.0f);
-	pout.mPosition = pin.mPosW;
+	pout.mPosition = float4(pin.mPosW, 1.0f);
 
 	return pout;
 }

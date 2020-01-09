@@ -5,10 +5,10 @@
 class DirectionalLight : public Light
 {
 public:
-	DirectionalLight(std::string&& name);
+	DirectionalLight(std::string&& name, ID3D12Device* device);
 	virtual ~DirectionalLight();
 
 public:
-	virtual void SetLightData(struct LightData& lightData, const DirectX::BoundingSphere& sceneBounding) override;
+	virtual void SetLightData(struct LightData& lightData) override;
 
 };
