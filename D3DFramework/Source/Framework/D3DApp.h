@@ -17,6 +17,8 @@
 #define DEFERRED_BUFFER_COUNT 4
 #define LIGHT_NUM 1
 
+// #define SSAO
+
 class D3DApp : public WinApp
 {
 public:
@@ -41,6 +43,7 @@ public:
 	virtual void OnDestroy() override;
 	virtual void OnResize(int screenWidth, int screenHeight) override;
 	virtual void ApplyOption(Option option);
+	virtual void CreateDescriptorHeaps(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum);
 
 public:
 	void Set4xMsaaState(bool value);
@@ -57,18 +60,22 @@ protected:
 	void CreateSwapChain();
 	void CreateSoundBuffer();
 	void CreateRtvAndDsvDescriptorHeaps(UINT shadowMapNum);
-	void CreateRootSignature(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum);
-	void CreateDescriptorHeaps(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum);
+	void CreateRootSignatures(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum);
 	void CreateShadersAndInputLayout();
 	void CreatePSOs();
 
 	void FlushCommandQueue();
 
+protected:
 	ID3D12Resource* GetCurrentBackBuffer() const;
 	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView() const;
 	D3D12_CPU_DESCRIPTOR_HANDLE GetDefferedBufferView(UINT index) const;
 	D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilView() const;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE GetCbvSrvUavDescriptorHandle(UINT index) const;
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetCpuSrv(int index) const;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GetGpuSrv(int index) const;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetDsv(int index) const;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetRtv(int index) const;
 
 private:
 	void LogAdapters();
@@ -96,14 +103,13 @@ protected:
 
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mRtvHeap;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mDsvHeap;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mCbvSrvUavDescriptorHeap = nullptr;
 
 	Microsoft::WRL::ComPtr<IDirectSound8> md3dSound;
 	Microsoft::WRL::ComPtr<IDirectSoundBuffer> mPrimarySoundBuffer;
 	Microsoft::WRL::ComPtr<IDirectSound3DListener8> mListener;
 
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mCbvSrvUavDescriptorHeap = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12RootSignature> mRootSignature = nullptr;
-
+	std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D12RootSignature>> mRootSignatures;
 	std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D12PipelineState>> mPSOs;
 	std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3DBlob>> mShaders;
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mDefaultLayout;
@@ -125,6 +131,7 @@ protected:
 	UINT mShadowMapHeapIndex = 0;
 	UINT mDeferredBufferHeapIndex = 0;
 	UINT mLightingPassHeapIndex = 0;
+	UINT mSsaoMapHeapIndex = 0;
 
 	UINT m4xMsaaQuality = 0;
 	UINT mRtvDescriptorSize = 0;
@@ -132,6 +139,13 @@ protected:
 	UINT mCbvSrvUavDescriptorSize = 0;
 
 	DirectX::XMFLOAT4 mBackBufferClearColor = (DirectX::XMFLOAT4)DirectX::Colors::LightSteelBlue;
+	const std::array<DirectX::XMFLOAT4, DEFERRED_BUFFER_COUNT> mDeferredBufferClearColors =
+	{
+		DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f), // Diffuse
+		DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f), // Specular And Roughness
+		DirectX::XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f), // Normal
+		DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f), // Position
+	};
 
 private:
 	const std::array<RootParameterInfo, ROOT_PARAMETER_NUM> mRootParameterInfos =

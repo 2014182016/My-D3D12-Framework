@@ -20,6 +20,7 @@ public:
 	virtual void OnResize(int screenWidth, int screenHeight) override;
 	virtual void Tick(float deltaTime) override;
 	virtual void Render() override;
+	virtual void CreateDescriptorHeaps(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum) override;
 
 public:
 	void InitFramework();
@@ -28,7 +29,7 @@ public:
 	void RenderObjects(const std::list<std::shared_ptr<class Renderable>>& list, D3D12_GPU_VIRTUAL_ADDRESS addressStarat,
 		UINT rootParameterIndex, UINT strideCBByteSize, bool visibleCheck = true, DirectX::BoundingFrustum* frustum = nullptr) const;
 	void RenderActualObjects(DirectX::BoundingFrustum* frustum = nullptr);
-	class GameObject* Picking(int screenX, int screenY, float distance = 1000.0f) const;
+	class GameObject* Picking(int screenX, int screenY, float distance = 1000.0f, bool isMeshCollision = false) const;
 
 public:
 	inline static D3DFramework* GetInstance() { return instance; }
@@ -40,7 +41,6 @@ private:
 	void CreateWidgets();
 	void CreateParticles();
 	void CreateFrameResources();
-	void CreateShadowMapResource(UINT textureNum, UINT cubeTextureNum);
 
 	void AddGameObject(std::shared_ptr<class GameObject> object, RenderLayer renderLayer);
 
@@ -50,11 +50,14 @@ private:
 	void UpdateMainPassBuffer(float deltaTime);
 	void UpdateWidgetBuffer(float deltaTime);
 	void UpdateParticleBuffer(float deltaTime);
+	void UpdateSsaoBuffer(float deltaTime);
 
 	void UpdateObjectBufferPool();
 
 	void DestroyGameObjects();
 	void DestroyParticles();
+
+	void SetCommonState();
 
 private:
 	static inline D3DFramework* instance = nullptr;
@@ -65,7 +68,6 @@ private:
 
 	std::array<std::list<std::shared_ptr<class Renderable>>, (int)RenderLayer::Count> mRenderableObjects;
 	std::list<std::shared_ptr<class GameObject>> mGameObjects;
-	std::list<std::shared_ptr<class GameObject>> mActualObjects; // 충돌 및 그림자 맵에 사용된다.
 	std::list<std::shared_ptr<class Light>> mLights;
 	std::list<std::shared_ptr<class Widget>> mWidgets;
 	std::list<std::shared_ptr<class Particle>> mParticles;
@@ -74,6 +76,7 @@ private:
 	std::array<std::unique_ptr<struct PassConstants>, LIGHT_NUM> mShadowPassCB;
 	std::unique_ptr<class Camera> mCamera;
 	std::unique_ptr<class Octree> mOctreeRoot;
+	std::unique_ptr<class Ssao> mSsao;
 
 	DirectX::BoundingFrustum mWorldCamFrustum;
 };

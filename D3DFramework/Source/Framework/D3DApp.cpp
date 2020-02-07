@@ -3,6 +3,7 @@
 #include "D3DUtil.h"
 #include "Structures.h"
 #include "AssetManager.h"
+#include "Ssao.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -59,7 +60,11 @@ void D3DApp::OnDestroy()
 void D3DApp::CreateRtvAndDsvDescriptorHeaps(UINT shadowMapNum)
 {
 	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc;
+#ifdef SSAO
+	rtvHeapDesc.NumDescriptors = SWAP_CHAIN_BUFFER_COUNT + DEFERRED_BUFFER_COUNT + 2;
+#else
 	rtvHeapDesc.NumDescriptors = SWAP_CHAIN_BUFFER_COUNT + DEFERRED_BUFFER_COUNT;
+#endif
 	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	rtvHeapDesc.NodeMask = 0;
@@ -138,13 +143,14 @@ void D3DApp::OnResize(int screenWidth, int screenHeight)
 	defferedBufferRtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 	for (UINT i = 0; i < DEFERRED_BUFFER_COUNT; ++i)
 	{
+		CD3DX12_CLEAR_VALUE optClear = CD3DX12_CLEAR_VALUE(mDeferredBufferFormats[i], (float*)&mDeferredBufferClearColors[i]);
 		defferedBufferDesc.Format = mDeferredBufferFormats[i];
 		ThrowIfFailed(md3dDevice->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 			D3D12_HEAP_FLAG_NONE,
 			&defferedBufferDesc,
-			D3D12_RESOURCE_STATE_RENDER_TARGET,
-			nullptr,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			&optClear,
 			IID_PPV_ARGS(mDeferredBuffer[i].GetAddressOf())));
 		md3dDevice->CreateRenderTargetView(mDeferredBuffer[i].Get(), &defferedBufferRtvDesc, rtvHeapHandle);
 		rtvHeapHandle.Offset(1, mRtvDescriptorSize);
@@ -407,11 +413,34 @@ D3D12_CPU_DESCRIPTOR_HANDLE D3DApp::GetDepthStencilView() const
 	return mDsvHeap->GetCPUDescriptorHandleForHeapStart();
 }
 
-CD3DX12_GPU_DESCRIPTOR_HANDLE D3DApp::GetCbvSrvUavDescriptorHandle(UINT index) const
+CD3DX12_CPU_DESCRIPTOR_HANDLE D3DApp::GetCpuSrv(int index) const
 {
-	return CD3DX12_GPU_DESCRIPTOR_HANDLE(mCbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart(),
-		index, mCbvSrvUavDescriptorSize);
+	auto srv = CD3DX12_CPU_DESCRIPTOR_HANDLE(mCbvSrvUavDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+	srv.Offset(index, mCbvSrvUavDescriptorSize);
+	return srv;
 }
+
+CD3DX12_GPU_DESCRIPTOR_HANDLE D3DApp::GetGpuSrv(int index) const
+{
+	auto srv = CD3DX12_GPU_DESCRIPTOR_HANDLE(mCbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+	srv.Offset(index, mCbvSrvUavDescriptorSize);
+	return srv;
+}
+
+CD3DX12_CPU_DESCRIPTOR_HANDLE D3DApp::GetDsv(int index) const
+{
+	auto dsv = CD3DX12_CPU_DESCRIPTOR_HANDLE(mDsvHeap->GetCPUDescriptorHandleForHeapStart());
+	dsv.Offset(index, mDsvDescriptorSize);
+	return dsv;
+}
+
+CD3DX12_CPU_DESCRIPTOR_HANDLE D3DApp::GetRtv(int index) const
+{
+	auto rtv = CD3DX12_CPU_DESCRIPTOR_HANDLE(mRtvHeap->GetCPUDescriptorHandleForHeapStart());
+	rtv.Offset(index, mRtvDescriptorSize);
+	return rtv;
+}
+
 
 void D3DApp::LogAdapters()
 {
@@ -488,7 +517,7 @@ void D3DApp::LogOutputDisplayModes(IDXGIOutput* output, DXGI_FORMAT format)
 	}
 }
 
-void D3DApp::CreateRootSignature(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum)
+void D3DApp::CreateRootSignatures(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum)
 {
 	// 일반적으로 셰이더 프로그램은 특정 자원들(상수 버퍼, 텍스처, 표본추출기 등)이
 	// 입력된다고 기대한다. 루트 서명은 셰이더 프로그램이 기대하는 자원들을 정의한다.
@@ -499,7 +528,12 @@ void D3DApp::CreateRootSignature(UINT textureNum, UINT cubeTextureNum, UINT shad
 	texTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, textureNum, mRootParameterInfos[RP_TEXTURE].mShaderRegister, mRootParameterInfos[RP_TEXTURE].mRegisterSpace);
 	texTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, shadowMapNum, mRootParameterInfos[RP_SHADOWMAP].mShaderRegister, mRootParameterInfos[RP_SHADOWMAP].mRegisterSpace);
 	texTable[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, cubeTextureNum, mRootParameterInfos[RP_CUBEMAP].mShaderRegister, mRootParameterInfos[RP_CUBEMAP].mRegisterSpace);
+	
+#ifdef SSAO
+	texTable[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, DEFERRED_BUFFER_COUNT + 4, mRootParameterInfos[RP_G_BUFFER].mShaderRegister, mRootParameterInfos[RP_G_BUFFER].mRegisterSpace);
+#else
 	texTable[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, DEFERRED_BUFFER_COUNT + 1, mRootParameterInfos[RP_G_BUFFER].mShaderRegister, mRootParameterInfos[RP_G_BUFFER].mRegisterSpace);
+#endif
 
 	// 퍼포먼스 TIP: 가장 자주 사용하는 것을 앞에 놓는다.
 	slotRootParameter[RP_OBJECT].InitAsConstantBufferView(mRootParameterInfos[RP_OBJECT].mShaderRegister, mRootParameterInfos[RP_OBJECT].mRegisterSpace); // Object 상수 버퍼
@@ -535,13 +569,90 @@ void D3DApp::CreateRootSignature(UINT textureNum, UINT cubeTextureNum, UINT shad
 		0,
 		serializedRootSig->GetBufferPointer(),
 		serializedRootSig->GetBufferSize(),
-		IID_PPV_ARGS(mRootSignature.GetAddressOf())));
+		IID_PPV_ARGS(&mRootSignatures["Common"])));
+
+#ifdef SSAO
+	CD3DX12_DESCRIPTOR_RANGE ssaoTexTable[3];
+	ssaoTexTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
+	ssaoTexTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0);
+	ssaoTexTable[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2, 0);
+
+	std::array<CD3DX12_ROOT_PARAMETER, 5> ssaoSlotRootParameter;
+	ssaoSlotRootParameter[0].InitAsConstantBufferView(0);
+	ssaoSlotRootParameter[1].InitAsConstants(1, 1);
+	ssaoSlotRootParameter[2].InitAsDescriptorTable(1, &ssaoTexTable[0], D3D12_SHADER_VISIBILITY_PIXEL);
+	ssaoSlotRootParameter[3].InitAsDescriptorTable(1, &ssaoTexTable[1], D3D12_SHADER_VISIBILITY_PIXEL);
+	ssaoSlotRootParameter[4].InitAsDescriptorTable(1, &ssaoTexTable[2], D3D12_SHADER_VISIBILITY_PIXEL);
+
+	const CD3DX12_STATIC_SAMPLER_DESC pointClamp(
+		0, // shaderRegister
+		D3D12_FILTER_MIN_MAG_MIP_POINT, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP); // addressW
+
+	const CD3DX12_STATIC_SAMPLER_DESC linearClamp(
+		1, // shaderRegister
+		D3D12_FILTER_MIN_MAG_MIP_LINEAR, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP); // addressW
+
+	const CD3DX12_STATIC_SAMPLER_DESC depthMapSam(
+		2, // shaderRegister
+		D3D12_FILTER_MIN_MAG_MIP_LINEAR, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressW
+		0.0f,
+		0,
+		D3D12_COMPARISON_FUNC_LESS_EQUAL,
+		D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE);
+
+	const CD3DX12_STATIC_SAMPLER_DESC linearWrap(
+		3, // shaderRegister
+		D3D12_FILTER_MIN_MAG_MIP_LINEAR, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP); // addressW
+
+	std::array<CD3DX12_STATIC_SAMPLER_DESC, 4> ssaoStaticSamplers =
+	{
+		pointClamp, linearClamp, depthMapSam, linearWrap
+	};
+
+	CD3DX12_ROOT_SIGNATURE_DESC ssaoRootSigDesc((UINT)ssaoSlotRootParameter.size(), ssaoSlotRootParameter.data(),
+		(UINT)ssaoStaticSamplers.size(), ssaoStaticSamplers.data(),
+		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+	serializedRootSig = nullptr;
+	errorBlob = nullptr;
+	hr = D3D12SerializeRootSignature(&ssaoRootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+		serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
+
+	if (errorBlob != nullptr)
+	{
+		::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+	}
+	ThrowIfFailed(hr);
+
+	ThrowIfFailed(md3dDevice->CreateRootSignature(
+		0,
+		serializedRootSig->GetBufferPointer(),
+		serializedRootSig->GetBufferSize(),
+		IID_PPV_ARGS(&mRootSignatures["Ssao"])));
+#endif
 }
+
 
 void D3DApp::CreateDescriptorHeaps(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum)
 {
 	D3D12_DESCRIPTOR_HEAP_DESC cbvSrvUavDescriptorHeap = {};
+#ifdef SSAO
+	cbvSrvUavDescriptorHeap.NumDescriptors = textureNum + cubeTextureNum + shadowMapNum + DEFERRED_BUFFER_COUNT + 4;
+#else
 	cbvSrvUavDescriptorHeap.NumDescriptors = textureNum + cubeTextureNum + shadowMapNum + DEFERRED_BUFFER_COUNT + 1;
+#endif
 	cbvSrvUavDescriptorHeap.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	cbvSrvUavDescriptorHeap.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&cbvSrvUavDescriptorHeap, IID_PPV_ARGS(&mCbvSrvUavDescriptorHeap)));
@@ -614,14 +725,29 @@ void D3DApp::CreateShadersAndInputLayout()
 	// Direct3D에게 각 정점의 성분을 알려주는 InputLayout과
 	// 셰이더를 컴파일한다.
 
-	const D3D_SHADER_MACRO skyReflectionDefines[] =
-	{
-		"SKY_REFLECTION", "1",
-		NULL, NULL
-	};
+	std::vector<D3D_SHADER_MACRO> defines;
+	D3D_SHADER_MACRO macro;
+
+#ifdef SSAO
+	//macro.Definition = "SKY_REFLECTION";
+	//macro.Name = "1";
+	//defines.push_back(macro);
+
+	macro.Definition = "SSAO";
+	macro.Name = "1";
+	defines.push_back(macro);
+#else
+	macro.Definition = "SKY_REFLECTION";
+	macro.Name = "1";
+	defines.push_back(macro);
+#endif
+
+	macro.Definition = NULL;
+	macro.Name = NULL;
+	defines.push_back(macro);
 
 	mShaders["ForwardVS"] = D3DUtil::CompileShader(L"Shaders\\Forward.hlsl", nullptr, "VS", "vs_5_1");
-	mShaders["ForwardPS"] = D3DUtil::CompileShader(L"Shaders\\Forward.hlsl", nullptr, "PS", "ps_5_1");
+	mShaders["ForwardPS"] = D3DUtil::CompileShader(L"Shaders\\Forward.hlsl", defines.data() , "PS", "ps_5_1");
 
 	mShaders["OpaqueVS"] = D3DUtil::CompileShader(L"Shaders\\Opaque.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["OpaquePS"] = D3DUtil::CompileShader(L"Shaders\\Opaque.hlsl", nullptr, "PS", "ps_5_1");
@@ -654,7 +780,12 @@ void D3DApp::CreateShadersAndInputLayout()
 	mShaders["PositionMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "PositionMapDebugPS", "ps_5_1");
 	mShaders["ShadowMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "ShadowMapDebugPS", "ps_5_1");
 
-	mShaders["LightingPassPS"] = D3DUtil::CompileShader(L"Shaders\\LightingPass.hlsl", nullptr, "PS", "ps_5_1");
+	mShaders["LightingPassPS"] = D3DUtil::CompileShader(L"Shaders\\LightingPass.hlsl", defines.data() , "PS", "ps_5_1");
+
+	mShaders["SsaoVS"] = D3DUtil::CompileShader(L"Shaders\\Ssao.hlsl", nullptr, "VS", "vs_5_1");
+	mShaders["SsaoPS"] = D3DUtil::CompileShader(L"Shaders\\Ssao.hlsl", nullptr, "PS", "ps_5_1");
+	mShaders["SsaoBlurVS"] = D3DUtil::CompileShader(L"Shaders\\SsaoBlur.hlsl", nullptr, "VS", "vs_5_1");
+	mShaders["SsaoBlurPS"] = D3DUtil::CompileShader(L"Shaders\\SsaoBlur.hlsl", nullptr, "PS", "ps_5_1");
 
 	mDefaultLayout =
 	{
@@ -704,7 +835,7 @@ void D3DApp::CreatePSOs()
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC forwardPsoDesc;
 	ZeroMemory(&forwardPsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
 	forwardPsoDesc.InputLayout = { mDefaultLayout.data(), (UINT)mDefaultLayout.size() };
-	forwardPsoDesc.pRootSignature = mRootSignature.Get();
+	forwardPsoDesc.pRootSignature = mRootSignatures["Common"].Get();
 	forwardPsoDesc.VS =
 	{
 		reinterpret_cast<BYTE*>(mShaders["ForwardVS"]->GetBufferPointer()),
@@ -907,6 +1038,44 @@ void D3DApp::CreatePSOs()
 	widgetPsoDesc.DepthStencilState.StencilEnable = false;
 	widgetPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&widgetPsoDesc, IID_PPV_ARGS(&mPSOs["Widget"])));
+
+#ifdef SSAO
+	// PSO for Ssao
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC ssaoPsoDesc = forwardPsoDesc;
+	ssaoPsoDesc.InputLayout = { nullptr, 0 };
+	ssaoPsoDesc.pRootSignature = mRootSignatures["Ssao"].Get();
+	ssaoPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["SsaoVS"]->GetBufferPointer()),
+		mShaders["SsaoVS"]->GetBufferSize()
+	};
+	ssaoPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["SsaoPS"]->GetBufferPointer()),
+		mShaders["SsaoPS"]->GetBufferSize()
+	};
+	ssaoPsoDesc.DepthStencilState.DepthEnable = false;
+	ssaoPsoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+	ssaoPsoDesc.RTVFormats[0] = Ssao::AmbientMapFormat;
+	ssaoPsoDesc.SampleDesc.Count = 1;
+	ssaoPsoDesc.SampleDesc.Quality = 0;
+	ssaoPsoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&ssaoPsoDesc, IID_PPV_ARGS(&mPSOs["Ssao"])));
+
+	// PSO for SsaoBlur
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC ssaoBlurPsoDesc = ssaoPsoDesc;
+	ssaoBlurPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["SsaoBlurVS"]->GetBufferPointer()),
+		mShaders["SsaoBlurVS"]->GetBufferSize()
+	};
+	ssaoBlurPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["SsaoBlurPS"]->GetBufferPointer()),
+		mShaders["SsaoBlurPS"]->GetBufferSize()
+	};
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&ssaoBlurPsoDesc, IID_PPV_ARGS(&mPSOs["SsaoBlur"])));
+#endif
 
 
 	// PSO for DiffuseMapDebug

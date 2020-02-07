@@ -27,6 +27,13 @@ void DirectionalLight::SetLightData(LightData& lightData)
 	XMMATRIX lightView = XMMatrixLookAtLH(lightPos, targetPos, lightUp);
 	XMMATRIX lightProj = XMMatrixOrthographicLH(mShadowMapSize.x, mShadowMapSize.y, 0.5f, mFalloffEnd);
 
+	XMMATRIX shadowTransform = lightView * lightProj * toTextureTransform;
+	XMStoreFloat4x4(&lightData.mShadowTransform, XMMatrixTranspose(shadowTransform));
+
+	XMMATRIX invLightView = XMMatrixInverse(&XMMatrixDeterminant(lightView), lightView);
+	DirectX::BoundingFrustum::CreateFromMatrix(mLightFrustum, lightProj);
+	mLightFrustum.Transform(mLightFrustum, invLightView);
+
 	XMStoreFloat4x4(&mView, lightView);
 	XMStoreFloat4x4(&mProj, lightProj);
 }

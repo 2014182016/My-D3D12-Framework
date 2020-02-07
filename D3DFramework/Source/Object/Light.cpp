@@ -33,3 +33,8 @@ void Light::SetLightData(LightData& lightData)
 	lightData.mType = (std::uint32_t)mLightType;
 	lightData.mEnabled = mEnabled;
 }
+
+void Light::RenderSceneToShadowMap(ID3D12GraphicsCommandList* cmdList)
+{
+	mShadowMap->RenderSceneToShadowMap(cmdList, &mLightFrustum);
+}

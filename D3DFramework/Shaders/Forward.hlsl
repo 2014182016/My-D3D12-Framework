@@ -88,6 +88,13 @@ float4 PS(VertexOut pin) : SV_Target
 	// Diffuse를 전반적으로 밝혀주는 Ambient항
 	float4 ambient = gAmbientLight * diffuseAlbedo;
 
+#ifdef SSAO
+	float4 ssaoPosH = mul(float4(pin.mPosW, 1.0f), gViewProjTex);
+	ssaoPosH /= ssaoPosH.w;
+	float ambientAccess = gSsaoMap.Sample(gsamLinearClamp, ssaoPosH.xy, 0.0f).r;
+	ambient *= ambientAccess;
+#endif
+
 	// roughness와 normal를 이용하여 shininess를 계산한다.
 	const float shininess = 1.0f - roughness;
 

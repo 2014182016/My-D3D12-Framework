@@ -24,7 +24,7 @@ public:
 	virtual void BuildDescriptors(ID3D12Device* device) override;
 	virtual void BuildResource(ID3D12Device* device) override;
 	virtual void OnResize(ID3D12Device* device, UINT width, UINT height) override;
-	virtual void RenderSceneToShadowMap(ID3D12GraphicsCommandList* cmdList) override;
+	virtual void RenderSceneToShadowMap(ID3D12GraphicsCommandList* cmdList, DirectX::BoundingFrustum* camFrustum = nullptr) override;
 
 private:
 	D3D12_VIEWPORT mViewport;

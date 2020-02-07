@@ -10,6 +10,7 @@
 #include "InputManager.h"
 #include "Octree.h"
 #include "Interfaces.h"
+#include "Ssao.h"
 
 #include "GameObject.h"
 #include "Material.h"
@@ -69,6 +70,11 @@ void D3DFramework::OnResize(int screenWidth, int screenHeight)
 
 	for (auto& widget : mWidgets)
 		widget->UpdateNumFrames();
+
+#ifdef SSAO
+	if(mSsao)
+		mSsao->OnResize(md3dDevice.Get(), screenWidth, screenHeight);
+#endif
 }
 
 void D3DFramework::InitFramework()
@@ -81,6 +87,10 @@ void D3DFramework::InitFramework()
 
 	AssetManager::GetInstance()->Initialize(md3dDevice.Get(), mCommandList.Get(), md3dSound.Get());
 
+#ifdef SSAO
+	mSsao = std::make_unique<Ssao>(md3dDevice.Get(), mCommandList.Get(), mScreenWidth, mScreenHeight);
+#endif
+
 	CreateObjects();
 	CreateLights();
 	CreateWidgets();
@@ -91,9 +101,8 @@ void D3DFramework::InitFramework()
 	UINT cubeTextureNum = (UINT)AssetManager::GetInstance()->GetCubeTextures().size();
 	UINT shadowMapNum = (UINT)LIGHT_NUM;
 
-	CreateRootSignature(textureNum, cubeTextureNum, shadowMapNum);
+	CreateRootSignatures(textureNum, cubeTextureNum, shadowMapNum);
 	CreateDescriptorHeaps(textureNum, cubeTextureNum, shadowMapNum);
-	CreateShadowMapResource(textureNum, cubeTextureNum);
 	CreatePSOs();
 
 	// 초기화 명령들을 실행한다.
@@ -108,23 +117,59 @@ void D3DFramework::InitFramework()
 		obj->BeginPlay();
 }
 
-void D3DFramework::CreateShadowMapResource(UINT textureNum, UINT cubeTextureNum)
+void D3DFramework::CreateDescriptorHeaps(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum)
 {
-	// 그림자 맵 서술자를 생성하기 위해 필요한 변수들을 설정한다.
-	auto srvCpuStart = mCbvSrvUavDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	auto srvGpuStart = mCbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
-	auto dsvCpuStart = mDsvHeap->GetCPUDescriptorHandleForHeapStart();
-	mShadowMapHeapIndex = textureNum + cubeTextureNum + DEFERRED_BUFFER_COUNT + 1;
+	D3DApp::CreateDescriptorHeaps(textureNum, cubeTextureNum, shadowMapNum);
 
+	mShadowMapHeapIndex = textureNum + cubeTextureNum + DEFERRED_BUFFER_COUNT + 1;
 	UINT i = 0;
 	for (const auto& light : mLights)
 	{
 		light->GetShadowMap()->BuildDescriptors(md3dDevice.Get(),
-			CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, mShadowMapHeapIndex + i, mCbvSrvUavDescriptorSize),
-			CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, mShadowMapHeapIndex + i, mCbvSrvUavDescriptorSize),
-			CD3DX12_CPU_DESCRIPTOR_HANDLE(dsvCpuStart, 1 + i, mDsvDescriptorSize));
+			GetCpuSrv(mShadowMapHeapIndex + i),
+			GetGpuSrv(mShadowMapHeapIndex + i),
+			GetDsv(1));
 		++i;
 	}
+
+#ifdef SSAO
+	mSsaoMapHeapIndex = mShadowMapHeapIndex + shadowMapNum;
+	mSsao->BuildDescriptors(md3dDevice.Get(),
+		GetGpuSrv(textureNum + cubeTextureNum + 2),
+		GetGpuSrv(textureNum + cubeTextureNum + DEFERRED_BUFFER_COUNT),
+		GetCpuSrv(mSsaoMapHeapIndex),
+		GetGpuSrv(mSsaoMapHeapIndex),
+		GetRtv(SWAP_CHAIN_BUFFER_COUNT + DEFERRED_BUFFER_COUNT),
+		mCbvSrvUavDescriptorSize,
+		mRtvDescriptorSize);
+#endif
+}
+
+void D3DFramework::SetCommonState()
+{
+	mCommandList->RSSetViewports(1, &mScreenViewport);
+	mCommandList->RSSetScissorRects(1, &mScissorRect);
+
+	mCommandList->SetGraphicsRootSignature(mRootSignatures["Common"].Get());
+
+	mCommandList->SetGraphicsRootSignature(mRootSignatures["Common"].Get());
+
+	// 구조적 버퍼는 힙을 생략하고 그냥 하나의 루트 서술자로 묶을 수 있다.
+	mCommandList->SetGraphicsRootShaderResourceView(RP_LIGHT, mCurrentFrameResource->GetLightVirtualAddress());
+	mCommandList->SetGraphicsRootShaderResourceView(RP_MATERIAL, mCurrentFrameResource->GetMaterialVirtualAddress());
+
+	// 이 장면에 사용되는 모든 텍스처를 묶는다. 테이블의 첫 서술자만 묶으면
+	// 테이블에 몇 개의 서술자가 있는지는 Root Signature에 설정되어 있다.
+	mCommandList->SetGraphicsRootDescriptorTable(RP_TEXTURE, GetGpuSrv(0));
+
+	// 큐브 맵을 파이프라인에 바인딩한다.
+	mCommandList->SetGraphicsRootDescriptorTable(RP_CUBEMAP, GetGpuSrv(mSkyCubeMapHeapIndex));
+
+	// G-Buffer에 사용될 렌더 타겟들을 파이프라인에 바인딩한다.
+	mCommandList->SetGraphicsRootDescriptorTable(RP_G_BUFFER, GetGpuSrv(mDeferredBufferHeapIndex));
+
+	// 그림자 맵을 파이프라인에 바인딩한다.
+	mCommandList->SetGraphicsRootDescriptorTable(RP_SHADOWMAP, GetGpuSrv(mShadowMapHeapIndex));
 }
 
 void D3DFramework::Render()
@@ -142,24 +187,7 @@ void D3DFramework::Render()
 	ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvSrvUavDescriptorHeap.Get() };
 	mCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
-	mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
-
-	// 구조적 버퍼는 힙을 생략하고 그냥 하나의 루트 서술자로 묶을 수 있다.
-	mCommandList->SetGraphicsRootShaderResourceView(RP_LIGHT, mCurrentFrameResource->GetLightVirtualAddress());
-	mCommandList->SetGraphicsRootShaderResourceView(RP_MATERIAL, mCurrentFrameResource->GetMaterialVirtualAddress());
-
-	// 이 장면에 사용되는 모든 텍스처를 묶는다. 테이블의 첫 서술자만 묶으면
-	// 테이블에 몇 개의 서술자가 있는지는 Root Signature에 설정되어 있다.
-	mCommandList->SetGraphicsRootDescriptorTable(RP_TEXTURE, mCbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-
-	// 큐브 맵을 파이프라인에 바인딩한다.
-	mCommandList->SetGraphicsRootDescriptorTable(RP_CUBEMAP, GetCbvSrvUavDescriptorHandle(mSkyCubeMapHeapIndex));
-
-	// G-Buffer에 사용될 렌더 타겟들을 파이프라인에 바인딩한다.
-	mCommandList->SetGraphicsRootDescriptorTable(RP_G_BUFFER, GetCbvSrvUavDescriptorHandle(mDeferredBufferHeapIndex));
-
-	// 그림자 맵을 파이프라인에 바인딩한다.
-	mCommandList->SetGraphicsRootDescriptorTable(RP_SHADOWMAP, GetCbvSrvUavDescriptorHandle(mShadowMapHeapIndex));
+	SetCommonState();
 
 	// Wireframe Pass ---------------------------------------------------------
 
@@ -168,9 +196,6 @@ void D3DFramework::Render()
 		// 후면 버퍼를 그리기 위해 자원 상태를 전환한다.
 		mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
 			D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-		mCommandList->RSSetViewports(1, &mScreenViewport);
-		mCommandList->RSSetScissorRects(1, &mScissorRect);
 
 		// 후면 버퍼과 깊이 버퍼를 지운고, 파이프라인에 바인딩한다.
 		mCommandList->ClearRenderTargetView(GetCurrentBackBufferView(), (float*)&mBackBufferClearColor, 0, nullptr);
@@ -194,7 +219,7 @@ void D3DFramework::Render()
 			D3D12_GPU_VIRTUAL_ADDRESS shadowPassCBAddress = mCurrentFrameResource->GetPassVirtualAddress() + (1 + i++) * passCBByteSize;
 			mCommandList->SetGraphicsRootConstantBufferView(RP_PASS, shadowPassCBAddress);
 
-			light->GetShadowMap()->RenderSceneToShadowMap(mCommandList.Get());
+			light->RenderSceneToShadowMap(mCommandList.Get());
 		}
 	}
 
@@ -210,15 +235,13 @@ void D3DFramework::Render()
 			defferedBufferTransition[i] = CD3DX12_RESOURCE_BARRIER::Transition(mDeferredBuffer[i].Get(),
 				D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		mCommandList->ResourceBarrier(DEFERRED_BUFFER_COUNT, defferedBufferTransition);
-		mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
-			D3D12_RESOURCE_STATE_DEPTH_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
 
 		mCommandList->RSSetViewports(1, &mScreenViewport);
 		mCommandList->RSSetScissorRects(1, &mScissorRect);
 
 		// 각 G-Buffer의 버퍼들과 깊이 버퍼를 지운고, 파이프라인에 바인딩한다.
 		for (int i = 0; i < DEFERRED_BUFFER_COUNT; i++)
-			mCommandList->ClearRenderTargetView(GetDefferedBufferView(i), (float*)&mBackBufferClearColor, 0, nullptr);
+			mCommandList->ClearRenderTargetView(GetDefferedBufferView(i), (float*)&mDeferredBufferClearColors[i], 0, nullptr);
 		mCommandList->ClearDepthStencilView(GetDepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 		mCommandList->OMSetRenderTargets(DEFERRED_BUFFER_COUNT, &GetDefferedBufferView(0), true, &GetDepthStencilView());
 
@@ -239,6 +262,17 @@ void D3DFramework::Render()
 		mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
 			D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
 	}
+
+#ifdef SSAO
+	// Ssao Pass--------------------------------------------------------------
+	{
+		mCommandList->SetGraphicsRootSignature(mRootSignatures["Ssao"].Get());
+		mSsao->ComputeSsao(mCommandList.Get(), mPSOs["Ssao"].Get(), mCurrentFrameResource->GetSsaoVirtualAddress());
+		mSsao->BlurAmbientMap(mCommandList.Get(), mPSOs["SsaoBlur"].Get(), mCurrentFrameResource->GetSsaoVirtualAddress(), 3);
+	}
+
+	SetCommonState();
+#endif
 
 	// Lighting Pass ---------------------------------------------------------
 
@@ -263,9 +297,6 @@ void D3DFramework::Render()
 
 		mCommandList->SetPipelineState(mPSOs["Particle"].Get());
 		RenderObjects(mRenderableObjects[(int)RenderLayer::Particle], mCurrentFrameResource->GetParticleVirtualAddress(), RP_PARTICLE, particleCBByteSize, true, &mWorldCamFrustum);
-
-		mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
-			D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_DEPTH_READ));
 
 		mCommandList->SetPipelineState(mPSOs["Sky"].Get());
 		RenderObjects(mRenderableObjects[(int)RenderLayer::Sky], mCurrentFrameResource->GetObjectVirtualAddress(), RP_OBJECT, objCBByteSize);
@@ -363,6 +394,10 @@ void D3DFramework::Tick(float deltaTime)
 	UpdateMainPassBuffer(deltaTime);
 	UpdateWidgetBuffer(deltaTime);
 	UpdateParticleBuffer(deltaTime);
+
+#ifdef SSAO
+	UpdateSsaoBuffer(deltaTime);
+#endif
 }
 
 
@@ -374,7 +409,6 @@ void D3DFramework::AddGameObject(std::shared_ptr<GameObject> object, RenderLayer
 	if (renderLayer == RenderLayer::Opaque || renderLayer == RenderLayer::Transparent || renderLayer == RenderLayer::AlphaTested)
 	{
 		object->WorldUpdate();
-		mActualObjects.push_back(object);
 
 		if (mOctreeRoot)
 		{
@@ -389,9 +423,6 @@ void D3DFramework::AddGameObject(std::shared_ptr<GameObject> object, RenderLayer
 void D3DFramework::DestroyGameObjects()
 {
 	mGameObjects.remove_if([](const std::shared_ptr<Object>& obj)->bool
-	{ return obj->GetIsDestroyesd(); });
-
-	mActualObjects.remove_if([](const std::shared_ptr<Object>& obj)->bool
 	{ return obj->GetIsDestroyesd(); });
 
 	mOctreeRoot->DestroyObjects();
@@ -467,14 +498,6 @@ void D3DFramework::UpdateLightBuffer(float deltaTime)
 
 			XMMATRIX view = light->GetView();
 			XMMATRIX proj = light->GetProj();
-			XMMATRIX shadowTransform = view * proj * toTextureTransform;
-			XMStoreFloat4x4(&lightData.mShadowTransform, XMMatrixTranspose(shadowTransform));
-
-			XMMATRIX invLightView = XMMatrixInverse(&XMMatrixDeterminant(view), view);
-			BoundingFrustum lightFrustum;
-			DirectX::BoundingFrustum::CreateFromMatrix(lightFrustum, proj);
-			lightFrustum.Transform(lightFrustum, invLightView);
-			light->GetShadowMap()->SetFrustum(lightFrustum);
 
 			XMMATRIX viewProj = XMMatrixMultiply(view, proj);
 			XMMATRIX invView = XMMatrixInverse(&XMMatrixDeterminant(view), view);
@@ -529,6 +552,12 @@ void D3DFramework::UpdateMaterialBuffer(float deltaTime)
 
 void D3DFramework::UpdateMainPassBuffer(float deltaTime)
 {
+	static const XMMATRIX T(
+		0.5f, 0.0f, 0.0f, 0.0f,
+		0.0f, -0.5f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.5f, 0.5f, 0.0f, 1.0f);
+
 	XMMATRIX view = mCamera->GetView();
 	XMMATRIX proj = mCamera->GetProj();
 
@@ -543,6 +572,7 @@ void D3DFramework::UpdateMainPassBuffer(float deltaTime)
 	XMStoreFloat4x4(&mMainPassCB->mInvProj, XMMatrixTranspose(invProj));
 	XMStoreFloat4x4(&mMainPassCB->mViewProj, XMMatrixTranspose(viewProj));
 	XMStoreFloat4x4(&mMainPassCB->mInvViewProj, XMMatrixTranspose(invViewProj));
+	XMStoreFloat4x4(&mMainPassCB->mViewProjTex, XMMatrixTranspose(viewProj * T));
 	mMainPassCB->mEyePosW = mCamera->GetPosition3f();
 	mMainPassCB->mCurrentSkyCubeMapIndex = mCurrentSkyCubeMapIndex;
 	mMainPassCB->mRenderTargetSize = XMFLOAT2((float)mScreenWidth, (float)mScreenHeight);
@@ -665,6 +695,41 @@ void D3DFramework::UpdateParticleBuffer(float deltaTime)
 		}
 		++particleIndex;
 	}
+}
+
+void D3DFramework::UpdateSsaoBuffer(float deltaTime)
+{
+	static const XMMATRIX T(
+		0.5f, 0.0f, 0.0f, 0.0f,
+		0.0f, -0.5f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.5f, 0.5f, 0.0f, 1.0f);
+
+	SsaoConstants ssaoCB;
+
+	XMMATRIX proj = mCamera->GetProj();
+	XMMATRIX invProj = XMMatrixInverse(&XMMatrixDeterminant(proj), proj);
+
+	XMStoreFloat4x4(&ssaoCB.mProj, XMMatrixTranspose(proj));
+	XMStoreFloat4x4(&ssaoCB.mInvProj, XMMatrixTranspose(invProj));
+	XMStoreFloat4x4(&ssaoCB.mProjTex, XMMatrixTranspose(proj * T));
+
+	mSsao->GetOffsetVectors(ssaoCB.mOffsetVectors);
+
+	auto blurWeights = mSsao->CalcGaussWeights(2.5f);
+	ssaoCB.mBlurWeights[0] = XMFLOAT4(&blurWeights[0]);
+	ssaoCB.mBlurWeights[1] = XMFLOAT4(&blurWeights[4]);
+	ssaoCB.mBlurWeights[2] = XMFLOAT4(&blurWeights[8]);
+
+	ssaoCB.mInvRenderTargetSize = XMFLOAT2(1.0f / mSsao->GetMapWidth(), 1.0f / mSsao->GetMapHeight());
+
+	ssaoCB.mOcclusionRadius = 0.5f;
+	ssaoCB.mOcclusionFadeStart = 0.2f;
+	ssaoCB.mOcclusionFadeEnd = 1.0f;
+	ssaoCB.mSurfaceEpsilon = 0.05f;
+
+	auto currSsaoCB = mCurrentFrameResource->mSsaoPool->GetBuffer();
+	currSsaoCB->CopyData(0, ssaoCB);
 }
 
 void D3DFramework::UpdateObjectBufferPool()
@@ -909,11 +974,21 @@ void D3DFramework::RenderActualObjects(DirectX::BoundingFrustum* frustum)
 {
 	auto currObjectCB = mCurrentFrameResource->mObjectPool->GetBuffer();
 	D3D12_GPU_VIRTUAL_ADDRESS addressStarat = currObjectCB->GetResource()->GetGPUVirtualAddress();
-	for (const auto& obj : mActualObjects)
+
+	for (const auto& obj : mRenderableObjects[(int)RenderLayer::Opaque])
+		RenderObject(obj.get(), addressStarat, RP_OBJECT, objCBByteSize, true, frustum);
+
+	for (const auto& obj : mRenderableObjects[(int)RenderLayer::AlphaTested])
+		RenderObject(obj.get(), addressStarat, RP_OBJECT, objCBByteSize, true, frustum);
+
+	for (const auto& obj : mRenderableObjects[(int)RenderLayer::Billborad])
+		RenderObject(obj.get(), addressStarat, RP_OBJECT, objCBByteSize, true, frustum);
+
+	for (const auto& obj : mRenderableObjects[(int)RenderLayer::Transparent])
 		RenderObject(obj.get(), addressStarat, RP_OBJECT, objCBByteSize, true, frustum);
 }
 
-GameObject* D3DFramework::Picking(int screenX, int screenY, float distance) const
+GameObject* D3DFramework::Picking(int screenX, int screenY, float distance, bool isMeshCollision) const
 {
 	XMFLOAT4X4 proj = mCamera->GetProj4x4f();
 
@@ -937,12 +1012,19 @@ GameObject* D3DFramework::Picking(int screenX, int screenY, float distance) cons
 	GameObject* hitObj = nullptr;
 
 	// Picking Ray로 충돌을 검사한다.
-	for (const auto& obj : mActualObjects)
+	for (const auto& obj : mGameObjects)
 	{
 		bool isHit = false;
 		float hitDist = FLT_MAX;
 
-		switch (obj->GetCollisionType())
+		CollisionType collisionType = obj->GetCollisionType();
+		if (isMeshCollision)
+		{
+			if (obj->GetMesh())
+				collisionType = obj->GetMesh()->GetCollisionType();
+		}
+
+		switch (collisionType)
 		{
 		case CollisionType::AABB:
 		{

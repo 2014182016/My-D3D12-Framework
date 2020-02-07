@@ -73,6 +73,7 @@ struct PassConstants
 	DirectX::XMFLOAT4X4 mInvProj = DirectX::Identity4x4f();
 	DirectX::XMFLOAT4X4 mViewProj = DirectX::Identity4x4f();
 	DirectX::XMFLOAT4X4 mInvViewProj = DirectX::Identity4x4f();
+	DirectX::XMFLOAT4X4 mViewProjTex = DirectX::Identity4x4f();
 	DirectX::XMFLOAT4X4 mIdentity = DirectX::Identity4x4f();
 	DirectX::XMFLOAT3 mEyePosW = { 0.0f, 0.0f, 0.0f };
 	float mPadding1;
@@ -96,6 +97,24 @@ struct PassConstants
 	std::uint32_t mCurrentSkyCubeMapIndex;
 	float mPadding2;
 	float mPadding3;
+};
+
+struct SsaoConstants
+{
+	DirectX::XMFLOAT4X4 mProj;
+	DirectX::XMFLOAT4X4 mInvProj;
+	DirectX::XMFLOAT4X4 mProjTex;
+	DirectX::XMFLOAT4   mOffsetVectors[14];
+
+	// For SsaoBlur.hlsl
+	DirectX::XMFLOAT4 mBlurWeights[3];
+
+	DirectX::XMFLOAT2 mInvRenderTargetSize = { 0.0f, 0.0f };
+
+	float mOcclusionRadius = 0.5f;
+	float mOcclusionFadeStart = 0.2f;
+	float mOcclusionFadeEnd = 2.0f;
+	float mSurfaceEpsilon = 0.05f;
 };
 
 struct MaterialData

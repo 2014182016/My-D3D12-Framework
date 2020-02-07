@@ -72,6 +72,15 @@
     <FxCompile Include="Shaders\Opaque.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
+    <FxCompile Include="Shaders\Ssao.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="SsaoInclude.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\SsaoBlur.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Component\Component.cpp">
@@ -156,6 +165,9 @@
       <Filter>소스 파일\Object</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\SimpleShadowMap.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\Ssao.cpp">
       <Filter>소스 파일\Framework</Filter>
     </ClCompile>
   </ItemGroup>
@@ -269,6 +281,9 @@
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\SimpleShadowMap.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Ssao.h">
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
   </ItemGroup>

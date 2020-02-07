@@ -38,6 +38,10 @@ Texture2D gNormalMap : register(t2, space4);
 Texture2D gPositonMap : register(t3, space4);
 Texture2D gDepthMap : register(t4, space4);
 
+#ifdef SSAO
+Texture2D gSsaoMap : register(t5, space4);
+#endif
+
 SamplerState gsamPointWrap        : register(s0);
 SamplerState gsamPointClamp       : register(s1);
 SamplerState gsamLinearWrap       : register(s2);
@@ -63,6 +67,7 @@ cbuffer cbPass : register(b1)
     float4x4 gInvProj;
     float4x4 gViewProj;
     float4x4 gInvViewProj;
+	float4x4 gViewProjTex;
 	float4x4 gIdentity;
     float3 gEyePosW;
 	float gPadding1;

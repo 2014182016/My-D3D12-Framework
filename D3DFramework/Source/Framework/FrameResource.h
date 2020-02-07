@@ -23,6 +23,7 @@ public:
 		mMaterialBufferPool = std::make_unique<BufferMemoryPool<MaterialData>>(device, materialCount, false);
 		mWidgetPool = std::make_unique<BufferMemoryPool<WidgetConstants>>(device, widgetCount, true);
 		mParticlePool = std::make_unique<BufferMemoryPool<ParticleConstants>>(device, particleCount, true);
+		mSsaoPool = std::make_unique<BufferMemoryPool<SsaoConstants>>(device, 1, true);
 	}
 	FrameResource(const FrameResource& rhs) = delete;
 	FrameResource& operator=(const FrameResource& rhs) = delete;
@@ -41,6 +42,8 @@ public:
 		if (mWidgetPool->GetBuffer()) return mWidgetPool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0; }
 	D3D12_GPU_VIRTUAL_ADDRESS GetParticleVirtualAddress() const {
 		if (mParticlePool->GetBuffer()) return mParticlePool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0; }
+	D3D12_GPU_VIRTUAL_ADDRESS GetSsaoVirtualAddress() const {
+		if (mSsaoPool->GetBuffer()) return mSsaoPool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0; }
  
 public:
 	// 명령 할당자는 GPU가 명령들을 다 처리한 후 재설정해야한다.
@@ -59,6 +62,7 @@ public:
 	std::unique_ptr<BufferMemoryPool<MaterialData>> mMaterialBufferPool = nullptr;
 	std::unique_ptr<BufferMemoryPool<WidgetConstants>> mWidgetPool = nullptr;
 	std::unique_ptr<BufferMemoryPool<ParticleConstants>> mParticlePool = nullptr;
+	std::unique_ptr<BufferMemoryPool<SsaoConstants>> mSsaoPool = nullptr;
 
 	std::vector<std::unique_ptr<UploadBuffer<WidgetVertex>>> mWidgetVBs;
 	std::vector<std::unique_ptr<UploadBuffer<ParticleVertex>>> mParticleVBs;

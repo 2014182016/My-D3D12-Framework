@@ -14,6 +14,9 @@ public:
 	virtual void SetLightData(struct LightData& lightData);
 
 public:
+	void RenderSceneToShadowMap(ID3D12GraphicsCommandList* cmdList);
+
+public:
 	inline LightType GetLightType() const { return mLightType; }
 
 	inline DirectX::XMFLOAT3 GetStrength() const { return mStrength; }
@@ -35,11 +38,21 @@ public:
 
 	inline DirectX::XMMATRIX GetView() const { return XMLoadFloat4x4(&mView); }
 	inline DirectX::XMMATRIX GetProj() const { return XMLoadFloat4x4(&mProj); }
+	inline DirectX::BoundingFrustum GetLightFrustum() const { return mLightFrustum; }
 
 	inline class ShadowMap* GetShadowMap() { return mShadowMap.get(); }
 
 protected:
+	// NDC 공간 [-1, 1]^2을 텍스처 공간 [0, 1]^2으로 변환하는 행렬
+	static inline const DirectX::XMMATRIX toTextureTransform =
+		DirectX::XMMATRIX(
+		0.5f, 0.0f, 0.0f, 0.0f,
+		0.0f, -0.5f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.5f, 0.5f, 0.0f, 1.0f);
+
 	std::unique_ptr<class ShadowMap> mShadowMap;
+	DirectX::BoundingFrustum mLightFrustum;
 
 	DirectX::XMFLOAT4X4 mView;
 	DirectX::XMFLOAT4X4 mProj;

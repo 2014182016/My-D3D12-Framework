@@ -17,9 +17,10 @@ SimpleShadowMap::SimpleShadowMap(UINT width, UINT height)
 	mScissorRect = { 0, 0, (int)width, (int)height };
 }
 
-void SimpleShadowMap::BuildDescriptors(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
-	                             CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-	                             CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv)
+void SimpleShadowMap::BuildDescriptors(ID3D12Device* device, 
+	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
+	CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
+	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv)
 {
 	mhCpuSrv = hCpuSrv;
 	mhGpuSrv = hGpuSrv;
@@ -40,7 +41,7 @@ void SimpleShadowMap::OnResize(ID3D12Device* device, UINT width, UINT height)
 	}
 }
 
-void SimpleShadowMap::RenderSceneToShadowMap(ID3D12GraphicsCommandList* cmdList)
+void SimpleShadowMap::RenderSceneToShadowMap(ID3D12GraphicsCommandList* cmdList, DirectX::BoundingFrustum* camFrustum)
 {
 	cmdList->RSSetViewports(1, &mViewport);
 	cmdList->RSSetScissorRects(1, &mScissorRect);
@@ -57,7 +58,7 @@ void SimpleShadowMap::RenderSceneToShadowMap(ID3D12GraphicsCommandList* cmdList)
 	// 반드시 활성 PSO의 렌더 대상 개수도 0으로 지정해야 함을 주의하기 바란다.
 	cmdList->OMSetRenderTargets(0, nullptr, false, &mhCpuDsv);
 
-	D3DFramework::GetInstance()->RenderActualObjects(&mLightFrustum);
+	D3DFramework::GetInstance()->RenderActualObjects(camFrustum);
 
 	// 텍스처를 다시 읽을 수 있도록 리소스를 GENERIC_READ로 바꾸어 준다.
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mShadowMap.Get(),
