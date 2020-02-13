@@ -105,6 +105,13 @@ cbuffer cbParticle : register(b3)
 	float gParticlePadding1;
 }
 
+#ifdef SKINNED
+cbuffer cbSkinned : register(b1)
+{
+	float4x4 gBoneTransforms[96];
+};
+#endif
+
 // 법선 맵 표본을 World Space로 변환한다.
 float3 NormalSampleToWorldSpace(float3 normalMapSample, float3 unitNormalW, float3 tangentW)
 {

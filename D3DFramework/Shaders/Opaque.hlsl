@@ -7,6 +7,10 @@ struct VertexIn
 	float3 mTangentU : TANGENT;
 	float3 mBinormalU: BINORMAL;
 	float2 mTexC     : TEXCOORD;
+#ifdef SKINNED
+	float3 mBoneWeights  : WEIGHTS;
+	uint4  mBoneIndices  : BONEINDICES;
+#endif
 };
 
 struct VertexOut
@@ -33,6 +37,28 @@ VertexOut VS(VertexIn vin)
 
 	// 이 정점에 사용할 Material을 가져온다.
 	MaterialData matData = gMaterialData[gObjMaterialIndex];
+
+#ifdef SKINNED
+	float weights[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+	weights[0] = vin.mBoneWeights.x;
+	weights[1] = vin.mBoneWeights.y;
+	weights[2] = vin.mBoneWeights.z;
+	weights[3] = 1.0f - weights[0] - weights[1] - weights[2];
+
+	float3 posL = float3(0.0f, 0.0f, 0.0f);
+	float3 normalL = float3(0.0f, 0.0f, 0.0f);
+	float3 tangentL = float3(0.0f, 0.0f, 0.0f);
+	for (int i = 0; i < 4; ++i)
+	{
+		posL += weights[i] * mul(float4(vin.mPosL, 1.0f), gBoneTransforms[vin.mBoneIndices[i]]).xyz;
+		normalL += weights[i] * mul(vin.mNormalL, (float3x3)gBoneTransforms[vin.mBoneIndices[i]]);
+		tangentL += weights[i] * mul(vin.mTangentL.xyz, (float3x3)gBoneTransforms[vin.mBoneIndices[i]]);
+	}
+
+	vin.mPosL = posL;
+	vin.mNormalL = normalL;
+	vin.mTangentL.xyz = tangentL;
+#endif
 
 	// World Space로 변환한다.
 	float4 posW = mul(float4(vin.mPosL, 1.0f), gObjWorld);

@@ -142,6 +142,7 @@
     <ClCompile Include="Source\Component\Mesh.cpp" />
     <ClCompile Include="Source\Component\Sound.cpp" />
     <ClCompile Include="Source\Component\Widget.cpp" />
+    <ClCompile Include="Source\Framework\Animation.cpp" />
     <ClCompile Include="Source\Framework\AssetManager.cpp" />
     <ClCompile Include="Source\Framework\Camera.cpp" />
     <ClCompile Include="Source\Framework\CubeRenderTarget.cpp" />
@@ -183,6 +184,7 @@
     <ClInclude Include="Source\Component\Mesh.h" />
     <ClInclude Include="Source\Component\Sound.h" />
     <ClInclude Include="Source\Component\Widget.h" />
+    <ClInclude Include="Source\Framework\Animation.h" />
     <ClInclude Include="Source\Framework\AssetManager.h" />
     <ClInclude Include="Source\Framework\BufferMemoryPool.hpp" />
     <ClInclude Include="Source\Framework\Camera.h" />
