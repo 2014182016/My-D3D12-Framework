@@ -2,7 +2,7 @@
 
 #include "WinApp.h"
 
-#define ROOT_PARAMETER_NUM 10
+#define ROOT_PARAMETER_NUM 12
 #define RP_OBJECT 0
 #define RP_PASS 1
 #define RP_LIGHT 2
@@ -13,6 +13,8 @@
 #define RP_G_BUFFER 7
 #define RP_WIDGET 8
 #define RP_PARTICLE 9
+#define RP_SSAO 10
+#define RP_BLUR 11
 
 #define DEFERRED_BUFFER_COUNT 4
 #define LIGHT_NUM 1
@@ -82,7 +84,7 @@ private:
 	void LogAdapterOutputs(IDXGIAdapter* adapter);
 	void LogOutputDisplayModes(IDXGIOutput* output, DXGI_FORMAT format);
 
-	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> GetStaticSamplers();
+	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 8> GetStaticSamplers();
 
 protected:
 	Microsoft::WRL::ComPtr<IDXGIFactory4> mdxgiFactory;
@@ -160,6 +162,8 @@ private:
 		RootParameterInfo(0,4), // G-Buffer
 		RootParameterInfo(2,0), // Widget
 		RootParameterInfo(3,0), // Particle
+		RootParameterInfo(4,0), // Ssao
+		RootParameterInfo(5,0), // Blur
 	};
 
 	const std::array<DXGI_FORMAT, DEFERRED_BUFFER_COUNT> mDeferredBufferFormats =

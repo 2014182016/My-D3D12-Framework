@@ -130,11 +130,11 @@ void Ssao::ComputeSsao(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* 
 	cmdList->OMSetRenderTargets(1, &mhAmbientMap0CpuRtv, true, nullptr);
 	cmdList->SetPipelineState(ssaoPso);
 
-	cmdList->SetGraphicsRootConstantBufferView(0, ssaoCBAddress);
-	cmdList->SetGraphicsRoot32BitConstant(1, 0, 0);
-	cmdList->SetGraphicsRootDescriptorTable(2, mhNormalMapGpuSrv);
-	cmdList->SetGraphicsRootDescriptorTable(3, mhDepthMapGpuSrv);
-	cmdList->SetGraphicsRootDescriptorTable(4, mhRandomVectorMapGpuSrv);
+	cmdList->SetGraphicsRootConstantBufferView(10, ssaoCBAddress);
+	cmdList->SetGraphicsRoot32BitConstant(11, 0, 0);
+	//cmdList->SetGraphicsRootDescriptorTable(2, mhNormalMapGpuSrv);
+	//cmdList->SetGraphicsRootDescriptorTable(3, mhDepthMapGpuSrv);
+	//cmdList->SetGraphicsRootDescriptorTable(4, mhRandomVectorMapGpuSrv);
 
 	cmdList->IASetVertexBuffers(0, 0, nullptr);
 	cmdList->IASetIndexBuffer(nullptr);
@@ -148,7 +148,7 @@ void Ssao::ComputeSsao(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* 
 void Ssao::BlurAmbientMap(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* blurPso, D3D12_GPU_VIRTUAL_ADDRESS ssaoCBAddress, int blurCount)
 {
 	cmdList->SetPipelineState(blurPso);
-	cmdList->SetGraphicsRootConstantBufferView(0, ssaoCBAddress);
+	cmdList->SetGraphicsRootConstantBufferView(10, ssaoCBAddress);
 
 	for (int i = 0; i < blurCount; ++i)
 	{
@@ -166,17 +166,18 @@ void Ssao::BlurAmbientMap(ID3D12GraphicsCommandList* cmdList, bool horzBlur)
 	if (horzBlur == true)
 	{
 		output = mAmbientMap1.Get();
-		randomVecSrv = mhAmbientMap0GpuSrv;
 		outputRtv = mhAmbientMap1CpuRtv;
-		cmdList->SetGraphicsRoot32BitConstant(1, 1, 0);
+		cmdList->SetGraphicsRoot32BitConstant(11, 1, 0);
 	}
 	else
 	{
 		output = mAmbientMap0.Get();
-		randomVecSrv = mhAmbientMap1GpuSrv;
 		outputRtv = mhAmbientMap0CpuRtv;
-		cmdList->SetGraphicsRoot32BitConstant(1, 0, 0);
+		cmdList->SetGraphicsRoot32BitConstant(11, 0, 0);
 	}
+
+	cmdList->RSSetViewports(1, &mViewport);
+	cmdList->RSSetScissorRects(1, &mScissorRect);
 
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(output,
 		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
@@ -184,7 +185,6 @@ void Ssao::BlurAmbientMap(ID3D12GraphicsCommandList* cmdList, bool horzBlur)
 	float clearValue[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 	cmdList->ClearRenderTargetView(outputRtv, clearValue, 0, nullptr);
 	cmdList->OMSetRenderTargets(1, &outputRtv, true, nullptr);
-	cmdList->SetGraphicsRootDescriptorTable(4, randomVecSrv);
 
 	cmdList->IASetVertexBuffers(0, 0, nullptr);
 	cmdList->IASetIndexBuffer(nullptr);

@@ -101,15 +101,9 @@ struct PassConstants
 
 struct SsaoConstants
 {
-	DirectX::XMFLOAT4X4 mProj;
-	DirectX::XMFLOAT4X4 mInvProj;
 	DirectX::XMFLOAT4X4 mProjTex;
 	DirectX::XMFLOAT4   mOffsetVectors[14];
-
-	// For SsaoBlur.hlsl
 	DirectX::XMFLOAT4 mBlurWeights[3];
-
-	DirectX::XMFLOAT2 mInvRenderTargetSize = { 0.0f, 0.0f };
 
 	float mOcclusionRadius = 0.5f;
 	float mOcclusionFadeStart = 0.2f;

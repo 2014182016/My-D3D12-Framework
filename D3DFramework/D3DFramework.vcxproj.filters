@@ -75,10 +75,10 @@
     <FxCompile Include="Shaders\Ssao.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="SsaoInclude.hlsl">
+    <FxCompile Include="Shaders\SsaoBlur.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="Shaders\SsaoBlur.hlsl">
+    <FxCompile Include="Shaders\SsaoInclude.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>

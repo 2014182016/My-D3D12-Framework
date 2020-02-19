@@ -121,19 +121,8 @@ void D3DFramework::CreateDescriptorHeaps(UINT textureNum, UINT cubeTextureNum, U
 {
 	D3DApp::CreateDescriptorHeaps(textureNum, cubeTextureNum, shadowMapNum);
 
-	mShadowMapHeapIndex = textureNum + cubeTextureNum + DEFERRED_BUFFER_COUNT + 1;
-	UINT i = 0;
-	for (const auto& light : mLights)
-	{
-		light->GetShadowMap()->BuildDescriptors(md3dDevice.Get(),
-			GetCpuSrv(mShadowMapHeapIndex + i),
-			GetGpuSrv(mShadowMapHeapIndex + i),
-			GetDsv(1));
-		++i;
-	}
-
+	mSsaoMapHeapIndex = textureNum + cubeTextureNum + DEFERRED_BUFFER_COUNT + 1;
 #ifdef SSAO
-	mSsaoMapHeapIndex = mShadowMapHeapIndex + shadowMapNum;
 	mSsao->BuildDescriptors(md3dDevice.Get(),
 		GetGpuSrv(textureNum + cubeTextureNum + 2),
 		GetGpuSrv(textureNum + cubeTextureNum + DEFERRED_BUFFER_COUNT),
@@ -143,14 +132,23 @@ void D3DFramework::CreateDescriptorHeaps(UINT textureNum, UINT cubeTextureNum, U
 		mCbvSrvUavDescriptorSize,
 		mRtvDescriptorSize);
 #endif
+
+	mShadowMapHeapIndex = mSsaoMapHeapIndex + 3;
+	UINT i = 0;
+	for (const auto& light : mLights)
+	{
+		light->GetShadowMap()->BuildDescriptors(md3dDevice.Get(),
+			GetCpuSrv(mShadowMapHeapIndex + i),
+			GetGpuSrv(mShadowMapHeapIndex + i),
+			GetDsv(1));
+		++i;
+	}
 }
 
 void D3DFramework::SetCommonState()
 {
 	mCommandList->RSSetViewports(1, &mScreenViewport);
 	mCommandList->RSSetScissorRects(1, &mScissorRect);
-
-	mCommandList->SetGraphicsRootSignature(mRootSignatures["Common"].Get());
 
 	mCommandList->SetGraphicsRootSignature(mRootSignatures["Common"].Get());
 
@@ -266,7 +264,6 @@ void D3DFramework::Render()
 #ifdef SSAO
 	// Ssao Pass--------------------------------------------------------------
 	{
-		mCommandList->SetGraphicsRootSignature(mRootSignatures["Ssao"].Get());
 		mSsao->ComputeSsao(mCommandList.Get(), mPSOs["Ssao"].Get(), mCurrentFrameResource->GetSsaoVirtualAddress());
 		mSsao->BlurAmbientMap(mCommandList.Get(), mPSOs["SsaoBlur"].Get(), mCurrentFrameResource->GetSsaoVirtualAddress(), 3);
 	}
@@ -316,7 +313,7 @@ RenderingPassSkip:
 #if defined(DEBUG) || defined(_DEBUG)
 		if (GetOptionEnabled(Option::Debug_GBuffer))
 		{
-			// 위젯의 1~5번째까지는 G-Buffer를 그리는 위젯이다.
+			// 위젯의 1~6번째까지는 G-Buffer를 그리는 위젯이다.
 			auto iter = mWidgets.begin();
 			++iter;
 
@@ -339,6 +336,12 @@ RenderingPassSkip:
 			mCommandList->SetPipelineState(mPSOs["DepthMapDebug"].Get());
 			RenderObject((*iter).get(), mCurrentFrameResource->GetWidgetVirtualAddress(), RP_WIDGET, widgetCBByteSize, false);
 			++iter;
+
+#ifdef SSAO
+			mCommandList->SetPipelineState(mPSOs["SsaoMapDebug"].Get());
+			RenderObject((*iter).get(), mCurrentFrameResource->GetWidgetVirtualAddress(), RP_WIDGET, widgetCBByteSize, false);
+			++iter;
+#endif
 
 			mCommandList->SetPipelineState(mPSOs["ShadowMapDebug"].Get());
 			RenderObject((*iter).get(), mCurrentFrameResource->GetWidgetVirtualAddress(), RP_WIDGET, widgetCBByteSize, false);
@@ -581,7 +584,7 @@ void D3DFramework::UpdateMainPassBuffer(float deltaTime)
 	mMainPassCB->mFarZ = mCamera->GetFarZ();
 	mMainPassCB->mTotalTime = mGameTimer->GetTotalTime();
 	mMainPassCB->mDeltaTime = mGameTimer->GetDeltaTime();
-	mMainPassCB->mAmbientLight = { 0.05f, 0.05f, 0.05f, 1.0f };
+	mMainPassCB->mAmbientLight = { 0.4f, 0.4f, 0.6f, 1.0f };
 	mMainPassCB->mFogColor = { 0.7f, 0.7f, 0.7f, 1.0f };
 	mMainPassCB->mFogStart = 0.0f;
 	mMainPassCB->mFogRange = 100.0f;
@@ -709,9 +712,6 @@ void D3DFramework::UpdateSsaoBuffer(float deltaTime)
 
 	XMMATRIX proj = mCamera->GetProj();
 	XMMATRIX invProj = XMMatrixInverse(&XMMatrixDeterminant(proj), proj);
-
-	XMStoreFloat4x4(&ssaoCB.mProj, XMMatrixTranspose(proj));
-	XMStoreFloat4x4(&ssaoCB.mInvProj, XMMatrixTranspose(invProj));
 	XMStoreFloat4x4(&ssaoCB.mProjTex, XMMatrixTranspose(proj * T));
 
 	mSsao->GetOffsetVectors(ssaoCB.mOffsetVectors);
@@ -720,8 +720,6 @@ void D3DFramework::UpdateSsaoBuffer(float deltaTime)
 	ssaoCB.mBlurWeights[0] = XMFLOAT4(&blurWeights[0]);
 	ssaoCB.mBlurWeights[1] = XMFLOAT4(&blurWeights[4]);
 	ssaoCB.mBlurWeights[2] = XMFLOAT4(&blurWeights[8]);
-
-	ssaoCB.mInvRenderTargetSize = XMFLOAT2(1.0f / mSsao->GetMapWidth(), 1.0f / mSsao->GetMapHeight());
 
 	ssaoCB.mOcclusionRadius = 0.5f;
 	ssaoCB.mOcclusionFadeStart = 0.2f;
@@ -880,9 +878,18 @@ void D3DFramework::CreateWidgets()
 	widget->SetVisible(false);
 	mRenderableObjects[(int)RenderLayer::Widget].push_back(widget);
 	mWidgets.push_back(std::move(widget));
+	
+	widget = std::make_shared<Widget>("SsaoMapDebug"s, md3dDevice.Get(), mCommandList.Get());
+	widget->SetPosition(800, -120);
+	widget->SetSize(160, 120);
+	widget->SetAnchor(0.0f, 1.0f);
+	widget->SetMaterial(AssetManager::GetInstance()->FindMaterial("Default"s));
+	widget->SetVisible(false);
+	mRenderableObjects[(int)RenderLayer::Widget].push_back(widget);
+	mWidgets.push_back(std::move(widget));
 
 	widget = std::make_shared<Widget>("ShadowMapDebug"s, md3dDevice.Get(), mCommandList.Get());
-	widget->SetPosition(800, -120);
+	widget->SetPosition(960, -120);
 	widget->SetSize(160, 120);
 	widget->SetAnchor(0.0f, 1.0f);
 	widget->SetMaterial(AssetManager::GetInstance()->FindMaterial("Default"s));

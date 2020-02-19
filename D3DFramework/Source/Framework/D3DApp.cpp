@@ -528,12 +528,7 @@ void D3DApp::CreateRootSignatures(UINT textureNum, UINT cubeTextureNum, UINT sha
 	texTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, textureNum, mRootParameterInfos[RP_TEXTURE].mShaderRegister, mRootParameterInfos[RP_TEXTURE].mRegisterSpace);
 	texTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, shadowMapNum, mRootParameterInfos[RP_SHADOWMAP].mShaderRegister, mRootParameterInfos[RP_SHADOWMAP].mRegisterSpace);
 	texTable[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, cubeTextureNum, mRootParameterInfos[RP_CUBEMAP].mShaderRegister, mRootParameterInfos[RP_CUBEMAP].mRegisterSpace);
-	
-#ifdef SSAO
 	texTable[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, DEFERRED_BUFFER_COUNT + 4, mRootParameterInfos[RP_G_BUFFER].mShaderRegister, mRootParameterInfos[RP_G_BUFFER].mRegisterSpace);
-#else
-	texTable[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, DEFERRED_BUFFER_COUNT + 1, mRootParameterInfos[RP_G_BUFFER].mShaderRegister, mRootParameterInfos[RP_G_BUFFER].mRegisterSpace);
-#endif
 
 	// 퍼포먼스 TIP: 가장 자주 사용하는 것을 앞에 놓는다.
 	slotRootParameter[RP_OBJECT].InitAsConstantBufferView(mRootParameterInfos[RP_OBJECT].mShaderRegister, mRootParameterInfos[RP_OBJECT].mRegisterSpace); // Object 상수 버퍼
@@ -546,6 +541,8 @@ void D3DApp::CreateRootSignatures(UINT textureNum, UINT cubeTextureNum, UINT sha
 	slotRootParameter[RP_G_BUFFER].InitAsDescriptorTable(1, &texTable[3], D3D12_SHADER_VISIBILITY_PIXEL); // G-Buffer
 	slotRootParameter[RP_WIDGET].InitAsConstantBufferView(mRootParameterInfos[RP_WIDGET].mShaderRegister, mRootParameterInfos[RP_WIDGET].mRegisterSpace); // Widget
 	slotRootParameter[RP_PARTICLE].InitAsConstantBufferView(mRootParameterInfos[RP_PARTICLE].mShaderRegister, mRootParameterInfos[RP_PARTICLE].mRegisterSpace); // Particle
+	slotRootParameter[RP_SSAO].InitAsConstantBufferView(mRootParameterInfos[RP_SSAO].mShaderRegister, mRootParameterInfos[RP_SSAO].mRegisterSpace); // Ssao
+	slotRootParameter[RP_BLUR].InitAsConstants(1, mRootParameterInfos[RP_BLUR].mShaderRegister); // Blur
 
 	auto staticSamplers = GetStaticSamplers();
 
@@ -571,6 +568,7 @@ void D3DApp::CreateRootSignatures(UINT textureNum, UINT cubeTextureNum, UINT sha
 		serializedRootSig->GetBufferSize(),
 		IID_PPV_ARGS(&mRootSignatures["Common"])));
 
+	/*
 #ifdef SSAO
 	CD3DX12_DESCRIPTOR_RANGE ssaoTexTable[3];
 	ssaoTexTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
@@ -642,17 +640,14 @@ void D3DApp::CreateRootSignatures(UINT textureNum, UINT cubeTextureNum, UINT sha
 		serializedRootSig->GetBufferSize(),
 		IID_PPV_ARGS(&mRootSignatures["Ssao"])));
 #endif
+	*/
 }
 
 
 void D3DApp::CreateDescriptorHeaps(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum)
 {
 	D3D12_DESCRIPTOR_HEAP_DESC cbvSrvUavDescriptorHeap = {};
-#ifdef SSAO
 	cbvSrvUavDescriptorHeap.NumDescriptors = textureNum + cubeTextureNum + shadowMapNum + DEFERRED_BUFFER_COUNT + 4;
-#else
-	cbvSrvUavDescriptorHeap.NumDescriptors = textureNum + cubeTextureNum + shadowMapNum + DEFERRED_BUFFER_COUNT + 1;
-#endif
 	cbvSrvUavDescriptorHeap.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	cbvSrvUavDescriptorHeap.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&cbvSrvUavDescriptorHeap, IID_PPV_ARGS(&mCbvSrvUavDescriptorHeap)));
@@ -728,7 +723,6 @@ void D3DApp::CreateShadersAndInputLayout()
 	std::vector<D3D_SHADER_MACRO> defines;
 	D3D_SHADER_MACRO macro;
 
-#ifdef SSAO
 	//macro.Definition = "SKY_REFLECTION";
 	//macro.Name = "1";
 	//defines.push_back(macro);
@@ -736,11 +730,6 @@ void D3DApp::CreateShadersAndInputLayout()
 	macro.Definition = "SSAO";
 	macro.Name = "1";
 	defines.push_back(macro);
-#else
-	macro.Definition = "SKY_REFLECTION";
-	macro.Name = "1";
-	defines.push_back(macro);
-#endif
 
 	macro.Definition = NULL;
 	macro.Name = NULL;
@@ -779,6 +768,7 @@ void D3DApp::CreateShadersAndInputLayout()
 	mShaders["DepthMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "DepthMapDebugPS", "ps_5_1");
 	mShaders["PositionMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "PositionMapDebugPS", "ps_5_1");
 	mShaders["ShadowMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "ShadowMapDebugPS", "ps_5_1");
+	mShaders["SsaoMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "SsaoMapDebugPS", "ps_5_1");
 
 	mShaders["LightingPassPS"] = D3DUtil::CompileShader(L"Shaders\\LightingPass.hlsl", defines.data() , "PS", "ps_5_1");
 
@@ -1043,7 +1033,7 @@ void D3DApp::CreatePSOs()
 	// PSO for Ssao
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC ssaoPsoDesc = forwardPsoDesc;
 	ssaoPsoDesc.InputLayout = { nullptr, 0 };
-	ssaoPsoDesc.pRootSignature = mRootSignatures["Ssao"].Get();
+	ssaoPsoDesc.pRootSignature = mRootSignatures["Common"].Get();
 	ssaoPsoDesc.VS =
 	{
 		reinterpret_cast<BYTE*>(mShaders["SsaoVS"]->GetBufferPointer()),
@@ -1138,6 +1128,16 @@ void D3DApp::CreatePSOs()
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&shadowMapDebugPsoDesc, IID_PPV_ARGS(&mPSOs["ShadowMapDebug"])));
 
 
+	// PSO for SsaoMapDebug
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC ssaoMapDebugPsoDesc = widgetPsoDesc;
+	ssaoMapDebugPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["SsaoMapDebugPS"]->GetBufferPointer()),
+		mShaders["SsaoMapDebugPS"]->GetBufferSize()
+	};
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&ssaoMapDebugPsoDesc, IID_PPV_ARGS(&mPSOs["SsaoMapDebug"])));
+
+
 	// PSO for LightingPass
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC lightingPassPsoDesc = widgetPsoDesc;
 	lightingPassPsoDesc.PS =
@@ -1205,7 +1205,7 @@ void D3DApp::ApplyOption(Option option)
 	}
 }
 
-std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> D3DApp::GetStaticSamplers()
+std::array<const CD3DX12_STATIC_SAMPLER_DESC, 8> D3DApp::GetStaticSamplers()
 {
 	// 그래픽 응용 프로그램이 사용하는 표본추출기의 수는 그리 많지 않으므로
 	// 미리 만들어서 Root Signature에 포함시켜 둔다.
@@ -1276,10 +1276,21 @@ std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> D3DApp::GetStaticSamplers()
 		D3D12_COMPARISON_FUNC_LESS_EQUAL,
 		D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK);
 
+	const CD3DX12_STATIC_SAMPLER_DESC depthMapSam(
+		7, // shaderRegister
+		D3D12_FILTER_MIN_MAG_MIP_LINEAR, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressW
+		0.0f,
+		0,
+		D3D12_COMPARISON_FUNC_LESS_EQUAL,
+		D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE);
+
 	return {
 		pointWrap, pointClamp,
 		linearWrap, linearClamp,
 		anisotropicWrap, anisotropicClamp,
-		shadow,
+		shadow, depthMapSam
 	};
 }

@@ -8,7 +8,8 @@
 // 많은 수의 텍셀을 담을 수 있다.
 //=============================================================================
 
-#include "SsaoInclude.hlsl"
+//#include "SsaoInclude.hlsl"
+#include "Common.hlsl"
 
 struct VertexOut
 {
@@ -28,6 +29,11 @@ VertexOut VS(uint vid : SV_VertexID)
 
 float4 PS(VertexOut pin) : SV_Target
 {
+	int3 texcoord = int3(pin.mPosH.xy, 0);
+	float3 centerNormal = gNormalMap.Load(texcoord).rgb;
+	float centerDepth = gDepthMap.Load(texcoord).r;
+	centerDepth = NdcDepthToViewDepth(centerDepth);
+
 	// 흐리기 핵 가중치들을 1차원 float 배열에 풀어 놓는다.
 	float blurWeights[12] =
 	{
@@ -37,21 +43,20 @@ float4 PS(VertexOut pin) : SV_Target
 	};
 
 	float2 texOffset;
+	float4 color = 0.0f;
 	if (gHorizontalBlur)
 	{
 		texOffset = float2(gInvRenderTargetSize.x, 0.0f);
+		color = blurWeights[gBlurRadius] * gSsaoMap.SampleLevel(gsamPointClamp, pin.mTexC, 0.0);
 	}
 	else
 	{
 		texOffset = float2(0.0f, gInvRenderTargetSize.y);
+		color = blurWeights[gBlurRadius] * gSsaoMap2.SampleLevel(gsamPointClamp, pin.mTexC, 0.0);
 	}
 
 	// 필터 핵 중앙의 값은 항상 총합에 기여한다.
-	float4 color = blurWeights[gBlurRadius] * gRandomVecMap.SampleLevel(gsamPointClamp, pin.mTexC, 0.0);
 	float totalWeight = blurWeights[gBlurRadius];
-
-	float3 centerNormal = gNormalMap.SampleLevel(gsamPointClamp, pin.mTexC, 0.0f).xyz;
-	float  centerDepth = NdcDepthToViewDepth(gDepthMap.SampleLevel(gsamDepthMap, pin.mTexC, 0.0f).r);
 
 	for (float i = -gBlurRadius; i <= gBlurRadius; ++i)
 	{
@@ -74,7 +79,14 @@ float4 PS(VertexOut pin) : SV_Target
 			float weight = blurWeights[i + gBlurRadius];
 
 			// 이웃 픽셀들을 추가한다(그러면 현재 픽셀이 더 흐려진다).
-			color += weight * gRandomVecMap.SampleLevel(gsamPointClamp, tex, 0.0);
+			if (gHorizontalBlur)
+			{
+				color += weight * gSsaoMap.SampleLevel(gsamPointClamp, tex, 0.0);
+			}
+			else
+			{
+				color += weight * gSsaoMap2.SampleLevel(gsamPointClamp, tex, 0.0);
+			}
 
 			totalWeight += weight;
 		}

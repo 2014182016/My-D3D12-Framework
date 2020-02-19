@@ -2,7 +2,8 @@
 // Ssao.hlsl by Frank Luna (C) 2015 All Rights Reserved.
 //=============================================================================
 
-#include "SsaoInclude.hlsl"
+//#include "SsaoInclude.hlsl"
+#include "Common.hlsl"
 
 struct VertexOut
 {
@@ -42,7 +43,6 @@ float4 PS(VertexOut pin) :SV_Target
 	// 우선 p = t * pin.mPosV를 만족하는 t를 구한다.
 	// p.z = t * pin.mPosV.z
 	// t = p.z / pin.mPosV.z
-
 	float3 p = (depth / pin.mPosV.z) * pin.mPosV;
 
 	// 무작위 벡터를 추출해서 [0, 1]을 [-1, 1]로 사상한다.
@@ -78,15 +78,15 @@ float4 PS(VertexOut pin) :SV_Target
 		rz = NdcDepthToViewDepth(rz);
 
 		// 완전한 시야 공간 위치 r = (rx, ry, rz)를 재구축한다.
-		// r은 q를 지나는 반직석에 있으므로 r = t * q를 만족하는 t가 존재한다.
+		// r은 q를 지나는 반직선에 있으므로 r = t * q를 만족하는 t가 존재한다.
 		// r.z = t * q.z이므로 t = r.z / q.z 이다.
 		float3 r = (rz / q.z) * q;
 
-		// r이 p를 가지는 지 판정한다.
+		// r이 p를 가리는 지 판정한다.
 		// * 내적 dot(normal, normalize(r - p))는 잠재적 차폐점 r이 (p, normal)으로
 		//   정의되는 평면보다 얼마나 앞에 있는지를 나타낸다. 더 앞에 있는 점일수록
 		//   차폐도의 가중치를 더 크게 잡는다. 이렇게 하면 자기 차폐문제, 즉 r이
-		//   시선과 직작인 평면 (p, normal)에 있을 때 시점 시준의 깊이 값 차이때문에
+		//   시선과 직각인 평면 (p, normal)에 있을 때 시점 시준의 깊이 값 차이때문에
 		//   r이 p를 가린다고 잘못 판정하는 문제도 방지된다.
 		// * 차폐도는 현재 점 p와 차폐점 r 사이의 거리에 의존한다. r이 p에서 너무 멀리
 		//   있으면 p를 가리지 않는 것으로 판정한다.
