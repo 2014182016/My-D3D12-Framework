@@ -57,7 +57,7 @@ private:
 	void DestroyGameObjects();
 	void DestroyParticles();
 
-	void SetCommonState();
+	void SetCommonState(ID3D12GraphicsCommandList* cmdList);
 
 private:
 	static inline D3DFramework* instance = nullptr;

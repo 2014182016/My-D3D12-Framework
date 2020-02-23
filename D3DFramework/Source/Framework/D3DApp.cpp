@@ -720,23 +720,21 @@ void D3DApp::CreateShadersAndInputLayout()
 	// Direct3D에게 각 정점의 성분을 알려주는 InputLayout과
 	// 셰이더를 컴파일한다.
 
-	std::vector<D3D_SHADER_MACRO> defines;
-	D3D_SHADER_MACRO macro;
-
-	//macro.Definition = "SKY_REFLECTION";
-	//macro.Name = "1";
-	//defines.push_back(macro);
-
-	macro.Definition = "SSAO";
-	macro.Name = "1";
-	defines.push_back(macro);
-
-	macro.Definition = NULL;
-	macro.Name = NULL;
-	defines.push_back(macro);
+#ifdef SSAO
+	D3D_SHADER_MACRO defines[] = {
+		//"SKY_REFLECTION", "1",
+		"SSAO", "1",
+		NULL, NULL,
+	};
+#else
+	D3D_SHADER_MACRO defines[] = {
+		//"SKY_REFLECTION", "1",
+		NULL, NULL,
+	};
+#endif
 
 	mShaders["ForwardVS"] = D3DUtil::CompileShader(L"Shaders\\Forward.hlsl", nullptr, "VS", "vs_5_1");
-	mShaders["ForwardPS"] = D3DUtil::CompileShader(L"Shaders\\Forward.hlsl", defines.data() , "PS", "ps_5_1");
+	mShaders["ForwardPS"] = D3DUtil::CompileShader(L"Shaders\\Forward.hlsl", defines, "PS", "ps_5_1");
 
 	mShaders["OpaqueVS"] = D3DUtil::CompileShader(L"Shaders\\Opaque.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["OpaquePS"] = D3DUtil::CompileShader(L"Shaders\\Opaque.hlsl", nullptr, "PS", "ps_5_1");
@@ -770,7 +768,7 @@ void D3DApp::CreateShadersAndInputLayout()
 	mShaders["ShadowMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "ShadowMapDebugPS", "ps_5_1");
 	mShaders["SsaoMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "SsaoMapDebugPS", "ps_5_1");
 
-	mShaders["LightingPassPS"] = D3DUtil::CompileShader(L"Shaders\\LightingPass.hlsl", defines.data() , "PS", "ps_5_1");
+	mShaders["LightingPassPS"] = D3DUtil::CompileShader(L"Shaders\\LightingPass.hlsl", defines, "PS", "ps_5_1");
 
 	mShaders["SsaoVS"] = D3DUtil::CompileShader(L"Shaders\\Ssao.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["SsaoPS"] = D3DUtil::CompileShader(L"Shaders\\Ssao.hlsl", nullptr, "PS", "ps_5_1");
@@ -1293,4 +1291,15 @@ std::array<const CD3DX12_STATIC_SAMPLER_DESC, 8> D3DApp::GetStaticSamplers()
 		anisotropicWrap, anisotropicClamp,
 		shadow, depthMapSam
 	};
+}
+
+void D3DApp::Reset(ID3D12GraphicsCommandList* cmdList, ID3D12CommandAllocator* cmdAlloc)
+{
+	// 명령 기록에 관련된 메모리의 재활용을 위해 명령 할당자를 재설정한다.
+	// 재설정은 GPU가 관련 명령목록들을 모두 처리한 후에 일어난다.
+	ThrowIfFailed(cmdAlloc->Reset());
+
+	// 명령 목록을 ExcuteCommandList을 통해서 명령 대기열에 추가했다면
+	// 명령 목록을 재설정할 수 있다. 명령 목록을 재설정하면 메모리가 재활용된다.
+	ThrowIfFailed(cmdList->Reset(cmdAlloc, nullptr));
 }

@@ -19,7 +19,7 @@
 #define DEFERRED_BUFFER_COUNT 4
 #define LIGHT_NUM 1
 
-// #define SSAO
+#define SSAO
 
 class D3DApp : public WinApp
 {
@@ -66,6 +66,7 @@ protected:
 	void CreateShadersAndInputLayout();
 	void CreatePSOs();
 
+	void Reset(ID3D12GraphicsCommandList* cmdList, ID3D12CommandAllocator* cmdAlloc);
 	void FlushCommandQueue();
 
 protected:

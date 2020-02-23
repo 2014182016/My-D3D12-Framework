@@ -73,6 +73,7 @@ struct PassConstants
 	DirectX::XMFLOAT4X4 mInvProj = DirectX::Identity4x4f();
 	DirectX::XMFLOAT4X4 mViewProj = DirectX::Identity4x4f();
 	DirectX::XMFLOAT4X4 mInvViewProj = DirectX::Identity4x4f();
+	DirectX::XMFLOAT4X4 mProjTex = DirectX::Identity4x4f();
 	DirectX::XMFLOAT4X4 mViewProjTex = DirectX::Identity4x4f();
 	DirectX::XMFLOAT4X4 mIdentity = DirectX::Identity4x4f();
 	DirectX::XMFLOAT3 mEyePosW = { 0.0f, 0.0f, 0.0f };
@@ -101,7 +102,6 @@ struct PassConstants
 
 struct SsaoConstants
 {
-	DirectX::XMFLOAT4X4 mProjTex;
 	DirectX::XMFLOAT4   mOffsetVectors[14];
 	DirectX::XMFLOAT4 mBlurWeights[3];
 
@@ -109,6 +109,11 @@ struct SsaoConstants
 	float mOcclusionFadeStart = 0.2f;
 	float mOcclusionFadeEnd = 2.0f;
 	float mSurfaceEpsilon = 0.05f;
+
+	float mSsaoContrast;
+	float mSsaoPadding0;
+	float mSsaoPadding1;
+	float mSsaoPadding2;
 };
 
 struct MaterialData

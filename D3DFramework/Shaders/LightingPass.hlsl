@@ -23,14 +23,7 @@ float4 PS(VertexOut pin) : SV_Target
 	toEyeW /= distToEye; // normalize
 
 	// Diffuse를 전반적으로 밝혀주는 Ambient항
-	float4 ambient = gAmbientLight * diffuseAlbedo ;
-
-#ifdef SSAO
-	float4 ssaoPosH = mul(posW, gViewProjTex);
-	ssaoPosH /= ssaoPosH.w;
-	float ambientAccess = gSsaoMap.Sample(gsamLinearClamp, ssaoPosH.xy, 0.0f).r;
-	ambient *= ambientAccess;
-#endif
+	float4 ambient = gAmbientLight * diffuseAlbedo;
 
 	// roughness와 normal를 이용하여 shininess를 계산한다.
 	const float shininess = 1.0f - roughness;
@@ -39,6 +32,13 @@ float4 PS(VertexOut pin) : SV_Target
 	// Lighting을 실시한다.
 	float4 directLight = ComputeShadowLighting(gLights, mat, posW.xyz, normal, toEyeW);
 	float4 litColor = ambient + directLight;
+
+#ifdef SSAO
+	float4 ssaoPosH = mul(posW, gViewProjTex);
+	ssaoPosH /= ssaoPosH.w;
+	float ambientAccess = gSsaoMap.Sample(gsamLinearClamp, ssaoPosH.xy, 0.0f).r;
+	litColor *= ambientAccess;
+#endif
 
 	// 분산 재질에서 알파를 가져온다.
 	litColor.a = diffuseAlbedo.a;

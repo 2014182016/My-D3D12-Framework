@@ -79,8 +79,7 @@ void D3DFramework::OnResize(int screenWidth, int screenHeight)
 
 void D3DFramework::InitFramework()
 {
-	// 초기화 명령들을 준비하기 위해 명령 목록들을 재설정한다.
-	ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), nullptr));
+	Reset(mCommandList.Get(), mDirectCmdListAlloc.Get());
 
 	mCamera->SetListener(mListener.Get());
 	mCamera->SetPosition(0.0f, 2.0f, -15.0f);
@@ -145,47 +144,40 @@ void D3DFramework::CreateDescriptorHeaps(UINT textureNum, UINT cubeTextureNum, U
 	}
 }
 
-void D3DFramework::SetCommonState()
+void D3DFramework::SetCommonState(ID3D12GraphicsCommandList* cmdList)
 {
-	mCommandList->RSSetViewports(1, &mScreenViewport);
-	mCommandList->RSSetScissorRects(1, &mScissorRect);
+	cmdList->RSSetViewports(1, &mScreenViewport);
+	cmdList->RSSetScissorRects(1, &mScissorRect);
 
-	mCommandList->SetGraphicsRootSignature(mRootSignatures["Common"].Get());
+	ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvSrvUavDescriptorHeap.Get() };
+	cmdList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
+	cmdList->SetGraphicsRootSignature(mRootSignatures["Common"].Get());
 
 	// 구조적 버퍼는 힙을 생략하고 그냥 하나의 루트 서술자로 묶을 수 있다.
-	mCommandList->SetGraphicsRootShaderResourceView(RP_LIGHT, mCurrentFrameResource->GetLightVirtualAddress());
-	mCommandList->SetGraphicsRootShaderResourceView(RP_MATERIAL, mCurrentFrameResource->GetMaterialVirtualAddress());
+	cmdList->SetGraphicsRootShaderResourceView(RP_LIGHT, mCurrentFrameResource->GetLightVirtualAddress());
+	cmdList->SetGraphicsRootShaderResourceView(RP_MATERIAL, mCurrentFrameResource->GetMaterialVirtualAddress());
 
 	// 이 장면에 사용되는 모든 텍스처를 묶는다. 테이블의 첫 서술자만 묶으면
 	// 테이블에 몇 개의 서술자가 있는지는 Root Signature에 설정되어 있다.
-	mCommandList->SetGraphicsRootDescriptorTable(RP_TEXTURE, GetGpuSrv(0));
+	cmdList->SetGraphicsRootDescriptorTable(RP_TEXTURE, GetGpuSrv(0));
 
 	// 큐브 맵을 파이프라인에 바인딩한다.
-	mCommandList->SetGraphicsRootDescriptorTable(RP_CUBEMAP, GetGpuSrv(mSkyCubeMapHeapIndex));
+	cmdList->SetGraphicsRootDescriptorTable(RP_CUBEMAP, GetGpuSrv(mSkyCubeMapHeapIndex));
 
 	// G-Buffer에 사용될 렌더 타겟들을 파이프라인에 바인딩한다.
-	mCommandList->SetGraphicsRootDescriptorTable(RP_G_BUFFER, GetGpuSrv(mDeferredBufferHeapIndex));
+	cmdList->SetGraphicsRootDescriptorTable(RP_G_BUFFER, GetGpuSrv(mDeferredBufferHeapIndex));
 
 	// 그림자 맵을 파이프라인에 바인딩한다.
-	mCommandList->SetGraphicsRootDescriptorTable(RP_SHADOWMAP, GetGpuSrv(mShadowMapHeapIndex));
+	cmdList->SetGraphicsRootDescriptorTable(RP_SHADOWMAP, GetGpuSrv(mShadowMapHeapIndex));
 }
 
 void D3DFramework::Render()
 {
 	auto cmdListAlloc = mCurrentFrameResource->mCmdListAlloc;
+	Reset(mCommandList.Get(), cmdListAlloc.Get());
 
-	// 명령 기록에 관련된 메모리의 재활용을 위해 명령 할당자를 재설정한다.
-	// 재설정은 GPU가 관련 명령목록들을 모두 처리한 후에 일어난다.
-	ThrowIfFailed(cmdListAlloc->Reset());
-
-	// 명령 목록을 ExcuteCommandList을 통해서 명령 대기열에 추가했다면
-	// 명령 목록을 재설정할 수 있다. 명령 목록을 재설정하면 메모리가 재활용된다.
-	ThrowIfFailed(mCommandList->Reset(cmdListAlloc.Get(), nullptr));
-
-	ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvSrvUavDescriptorHeap.Get() };
-	mCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
-
-	SetCommonState();
+	SetCommonState(mCommandList.Get());
 
 	// Wireframe Pass ---------------------------------------------------------
 
@@ -268,7 +260,7 @@ void D3DFramework::Render()
 		mSsao->BlurAmbientMap(mCommandList.Get(), mPSOs["SsaoBlur"].Get(), mCurrentFrameResource->GetSsaoVirtualAddress(), 3);
 	}
 
-	SetCommonState();
+	SetCommonState(mCommandList.Get());
 #endif
 
 	// Lighting Pass ---------------------------------------------------------
@@ -406,6 +398,7 @@ void D3DFramework::Tick(float deltaTime)
 
 void D3DFramework::AddGameObject(std::shared_ptr<GameObject> object, RenderLayer renderLayer)
 {
+	object->SetRenderLayer(renderLayer);
 	mGameObjects.push_back(object);
 	mRenderableObjects[(int)renderLayer].push_back(object);
 
@@ -575,6 +568,7 @@ void D3DFramework::UpdateMainPassBuffer(float deltaTime)
 	XMStoreFloat4x4(&mMainPassCB->mInvProj, XMMatrixTranspose(invProj));
 	XMStoreFloat4x4(&mMainPassCB->mViewProj, XMMatrixTranspose(viewProj));
 	XMStoreFloat4x4(&mMainPassCB->mInvViewProj, XMMatrixTranspose(invViewProj));
+	XMStoreFloat4x4(&mMainPassCB->mProjTex, XMMatrixTranspose(proj * T));
 	XMStoreFloat4x4(&mMainPassCB->mViewProjTex, XMMatrixTranspose(viewProj * T));
 	mMainPassCB->mEyePosW = mCamera->GetPosition3f();
 	mMainPassCB->mCurrentSkyCubeMapIndex = mCurrentSkyCubeMapIndex;
@@ -710,12 +704,7 @@ void D3DFramework::UpdateSsaoBuffer(float deltaTime)
 
 	SsaoConstants ssaoCB;
 
-	XMMATRIX proj = mCamera->GetProj();
-	XMMATRIX invProj = XMMatrixInverse(&XMMatrixDeterminant(proj), proj);
-	XMStoreFloat4x4(&ssaoCB.mProjTex, XMMatrixTranspose(proj * T));
-
 	mSsao->GetOffsetVectors(ssaoCB.mOffsetVectors);
-
 	auto blurWeights = mSsao->CalcGaussWeights(2.5f);
 	ssaoCB.mBlurWeights[0] = XMFLOAT4(&blurWeights[0]);
 	ssaoCB.mBlurWeights[1] = XMFLOAT4(&blurWeights[4]);
@@ -725,6 +714,8 @@ void D3DFramework::UpdateSsaoBuffer(float deltaTime)
 	ssaoCB.mOcclusionFadeStart = 0.2f;
 	ssaoCB.mOcclusionFadeEnd = 1.0f;
 	ssaoCB.mSurfaceEpsilon = 0.05f;
+
+	ssaoCB.mSsaoContrast = 4.0f;
 
 	auto currSsaoCB = mCurrentFrameResource->mSsaoPool->GetBuffer();
 	currSsaoCB->CopyData(0, ssaoCB);
@@ -750,17 +741,15 @@ void D3DFramework::CreateObjects()
 	object->SetScale(5000.0f, 5000.0f, 5000.0f);
 	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Sky"s));
 	object->SetMesh(AssetManager::GetInstance()->FindMesh("SkySphere"s));
-	object->SetRenderLayer(RenderLayer::Sky);
 	object->SetCollisionEnabled(false);
-	AddGameObject(object, object->GetRenderLayer());
+	AddGameObject(object, RenderLayer::Sky);
 
 	object = std::make_shared<GameObject>("Floor0"s);
 	object->SetScale(20.0f, 0.1f, 30.0f);
 	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tile0"s));
 	object->SetMesh(AssetManager::GetInstance()->FindMesh("Cube_AABB"s));
-	object->SetRenderLayer(RenderLayer::Opaque);
 	object->SetCollisionEnabled(true);
-	AddGameObject(object, object->GetRenderLayer());
+	AddGameObject(object, RenderLayer::Opaque);
 
 
 	for (int i = 0; i < 5; ++i)
@@ -777,25 +766,22 @@ void D3DFramework::CreateObjects()
 		object->SetPosition(5.0f, 1.5f, -10.0f + i * 5.0f);
 		object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Brick0"s));
 		object->SetMesh(AssetManager::GetInstance()->FindMesh("Cylinder"s));
-		object->SetRenderLayer(RenderLayer::Opaque);
 		object->SetCollisionEnabled(true);
-		AddGameObject(object, object->GetRenderLayer());
+		AddGameObject(object, RenderLayer::Opaque);
 
 		object = std::make_shared<GameObject>("SphereLeft"s + std::to_string(i));
 		object->SetPosition(-5.0f, 3.5f, -10.0f + i * 5.0f);
 		object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Mirror0"s));
 		object->SetMesh(AssetManager::GetInstance()->FindMesh("Sphere"s));
-		object->SetRenderLayer(RenderLayer::Transparent);
 		object->SetCollisionEnabled(true);
-		AddGameObject(object, object->GetRenderLayer());
+		AddGameObject(object, RenderLayer::Transparent);
 
 		object = std::make_shared<GameObject>("SphereRight"s + std::to_string(i));
 		object->SetPosition(5.0f, 3.5f, -10.0f + i * 5.0f);
 		object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Mirror0"s));
 		object->SetMesh(AssetManager::GetInstance()->FindMesh("Sphere"s));
-		object->SetRenderLayer(RenderLayer::Transparent);
 		object->SetCollisionEnabled(true);
-		AddGameObject(object, object->GetRenderLayer());
+		AddGameObject(object, RenderLayer::Transparent);
 	}
 }
 

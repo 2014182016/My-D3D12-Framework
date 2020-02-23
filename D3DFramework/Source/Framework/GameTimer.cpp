@@ -2,6 +2,7 @@
 // GameTimer.cpp by Frank Luna (C) 2011 All Rights Reserved.
 //***************************************************************************************
 
+#include "pch.h"
 #include "GameTimer.h"
 #include <Windows.h>
 

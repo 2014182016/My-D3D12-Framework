@@ -34,9 +34,9 @@ float4 PS(VertexOut pin) :SV_Target
 	// q : p 주변의 무작위 점
 	// r : p를 가릴 가능성이 있는 잠재적 차폐점
 
-	int3 texcoord = int3(pin.mPosH.xy, 0);
-	float3 normal = gNormalMap.Load(texcoord).rgb;
-	float depth = gDepthMap.Load(texcoord).r;
+	float3 normal = normalize(gNormalMap.SampleLevel(gsamPointClamp, pin.mTexC, 0.0f).xyz);
+	normal = mul(normal, (float3x3)gView);
+	float depth = gDepthMap.SampleLevel(gsamDepthMap, pin.mTexC, 0.0f).r;
 	depth = NdcDepthToViewDepth(depth);
 
 	// 완전한 시야공간 (x,y,z)를 재구축한다.
@@ -74,7 +74,7 @@ float4 PS(VertexOut pin) :SV_Target
 		// (이것이 q의 깊이는 아니다. q는 그냥 p 근처의 임의의 점이며)
 		// 장면의 물체가 아닌 빈 공간에 있는 점일 수 있다.)
 		// 가장 가까운 깊이는 깊이 맵에서 추출한다.
-		float rz = gDepthMap.SampleLevel(gsamLinearWrap, projQ.xy, 0.0f).r;
+		float rz = gDepthMap.SampleLevel(gsamDepthMap, projQ.xy, 0.0f).r;
 		rz = NdcDepthToViewDepth(rz);
 
 		// 완전한 시야 공간 위치 r = (rx, ry, rz)를 재구축한다.
@@ -98,9 +98,8 @@ float4 PS(VertexOut pin) :SV_Target
 	}
 
 	occlusionSum /= gSampleCount;
-
 	float access = 1.0f - occlusionSum;
 
 	// SSAO가 좀 더 극적인 효과를 내도록, SSAO의 대비(constrast)를 증가한다.
-	return saturate(pow(access, 2.0f));
+	return saturate(pow(access, gSsaoContrast));
 }

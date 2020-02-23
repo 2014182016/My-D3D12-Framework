@@ -29,9 +29,9 @@ VertexOut VS(uint vid : SV_VertexID)
 
 float4 PS(VertexOut pin) : SV_Target
 {
-	int3 texcoord = int3(pin.mPosH.xy, 0);
-	float3 centerNormal = gNormalMap.Load(texcoord).rgb;
-	float centerDepth = gDepthMap.Load(texcoord).r;
+	float3 centerNormal = normalize(gNormalMap.SampleLevel(gsamPointClamp, pin.mTexC, 0.0f).xyz);
+	centerNormal = mul(centerNormal, (float3x3)gView);
+	float centerDepth = gDepthMap.SampleLevel(gsamDepthMap, pin.mTexC, 0.0f).r;
 	centerDepth = NdcDepthToViewDepth(centerDepth);
 
 	// 흐리기 핵 가중치들을 1차원 float 배열에 풀어 놓는다.
@@ -67,7 +67,9 @@ float4 PS(VertexOut pin) : SV_Target
 		float2 tex = pin.mTexC + i * texOffset;
 
 		float3 neighborNormal = gNormalMap.SampleLevel(gsamPointClamp, tex, 0.0f).xyz;
-		float  neighborDepth = NdcDepthToViewDepth(gDepthMap.SampleLevel(gsamDepthMap, tex, 0.0f).r);
+		neighborNormal = mul(neighborNormal, (float3x3)gView);
+		float  neighborDepth = gDepthMap.SampleLevel(gsamDepthMap, tex, 0.0f).r;
+		neighborDepth = NdcDepthToViewDepth(neighborDepth);
 
 		// 중앙의 값과 그 이웃의 값의 차이가 너무 크면(법선이든 깊이이든)
 		// 표본이 불연속 경계에 걸쳐 있는 것으로 간주한다. 그런 표본들은

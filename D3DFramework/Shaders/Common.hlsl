@@ -81,6 +81,7 @@ cbuffer cbPass : register(b1)
     float4x4 gInvProj;
     float4x4 gViewProj;
     float4x4 gInvViewProj;
+	float4x4 gProjTex;
 	float4x4 gViewProjTex;
 	float4x4 gIdentity;
     float3 gEyePosW;
@@ -121,7 +122,6 @@ cbuffer cbParticle : register(b3)
 
 cbuffer cbSsao : register(b4)
 {
-	float4x4 gProjTex;
 	float4 gOffsetVectors[14];
 	float4 gBlurWeights[3];
 
@@ -129,6 +129,11 @@ cbuffer cbSsao : register(b4)
 	float gOcclusionFadeStart;
 	float gOcclusionFadeEnd;
 	float gSurfaceEpsilon;
+
+	float gSsaoContrast;
+	float gSsaoPadding0;
+	float gSsaoPadding1;
+	float gSsaoPadding2;
 };
 
 cbuffer cbRootConstants : register(b5)

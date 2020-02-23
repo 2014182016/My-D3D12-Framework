@@ -23,7 +23,6 @@
 #pragma comment(lib, "dsound.lib")
 #pragma comment(lib, "dinput8.lib")
 
-
 #include <windows.h>
 #include <wrl.h>
 #include <Pdh.h>
