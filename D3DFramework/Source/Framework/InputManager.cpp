@@ -66,14 +66,8 @@ void InputManager::OnKeyUp(unsigned int input)
 {
 	mKeys[input] = false;
 
-	if (input == VK_F1)
-		D3DFramework::GetInstance()->SwitchOptionEnabled(Option::Wireframe);
-	else if (input == VK_F2)
-		D3DFramework::GetInstance()->SwitchOptionEnabled(Option::Debug_Collision);
-	else if (input == VK_F3)
-		D3DFramework::GetInstance()->SwitchOptionEnabled(Option::Debug_Octree);
-	else if (input == VK_F4)
-		D3DFramework::GetInstance()->SwitchOptionEnabled(Option::Debug_Light);
+	if(input == VK_ESCAPE)
+		DestroyWindow(D3DFramework::GetInstance()->GetMainWnd());
 	else if (input == VK_F5)
 		D3DFramework::GetInstance()->SwitchOptionEnabled(Option::Debug_GBuffer);
 }

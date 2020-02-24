@@ -85,7 +85,7 @@ void D3DApp::OnResize(int screenWidth, int screenHeight)
 {
 	__super::OnResize(screenWidth, screenHeight);
 
-	if (!md3dDevice || !mSwapChain || !mDirectCmdListAlloc)
+	if (!md3dDevice || !mSwapChain || !mMainCommandAlloc)
 		return;
 
 	/*
@@ -97,7 +97,7 @@ void D3DApp::OnResize(int screenWidth, int screenHeight)
 	// 리소스를 변경하기 전에 명령들을 비운다.
 	FlushCommandQueue();
 
-	ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), nullptr));
+	ThrowIfFailed(mMainCommandList->Reset(mMainCommandAlloc.Get(), nullptr));
 
 	// 리소스를 새로 만들기 위해 기존의 리소스를 해제한다.
 	for (int i = 0; i < SWAP_CHAIN_BUFFER_COUNT; ++i)
@@ -183,12 +183,12 @@ void D3DApp::OnResize(int screenWidth, int screenHeight)
 	md3dDevice->CreateDepthStencilView(mDepthStencilBuffer.Get(), &dsvDesc, GetDepthStencilView());
 
 	// 깊이 버퍼로서 사용하기 위해 상태 이전을 한다.
-	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
-		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE));
+	mMainCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
+		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_GENERIC_READ));
 
 	// Resize 명령을 실행한다.
-	ThrowIfFailed(mCommandList->Close());
-	ID3D12CommandList* cmdsLists[] = { mCommandList.Get() };
+	ThrowIfFailed(mMainCommandList->Close());
+	ID3D12CommandList* cmdsLists[] = { mMainCommandList.Get() };
 	mCommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
 
 	// Resize가 완료될 때까지 기다린다.
@@ -287,18 +287,18 @@ void D3DApp::CreateCommandObjects()
 
 	ThrowIfFailed(md3dDevice->CreateCommandAllocator(
 		D3D12_COMMAND_LIST_TYPE_DIRECT,
-		IID_PPV_ARGS(mDirectCmdListAlloc.GetAddressOf())));
+		IID_PPV_ARGS(mMainCommandAlloc.GetAddressOf())));
 
 	ThrowIfFailed(md3dDevice->CreateCommandList(
 		0,
 		D3D12_COMMAND_LIST_TYPE_DIRECT,
-		mDirectCmdListAlloc.Get(),
+		mMainCommandAlloc.Get(),
 		nullptr,   
-		IID_PPV_ARGS(mCommandList.GetAddressOf())));
+		IID_PPV_ARGS(mMainCommandList.GetAddressOf())));
 
 	// 닫힌 상태로 시작한다. 이후 명령 목록을 처음 참조할 때 Reset을 호출하는데,
 	// Reset을 호출하려면 CommandList가 닫혀 있어야 하기 때문이다.
-	mCommandList->Close();
+	mMainCommandList->Close();
 }
 
 void D3DApp::CreateSwapChain()
@@ -1008,25 +1008,6 @@ void D3DApp::CreatePSOs()
 	smapPsoDesc.NumRenderTargets = 0;
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&smapPsoDesc, IID_PPV_ARGS(&mPSOs["ShadowMap"])));
 
-
-	// PSO for Widget
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC widgetPsoDesc = forwardPsoDesc;
-	widgetPsoDesc.InputLayout = { mWidgetLayout.data(), (UINT)mWidgetLayout.size() };
-	widgetPsoDesc.VS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["WidgetVS"]->GetBufferPointer()),
-		mShaders["WidgetVS"]->GetBufferSize()
-	};
-	widgetPsoDesc.PS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["WidgetPS"]->GetBufferPointer()),
-		mShaders["WidgetPS"]->GetBufferSize()
-	};
-	widgetPsoDesc.DepthStencilState.DepthEnable = false;
-	widgetPsoDesc.DepthStencilState.StencilEnable = false;
-	widgetPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&widgetPsoDesc, IID_PPV_ARGS(&mPSOs["Widget"])));
-
 #ifdef SSAO
 	// PSO for Ssao
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC ssaoPsoDesc = forwardPsoDesc;
@@ -1065,6 +1046,24 @@ void D3DApp::CreatePSOs()
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&ssaoBlurPsoDesc, IID_PPV_ARGS(&mPSOs["SsaoBlur"])));
 #endif
 
+
+	// PSO for Widget
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC widgetPsoDesc = forwardPsoDesc;
+	widgetPsoDesc.InputLayout = { mWidgetLayout.data(), (UINT)mWidgetLayout.size() };
+	widgetPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["WidgetVS"]->GetBufferPointer()),
+		mShaders["WidgetVS"]->GetBufferSize()
+	};
+	widgetPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["WidgetPS"]->GetBufferPointer()),
+		mShaders["WidgetPS"]->GetBufferSize()
+	};
+	widgetPsoDesc.DepthStencilState.DepthEnable = false;
+	widgetPsoDesc.DepthStencilState.StencilEnable = false;
+	widgetPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&widgetPsoDesc, IID_PPV_ARGS(&mPSOs["Widget"])));
 
 	// PSO for DiffuseMapDebug
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC diffuseMapDebugPsoDesc = widgetPsoDesc;

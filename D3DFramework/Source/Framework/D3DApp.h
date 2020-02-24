@@ -19,7 +19,7 @@
 #define DEFERRED_BUFFER_COUNT 4
 #define LIGHT_NUM 1
 
-#define SSAO
+// #define SSAO
 
 class D3DApp : public WinApp
 {
@@ -96,8 +96,8 @@ protected:
 	UINT64 mCurrentFence = 0;
 
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> mCommandQueue;
-	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> mDirectCmdListAlloc;
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> mCommandList;
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> mMainCommandAlloc;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> mMainCommandList;
 
 	int mCurrentBackBuffer = 0;
 	Microsoft::WRL::ComPtr<ID3D12Resource> mSwapChainBuffer[SWAP_CHAIN_BUFFER_COUNT];

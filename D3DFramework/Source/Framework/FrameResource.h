@@ -5,26 +5,16 @@
 #include "Enums.h"
 #include "BufferMemoryPool.hpp"
 
+#define FRAME_PHASE 5
+
 // CPU가 한 프레임의 명령 목록들을 구축하는 데 필요한 자원들을
 // 대표하는 구조체
 struct FrameResource
 {
 public:
-	FrameResource(ID3D12Device* device, UINT passCount, UINT objectCount, UINT lightCount, UINT materialCount,
-		UINT widgetCount, UINT particleCount)
-	{
-		ThrowIfFailed(device->CreateCommandAllocator(
-			D3D12_COMMAND_LIST_TYPE_DIRECT,
-			IID_PPV_ARGS(mCmdListAlloc.GetAddressOf())));
-
-		mPassPool = std::make_unique<BufferMemoryPool<PassConstants>>(device, passCount, true);
-		mObjectPool = std::make_unique<BufferMemoryPool<ObjectConstants>>(device, objectCount, true);
-		mLightBufferPool = std::make_unique<BufferMemoryPool<LightData>>(device, lightCount, false);
-		mMaterialBufferPool = std::make_unique<BufferMemoryPool<MaterialData>>(device, materialCount, false);
-		mWidgetPool = std::make_unique<BufferMemoryPool<WidgetConstants>>(device, widgetCount, true);
-		mParticlePool = std::make_unique<BufferMemoryPool<ParticleConstants>>(device, particleCount, true);
-		mSsaoPool = std::make_unique<BufferMemoryPool<SsaoConstants>>(device, 1, true);
-	}
+	FrameResource(ID3D12Device* device, bool singleThread,
+		UINT passCount, UINT objectCount, UINT lightCount, UINT materialCount,
+		UINT widgetCount, UINT particleCount);
 	FrameResource(const FrameResource& rhs) = delete;
 	FrameResource& operator=(const FrameResource& rhs) = delete;
 	~FrameResource() { }
@@ -46,9 +36,15 @@ public:
 		if (mSsaoPool->GetBuffer()) return mSsaoPool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0; }
  
 public:
+	static inline UINT processorCoreNum = 0;
+
 	// 명령 할당자는 GPU가 명령들을 다 처리한 후 재설정해야한다.
 	// 따라서 프레임마다 할당자가 필요하다.
-	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> mCmdListAlloc;
+	std::vector<Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>> mWorekrCmdLists;
+	std::vector<Microsoft::WRL::ComPtr<ID3D12CommandAllocator>> mWorkerCmdAllocs;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> mFrameCmdLists[FRAME_PHASE];
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> mFrameCmdAllocs[FRAME_PHASE];
+	std::vector<ID3D12CommandList*> mExecutableCmdLists;
 
 	// Fence는 현재 울타리 지점까지의 명령들을 표시하는 값이다.
 	// 이 값은 GPU가 아직 이 프레임 자원들을 사용하고 있는지 판정하는 용도로 쓰인다.
