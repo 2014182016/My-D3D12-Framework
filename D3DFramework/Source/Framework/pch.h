@@ -20,6 +20,7 @@
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "pdh.lib")
 #pragma comment(lib, "winmm.lib")
+#pragma comment(lib, "dxguid.lib")
 #pragma comment(lib, "dsound.lib")
 #pragma comment(lib, "dinput8.lib")
 

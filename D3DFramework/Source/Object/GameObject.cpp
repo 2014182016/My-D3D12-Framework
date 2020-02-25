@@ -7,6 +7,7 @@ using namespace DirectX;
 GameObject::GameObject(std::string&& name) : Object(std::move(name)) { }
 
 GameObject::~GameObject() { }
+
 void GameObject::WorldUpdate()
 {
 	__super::WorldUpdate();

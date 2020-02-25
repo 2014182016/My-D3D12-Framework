@@ -7,7 +7,10 @@ using namespace DirectX;
 
 Mesh::Mesh(std::string&& name) : Component(std::move(name)) { }
 
-Mesh::~Mesh() { }
+Mesh::~Mesh() 
+{
+	DisposeUploaders();
+}
 
 void Mesh::BuildVertices(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
 	void* vertices, UINT vertexCount, UINT vertexStride)

@@ -179,6 +179,7 @@
     <ClCompile Include="Source\Object\Object.cpp" />
     <ClCompile Include="Source\Object\Particle.cpp" />
     <ClCompile Include="Source\Object\PointLight.cpp" />
+    <ClCompile Include="Source\Object\SkySphere.cpp" />
     <ClCompile Include="Source\Object\SpotLight.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
     </ClCompile>
@@ -222,6 +223,7 @@
     <ClInclude Include="Source\Object\Object.h" />
     <ClInclude Include="Source\Object\Particle.h" />
     <ClInclude Include="Source\Object\PointLight.h" />
+    <ClInclude Include="Source\Object\SkySphere.h" />
     <ClInclude Include="Source\Object\SpotLight.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -351,12 +353,14 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpplatest</LanguageStandard>
+      <AdditionalIncludeDirectories>D:\Visual Studio 2017\Projects\D3DFramework\D3DFramework\Source\Object;D:\Visual Studio 2017\Projects\D3DFramework\D3DFramework\Source\Framework;D:\Visual Studio 2017\Projects\D3DFramework\D3DFramework\Source\Component;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>dsound.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

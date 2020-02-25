@@ -9,7 +9,7 @@
 #define RP_MATERIAL 3
 #define RP_TEXTURE 4
 #define RP_SHADOWMAP 5
-#define RP_CUBEMAP 6
+#define RP_SSAOMAP 6
 #define RP_G_BUFFER 7
 #define RP_WIDGET 8
 #define RP_PARTICLE 9
@@ -45,7 +45,7 @@ public:
 	virtual void OnDestroy() override;
 	virtual void OnResize(int screenWidth, int screenHeight) override;
 	virtual void ApplyOption(Option option);
-	virtual void CreateDescriptorHeaps(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum);
+	virtual void CreateDescriptorHeaps(UINT textureNum,  UINT shadowMapNum);
 
 public:
 	void Set4xMsaaState(bool value);
@@ -62,7 +62,7 @@ protected:
 	void CreateSwapChain();
 	void CreateSoundBuffer();
 	void CreateRtvAndDsvDescriptorHeaps(UINT shadowMapNum);
-	void CreateRootSignatures(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum);
+	void CreateRootSignatures(UINT textureNum, UINT shadowMapNum);
 	void CreateShadersAndInputLayout();
 	void CreatePSOs();
 
@@ -106,7 +106,7 @@ protected:
 
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mRtvHeap;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mDsvHeap;
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mCbvSrvUavDescriptorHeap = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mCbvSrvUavDescriptorHeap;
 
 	Microsoft::WRL::ComPtr<IDirectSound8> md3dSound;
 	Microsoft::WRL::ComPtr<IDirectSoundBuffer> mPrimarySoundBuffer;
@@ -129,8 +129,6 @@ protected:
 	UINT widgetCBByteSize = 0;
 	UINT particleCBByteSize = 0;
 
-	UINT mCurrentSkyCubeMapIndex = 0;
-	UINT mSkyCubeMapHeapIndex = 0;
 	UINT mShadowMapHeapIndex = 0;
 	UINT mDeferredBufferHeapIndex = 0;
 	UINT mLightingPassHeapIndex = 0;
@@ -159,7 +157,7 @@ private:
 		RootParameterInfo(1,3), // Materials
 		RootParameterInfo(0,0), // Textures
 		RootParameterInfo(0,1), // ShadowMaps
-		RootParameterInfo(0,2), // CubeMaps
+		RootParameterInfo(0,2), // SsaoMaps
 		RootParameterInfo(0,4), // G-Buffer
 		RootParameterInfo(2,0), // Widget
 		RootParameterInfo(3,0), // Particle

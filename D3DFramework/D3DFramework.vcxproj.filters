@@ -176,6 +176,9 @@
     <ClCompile Include="Source\Framework\FrameResource.cpp">
       <Filter>소스 파일\Framework</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Object\SkySphere.cpp">
+      <Filter>소스 파일\Object</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Component\Component.h">
@@ -294,6 +297,9 @@
     </ClInclude>
     <ClInclude Include="Source\Framework\Animation.h">
       <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Object\SkySphere.h">
+      <Filter>헤더 파일\Object</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

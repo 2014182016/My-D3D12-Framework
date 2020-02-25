@@ -96,27 +96,8 @@ float4 PS(VertexOut pin) : SV_Target
     float4 directLight = ComputeShadowLighting(gLights, mat, pin.mPosW, bumpedNormalW, toEyeW);
 	float4 litColor = ambient + directLight;
 
-#ifdef SSAO
-	float4 ssaoPosH = mul(pin.mPosW, gViewProjTex);
-	ssaoPosH /= ssaoPosH.w;
-	float ambientAccess = gSsaoMap.Sample(gsamLinearClamp, ssaoPosH.xy, 0.0f).r;
-	litColor *= ambientAccess;
-#endif
-
 	// 분산 재질에서 알파를 가져온다.
 	litColor.a = diffuseAlbedo.a;
-
-
-#ifdef SKY_REFLECTION
-	// Sky Cube Map으로 환경 매핑을 사용하여 픽셀에 입힌다.
-	if (gCurrentSkyCubeMapIndex != DISABLED)
-	{
-		float3 r = reflect(-toEyeW, pin.mNormalW);
-		float4 reflectionColor = gCubeMaps[gCurrentSkyCubeMapIndex].Sample(gsamLinearWrap, r);
-		float3 fresnelFactor = SchlickFresnel(specular, pin.mNormalW, r);
-		litColor.rgb += shininess * fresnelFactor * reflectionColor.rgb;
-	}
-#endif
 
 	if (gFogEnabled)
 	{

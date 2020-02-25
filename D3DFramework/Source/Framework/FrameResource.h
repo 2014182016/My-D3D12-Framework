@@ -17,7 +17,7 @@ public:
 		UINT widgetCount, UINT particleCount);
 	FrameResource(const FrameResource& rhs) = delete;
 	FrameResource& operator=(const FrameResource& rhs) = delete;
-	~FrameResource() { }
+	~FrameResource();
 
 public:
 	D3D12_GPU_VIRTUAL_ADDRESS GetPassVirtualAddress() const {

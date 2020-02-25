@@ -66,8 +66,10 @@ void InputManager::OnKeyUp(unsigned int input)
 {
 	mKeys[input] = false;
 
-	if(input == VK_ESCAPE)
+	if (input == VK_ESCAPE)
 		DestroyWindow(D3DFramework::GetInstance()->GetMainWnd());
+	else if (input == VK_F1)
+		D3DFramework::GetInstance()->SwitchOptionEnabled(Option::Wireframe);
 	else if (input == VK_F5)
 		D3DFramework::GetInstance()->SwitchOptionEnabled(Option::Debug_GBuffer);
 }

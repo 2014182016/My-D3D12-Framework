@@ -7,7 +7,6 @@
 #define DISABLED -1
 
 #define TEX_NUM 8
-#define CUBE_MAP_NUM 1
 
 #define FOG_LINEAR 0
 #define FOG_EXPONENTIAL 1
@@ -40,7 +39,10 @@ struct MaterialData
 
 Texture2D gTextureMaps[TEX_NUM] : register(t0, space0);
 Texture2D gShadowMaps[LIGHT_NUM]: register(t0, space1);
-TextureCube gCubeMaps[CUBE_MAP_NUM] : register(t0, space2);
+
+Texture2D gSsaoMap : register(t0, space2);
+Texture2D gSsaoMap2 : register(t1, space2);
+Texture2D gRandomVecMap : register(t2, space2);
 
 StructuredBuffer<Light> gLights : register(t0, space3);
 StructuredBuffer<MaterialData> gMaterialData : register(t1, space3);
@@ -50,10 +52,6 @@ Texture2D gSpecularAndRoughnessMap : register(t1, space4);
 Texture2D gNormalMap : register(t2, space4);
 Texture2D gPositonMap : register(t3, space4);
 Texture2D gDepthMap : register(t4, space4);
-
-Texture2D gSsaoMap : register(t5, space4);
-Texture2D gSsaoMap2 : register(t6, space4);
-Texture2D gRandomVecMap : register(t7, space4);
 
 SamplerState gsamPointWrap        : register(s0);
 SamplerState gsamPointClamp       : register(s1);

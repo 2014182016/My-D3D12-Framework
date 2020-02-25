@@ -29,6 +29,9 @@ WinApp::WinApp(HINSTANCE hInstance, int screenWidth, int screenHeight, std::wstr
 WinApp::~WinApp() 
 { 
 	app = nullptr;
+
+	mGameTimer = nullptr;
+	mInputManager = nullptr;
 }
 
 

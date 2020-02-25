@@ -19,7 +19,13 @@ AssetManager* AssetManager::GetInstance()
 
 AssetManager::AssetManager() { }
 
-AssetManager::~AssetManager() { }
+AssetManager::~AssetManager() 
+{
+	mMeshes.clear();
+	mMaterials.clear();
+	mTextures.clear();
+	mSounds.clear();
+}
 
 void AssetManager::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, IDirectSound8* d3dSound)
 {
@@ -48,20 +54,6 @@ void AssetManager::LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList*
 			texMap->mFilename.c_str(), texMap->mResource, texMap->mUploadHeap));
 
 		mTextures[texName] = std::move(texMap);
-	}
-
-	for (size_t i = 0; i < mCubeTexInfos.size(); ++i)
-	{
-		auto[texName, fileName] = mCubeTexInfos[i];
-
-		auto texMap = std::make_unique<Texture>();
-		texMap->mName = texName;
-		texMap->mFilename = fileName;
-		texMap->mTextureIndex = (std::uint32_t)i;
-		ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(device, commandList,
-			texMap->mFilename.c_str(), texMap->mResource, texMap->mUploadHeap));
-
-		mCubeTextures[texName] = std::move(texMap);
 	}
 }
 
@@ -487,7 +479,7 @@ void AssetManager::BuildMaterial()
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.2f, 0.2f, 0.2f);
 	mat->SetRoughtness(0.1f);
-	mat->Scale(5.0f, 5.0f);
+	mat->SetScale(5.0f, 5.0f);
 	mMaterials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Mirror0"s);
@@ -516,11 +508,12 @@ void AssetManager::BuildMaterial()
 	mMaterials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Sky"s);
-	mat->SetDiffuseIndex(FindCubeTexture("Grasscube1024"s)->mTextureIndex);
+	mat->SetDiffuseIndex(FindTexture("Clouds"s)->mTextureIndex);
 	mat->SetNormalIndex(DISABLED);
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.1f, 0.1f, 0.1f);
 	mat->SetRoughtness(1.0f);
+	mat->SetScale(2.0f, 2.0f);
 	mMaterials[mat->GetName()] = std::move(mat);
 }
 
@@ -593,34 +586,11 @@ Texture* AssetManager::FindTexture(std::string&& name) const
 	return (*iter).second.get();
 }
 
-Texture* AssetManager::FindCubeTexture(std::string&& name) const
-{
-	auto iter = mCubeTextures.find(name);
-
-	if (iter == mCubeTextures.end())
-	{
-#if defined(DEBUG) | defined(_DEBUG)
-		std::cout << "CubeTexture " << name << "이 발견되지 않음." << std::endl;
-#endif
-		return nullptr;
-	}
-
-	return (*iter).second.get();
-}
-
 
 ID3D12Resource* AssetManager::GetTextureResource(UINT index) const
 {
 	std::string texName = mTexInfos[index].mName;
 	auto tex = mTextures.find(texName);
-
-	return tex->second->mResource.Get();
-}
-
-ID3D12Resource* AssetManager::GetCubeTextureResource(UINT index) const
-{
-	std::string cubeTexName = mCubeTexInfos[index].mName;
-	auto tex = mCubeTextures.find(cubeTexName);
 
 	return tex->second->mResource.Get();
 }

@@ -43,18 +43,6 @@ float4 PS(VertexOut pin) : SV_Target
 	// 분산 재질에서 알파를 가져온다.
 	litColor.a = diffuseAlbedo.a;
 
-
-#ifdef SKY_REFLECTION
-	// Sky Cube Map으로 환경 매핑을 사용하여 픽셀에 입힌다.
-	if (gCurrentSkyCubeMapIndex != DISABLED)
-	{
-		float3 r = reflect(-toEyeW, normal);
-		float4 reflectionColor = gCubeMaps[gCurrentSkyCubeMapIndex].Sample(gsamLinearWrap, r);
-		float3 fresnelFactor = SchlickFresnel(specular, normal, r);
-		litColor.rgb += shininess * fresnelFactor * reflectionColor.rgb;
-	}
-#endif
-
 	if (gFogEnabled)
 	{
 		float fogAmount;

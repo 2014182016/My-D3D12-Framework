@@ -67,3 +67,31 @@ FrameResource::FrameResource(ID3D12Device* device, bool singleThread,
 	mParticlePool = std::make_unique<BufferMemoryPool<ParticleConstants>>(device, particleCount, true);
 	mSsaoPool = std::make_unique<BufferMemoryPool<SsaoConstants>>(device, 1, true);
 }
+
+FrameResource::~FrameResource() 
+{
+	for (UINT i = 0; i < processorCoreNum; ++i)
+	{
+		mWorekrCmdLists[i] = nullptr;
+		mWorkerCmdAllocs[i] = nullptr;
+	}
+
+	for (UINT i = 0; i < FRAME_PHASE; ++i)
+	{
+		mFrameCmdLists[i] = nullptr;
+		mFrameCmdAllocs[i] = nullptr;
+	}
+
+	mExecutableCmdLists.clear();
+
+	mPassPool = nullptr;
+	mObjectPool = nullptr;
+	mLightBufferPool = nullptr;
+	mMaterialBufferPool = nullptr;
+	mWidgetPool = nullptr;
+	mParticlePool = nullptr;
+	mSsaoPool = nullptr;
+
+	mWidgetVBs.clear();
+	mParticleVBs.clear();
+}

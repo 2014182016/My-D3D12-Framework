@@ -20,7 +20,7 @@ public:
 	virtual void OnResize(int screenWidth, int screenHeight) override;
 	virtual void Tick(float deltaTime) override;
 	virtual void Render() override;
-	virtual void CreateDescriptorHeaps(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum) override;
+	virtual void CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum) override;
 
 public:
 	void InitFramework();
@@ -56,6 +56,7 @@ private:
 	void UpdateSsaoBuffer(float deltaTime);
 	void UpdateObjectBufferPool();
 
+	void WireframePass(ID3D12GraphicsCommandList* cmdList);
 	void ShadowMapPass(ID3D12GraphicsCommandList* cmdList);
 	void GBufferPass(ID3D12GraphicsCommandList* cmdList);
 	void SsaoPass(ID3D12GraphicsCommandList* cmdList);

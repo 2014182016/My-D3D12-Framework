@@ -12,7 +12,7 @@ public:
 	void SetUV(float u, float v);
 	void Move(float u, float v);
 	void Rotate(float degree);
-	void Scale(float scaleU, float scaleV);
+	void SetScale(float scaleU, float scaleV);
 
 public:
 	DirectX::XMMATRIX GetMaterialTransform() const;

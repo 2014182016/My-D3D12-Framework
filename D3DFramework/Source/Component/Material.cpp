@@ -74,7 +74,7 @@ void Material::Rotate(float degree)
 	UpdateNumFrames();
 }
 
-void Material::Scale(float scaleU, float scaleV)
+void Material::SetScale(float scaleU, float scaleV)
 {
 	mMatTransform(0, 0) *= scaleU;
 	mMatTransform(1, 1) *= scaleV;

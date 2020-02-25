@@ -16,7 +16,35 @@ D3DApp::D3DApp(HINSTANCE hInstance, int screenWidth, int screenHeight, std::wstr
 	particleCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(ParticleConstants));
 }
 
-D3DApp::~D3DApp() { }
+D3DApp::~D3DApp()
+{
+	mdxgiFactory = nullptr;
+	mSwapChain = nullptr;
+	md3dDevice = nullptr;
+
+	mFence = nullptr;
+	mCommandQueue = nullptr;
+	mMainCommandAlloc = nullptr;
+	mMainCommandList = nullptr;
+
+	mDepthStencilBuffer = nullptr;
+	for (int i = 0; i < SWAP_CHAIN_BUFFER_COUNT; ++i)
+		mSwapChainBuffer[i] = nullptr;
+	for (int i = 0; i < DEFERRED_BUFFER_COUNT; ++i)
+		mDeferredBuffer[i] = nullptr;
+
+	mRtvHeap = nullptr;
+	mDsvHeap = nullptr;
+	mCbvSrvUavDescriptorHeap = nullptr;
+
+	md3dSound = nullptr;
+	mPrimarySoundBuffer = nullptr;
+	mListener = nullptr;
+
+	mRootSignatures.clear();
+	mPSOs.clear();
+	mShaders.clear();
+}
 
 
 void D3DApp::Set4xMsaaState(bool value)
@@ -517,18 +545,18 @@ void D3DApp::LogOutputDisplayModes(IDXGIOutput* output, DXGI_FORMAT format)
 	}
 }
 
-void D3DApp::CreateRootSignatures(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum)
+void D3DApp::CreateRootSignatures(UINT textureNum, UINT shadowMapNum)
 {
 	// 일반적으로 셰이더 프로그램은 특정 자원들(상수 버퍼, 텍스처, 표본추출기 등)이
 	// 입력된다고 기대한다. 루트 서명은 셰이더 프로그램이 기대하는 자원들을 정의한다.
 
 	std::array<CD3DX12_ROOT_PARAMETER, ROOT_PARAMETER_NUM> slotRootParameter;
 
-	CD3DX12_DESCRIPTOR_RANGE texTable[5];
+	CD3DX12_DESCRIPTOR_RANGE texTable[4];
 	texTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, textureNum, mRootParameterInfos[RP_TEXTURE].mShaderRegister, mRootParameterInfos[RP_TEXTURE].mRegisterSpace);
 	texTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, shadowMapNum, mRootParameterInfos[RP_SHADOWMAP].mShaderRegister, mRootParameterInfos[RP_SHADOWMAP].mRegisterSpace);
-	texTable[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, cubeTextureNum, mRootParameterInfos[RP_CUBEMAP].mShaderRegister, mRootParameterInfos[RP_CUBEMAP].mRegisterSpace);
-	texTable[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, DEFERRED_BUFFER_COUNT + 4, mRootParameterInfos[RP_G_BUFFER].mShaderRegister, mRootParameterInfos[RP_G_BUFFER].mRegisterSpace);
+	texTable[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 3, mRootParameterInfos[RP_SSAOMAP].mShaderRegister, mRootParameterInfos[RP_SSAOMAP].mRegisterSpace);
+	texTable[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, DEFERRED_BUFFER_COUNT + 1, mRootParameterInfos[RP_G_BUFFER].mShaderRegister, mRootParameterInfos[RP_G_BUFFER].mRegisterSpace);
 
 	// 퍼포먼스 TIP: 가장 자주 사용하는 것을 앞에 놓는다.
 	slotRootParameter[RP_OBJECT].InitAsConstantBufferView(mRootParameterInfos[RP_OBJECT].mShaderRegister, mRootParameterInfos[RP_OBJECT].mRegisterSpace); // Object 상수 버퍼
@@ -537,7 +565,7 @@ void D3DApp::CreateRootSignatures(UINT textureNum, UINT cubeTextureNum, UINT sha
 	slotRootParameter[RP_MATERIAL].InitAsShaderResourceView(mRootParameterInfos[RP_MATERIAL].mShaderRegister, mRootParameterInfos[RP_MATERIAL].mRegisterSpace); // Materials
 	slotRootParameter[RP_TEXTURE].InitAsDescriptorTable(1, &texTable[0], D3D12_SHADER_VISIBILITY_PIXEL); // Textures
 	slotRootParameter[RP_SHADOWMAP].InitAsDescriptorTable(1, &texTable[1], D3D12_SHADER_VISIBILITY_PIXEL); // Shadow Maps
-	slotRootParameter[RP_CUBEMAP].InitAsDescriptorTable(1, &texTable[2], D3D12_SHADER_VISIBILITY_PIXEL); // CubeTextures
+	slotRootParameter[RP_SSAOMAP].InitAsDescriptorTable(1, &texTable[2], D3D12_SHADER_VISIBILITY_PIXEL); // Ssao Maps
 	slotRootParameter[RP_G_BUFFER].InitAsDescriptorTable(1, &texTable[3], D3D12_SHADER_VISIBILITY_PIXEL); // G-Buffer
 	slotRootParameter[RP_WIDGET].InitAsConstantBufferView(mRootParameterInfos[RP_WIDGET].mShaderRegister, mRootParameterInfos[RP_WIDGET].mRegisterSpace); // Widget
 	slotRootParameter[RP_PARTICLE].InitAsConstantBufferView(mRootParameterInfos[RP_PARTICLE].mShaderRegister, mRootParameterInfos[RP_PARTICLE].mRegisterSpace); // Particle
@@ -644,10 +672,10 @@ void D3DApp::CreateRootSignatures(UINT textureNum, UINT cubeTextureNum, UINT sha
 }
 
 
-void D3DApp::CreateDescriptorHeaps(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum)
+void D3DApp::CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum)
 {
 	D3D12_DESCRIPTOR_HEAP_DESC cbvSrvUavDescriptorHeap = {};
-	cbvSrvUavDescriptorHeap.NumDescriptors = textureNum + cubeTextureNum + shadowMapNum + DEFERRED_BUFFER_COUNT + 4;
+	cbvSrvUavDescriptorHeap.NumDescriptors = textureNum +  shadowMapNum + DEFERRED_BUFFER_COUNT + 1 + 3; // Depth Buffer, SsaoMaps
 	cbvSrvUavDescriptorHeap.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	cbvSrvUavDescriptorHeap.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&cbvSrvUavDescriptorHeap, IID_PPV_ARGS(&mCbvSrvUavDescriptorHeap)));
@@ -675,27 +703,7 @@ void D3DApp::CreateDescriptorHeaps(UINT textureNum, UINT cubeTextureNum, UINT sh
 		hDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
 	}
 
-	// 기존의 텍스처 인덱스부터 마지막까지는 큐브 맵의 영역이다.
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-	srvDesc.TextureCube.MostDetailedMip = 0;
-	srvDesc.TextureCube.ResourceMinLODClamp = 0.0f;
-	mSkyCubeMapHeapIndex = textureNum;
-	hDescriptor = mCbvSrvUavDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	hDescriptor.Offset(mSkyCubeMapHeapIndex, mCbvSrvUavDescriptorSize);
-	for (UINT i = 0; i < cubeTextureNum; ++i)
-	{
-		// texNames의 인데스와 Material에 사용될 텍스처 인덱스를 맞춰주기 위해 순서대로 View를 생성한다.
-		ID3D12Resource* resource = AssetManager::GetInstance()->GetCubeTextureResource(i);
-
-		srvDesc.TextureCube.MipLevels = resource->GetDesc().MipLevels;
-		srvDesc.Format = resource->GetDesc().Format;
-		md3dDevice->CreateShaderResourceView(resource, &srvDesc, hDescriptor);
-
-		// next descriptor
-		hDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
-	}
-
-	mDeferredBufferHeapIndex = textureNum + cubeTextureNum;
+	mDeferredBufferHeapIndex = textureNum;
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	for (UINT i = 0; i < DEFERRED_BUFFER_COUNT; ++i)
 	{
@@ -722,13 +730,11 @@ void D3DApp::CreateShadersAndInputLayout()
 
 #ifdef SSAO
 	D3D_SHADER_MACRO defines[] = {
-		//"SKY_REFLECTION", "1",
 		"SSAO", "1",
 		NULL, NULL,
 	};
 #else
 	D3D_SHADER_MACRO defines[] = {
-		//"SKY_REFLECTION", "1",
 		NULL, NULL,
 	};
 #endif

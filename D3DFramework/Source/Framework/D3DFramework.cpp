@@ -22,6 +22,7 @@
 #include "Widget.h"
 #include "Particle.h"
 #include "Billboard.h"
+#include "SkySphere.h"
 
 using namespace DirectX;
 using namespace std::literals;
@@ -45,7 +46,26 @@ D3DFramework::D3DFramework(HINSTANCE hInstance, int screenWidth, int screenHeigh
 	mOctreeRoot->BuildTree();
 }
 
-D3DFramework::~D3DFramework() { }
+D3DFramework::~D3DFramework() 
+{
+	for (int i = 0; i < NUM_FRAME_RESOURCES; ++i)
+		mFrameResources[i] = nullptr;
+	mCurrentFrameResource = nullptr;
+
+	for (int i = 0; i < (int)RenderLayer::Count; ++i)
+		mRenderableObjects[i].clear();
+	mGameObjects.clear();
+	mLights.clear();
+	mWidgets.clear();
+	mParticles.clear();
+
+	for (int i = 0; i < LIGHT_NUM; ++i)
+		mShadowPassCB[i] = nullptr;
+	mMainPassCB = nullptr;
+	mCamera = nullptr;
+	mOctreeRoot = nullptr;
+	mSsao = nullptr;
+}
 
 
 bool D3DFramework::Initialize()
@@ -106,11 +126,10 @@ void D3DFramework::InitFramework()
 	CreateThreads();
 
 	UINT textureNum = (UINT)AssetManager::GetInstance()->GetTextures().size();
-	UINT cubeTextureNum = (UINT)AssetManager::GetInstance()->GetCubeTextures().size();
 	UINT shadowMapNum = (UINT)LIGHT_NUM;
 
-	CreateRootSignatures(textureNum, cubeTextureNum, shadowMapNum);
-	CreateDescriptorHeaps(textureNum, cubeTextureNum, shadowMapNum);
+	CreateRootSignatures(textureNum, shadowMapNum);
+	CreateDescriptorHeaps(textureNum, shadowMapNum);
 	CreatePSOs();
 
 	// 초기화 명령들을 실행한다.
@@ -125,15 +144,15 @@ void D3DFramework::InitFramework()
 		obj->BeginPlay();
 }
 
-void D3DFramework::CreateDescriptorHeaps(UINT textureNum, UINT cubeTextureNum, UINT shadowMapNum)
+void D3DFramework::CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum)
 {
-	D3DApp::CreateDescriptorHeaps(textureNum, cubeTextureNum, shadowMapNum);
+	D3DApp::CreateDescriptorHeaps(textureNum, shadowMapNum);
 
-	mSsaoMapHeapIndex = textureNum + cubeTextureNum + DEFERRED_BUFFER_COUNT + 1;
+	mSsaoMapHeapIndex = textureNum + DEFERRED_BUFFER_COUNT + 1;
 #ifdef SSAO
 	mSsao->BuildDescriptors(md3dDevice.Get(),
-		GetGpuSrv(textureNum + cubeTextureNum + 2),
-		GetGpuSrv(textureNum + cubeTextureNum + DEFERRED_BUFFER_COUNT),
+		GetGpuSrv(textureNum + 2),
+		GetGpuSrv(textureNum + DEFERRED_BUFFER_COUNT),
 		GetCpuSrv(mSsaoMapHeapIndex),
 		GetGpuSrv(mSsaoMapHeapIndex),
 		GetRtv(SWAP_CHAIN_BUFFER_COUNT + DEFERRED_BUFFER_COUNT),
@@ -170,12 +189,13 @@ void D3DFramework::SetCommonState(ID3D12GraphicsCommandList* cmdList)
 	cmdList->SetGraphicsRootShaderResourceView(RP_LIGHT, mCurrentFrameResource->GetLightVirtualAddress());
 	cmdList->SetGraphicsRootShaderResourceView(RP_MATERIAL, mCurrentFrameResource->GetMaterialVirtualAddress());
 
+#ifdef SSAO
+	cmdList->SetGraphicsRootDescriptorTable(RP_SSAOMAP, GetGpuSrv(mSsaoMapHeapIndex));
+#endif
+
 	// 이 장면에 사용되는 모든 텍스처를 묶는다. 테이블의 첫 서술자만 묶으면
 	// 테이블에 몇 개의 서술자가 있는지는 Root Signature에 설정되어 있다.
 	cmdList->SetGraphicsRootDescriptorTable(RP_TEXTURE, GetGpuSrv(0));
-
-	// 큐브 맵을 파이프라인에 바인딩한다.
-	cmdList->SetGraphicsRootDescriptorTable(RP_CUBEMAP, GetGpuSrv(mSkyCubeMapHeapIndex));
 
 	// G-Buffer에 사용될 렌더 타겟들을 파이프라인에 바인딩한다.
 	cmdList->SetGraphicsRootDescriptorTable(RP_G_BUFFER, GetGpuSrv(mDeferredBufferHeapIndex));
@@ -186,27 +206,42 @@ void D3DFramework::SetCommonState(ID3D12GraphicsCommandList* cmdList)
 
 void D3DFramework::Render()
 {
-	auto cmdListPre = mCurrentFrameResource->mFrameCmdLists[0].Get();
-	auto cmdListMid1 = mCurrentFrameResource->mFrameCmdLists[1].Get();
-	auto cmdListMid2 = mCurrentFrameResource->mFrameCmdLists[2].Get();
-	auto cmdListMid3 = mCurrentFrameResource->mFrameCmdLists[3].Get();
-	auto cmdListPost = mCurrentFrameResource->mFrameCmdLists[4].Get();
+	if (GetOptionEnabled(Option::Wireframe))
+	{
+		auto cmdList = mCurrentFrameResource->mFrameCmdLists[0].Get();
+		auto cmdAlloc = mCurrentFrameResource->mFrameCmdAllocs[0].Get();
+		Reset(cmdList, cmdAlloc);
 
-	Init(cmdListPre);
+		WireframePass(cmdList);
 
-	ShadowMapPass(cmdListMid1);
-	GBufferPass(nullptr);
-	MidFrame(cmdListMid2);
+		ThrowIfFailed(cmdList->Close());
+		ID3D12CommandList* cmdLists[] = { cmdList };
+		mCommandQueue->ExecuteCommandLists(_countof(cmdLists), cmdLists);
+	}
+	else
+	{
+		auto cmdListPre = mCurrentFrameResource->mFrameCmdLists[0].Get();
+		auto cmdListMid1 = mCurrentFrameResource->mFrameCmdLists[1].Get();
+		auto cmdListMid2 = mCurrentFrameResource->mFrameCmdLists[2].Get();
+		auto cmdListMid3 = mCurrentFrameResource->mFrameCmdLists[3].Get();
+		auto cmdListPost = mCurrentFrameResource->mFrameCmdLists[4].Get();
 
-	SetCommonState(cmdListMid3);
+		Init(cmdListPre);
+
+		ShadowMapPass(cmdListMid1);
+		GBufferPass(nullptr);
+		MidFrame(cmdListMid2);
+
+		SetCommonState(cmdListMid3);
 #ifdef SSAO
-	SsaoPass(cmdListMid3);
+		SsaoPass(cmdListMid3);
 #endif
-	LightingPass(cmdListMid3);
-	ForwardPass(cmdListMid3);
-	WidgetPass(cmdListMid3);
+		LightingPass(cmdListMid3);
+		ForwardPass(cmdListMid3);
+		WidgetPass(cmdListMid3);
 
-	Finish(cmdListPost);
+		Finish(cmdListPost);
+	}
 
 	// 전면 버퍼와 후면 버퍼를 바꾼다.
 	ThrowIfFailed(mSwapChain->Present(0, 0));
@@ -430,7 +465,6 @@ void D3DFramework::UpdateMainPassBuffer(float deltaTime)
 	XMStoreFloat4x4(&mMainPassCB->mProjTex, XMMatrixTranspose(proj * T));
 	XMStoreFloat4x4(&mMainPassCB->mViewProjTex, XMMatrixTranspose(viewProj * T));
 	mMainPassCB->mEyePosW = mCamera->GetPosition3f();
-	mMainPassCB->mCurrentSkyCubeMapIndex = mCurrentSkyCubeMapIndex;
 	mMainPassCB->mRenderTargetSize = XMFLOAT2((float)mScreenWidth, (float)mScreenHeight);
 	mMainPassCB->mInvRenderTargetSize = XMFLOAT2(1.0f / mScreenWidth, 1.0f / mScreenHeight);
 	mMainPassCB->mNearZ = mCamera->GetNearZ();
@@ -596,7 +630,7 @@ void D3DFramework::CreateObjects()
 {
 	std::shared_ptr<GameObject> object;
 	
-	object = std::make_shared<GameObject>("Sky"s);
+	object = std::make_shared<SkySphere>("Sky"s);
 	object->SetScale(5000.0f, 5000.0f, 5000.0f);
 	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Sky"s));
 	object->SetMesh(AssetManager::GetInstance()->FindMesh("SkySphere"s));
@@ -932,6 +966,27 @@ GameObject* D3DFramework::Picking(int screenX, int screenY, float distance, bool
 #endif
 
 	return hitObj;
+}
+
+void D3DFramework::WireframePass(ID3D12GraphicsCommandList* cmdList)
+{
+	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
+		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
+		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
+
+	cmdList->ClearRenderTargetView(GetCurrentBackBufferView(), (float*)&mBackBufferClearColor, 0, nullptr);
+	cmdList->ClearDepthStencilView(GetDepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+	cmdList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
+
+	SetCommonState(cmdList);
+	cmdList->SetPipelineState(mPSOs["Wireframe"].Get());
+	RenderActualObjects(cmdList, &mWorldCamFrustum);
+
+	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
+		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
+		D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
 }
 
 void D3DFramework::ShadowMapPass(ID3D12GraphicsCommandList* cmdList)

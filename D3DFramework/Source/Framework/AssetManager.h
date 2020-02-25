@@ -44,17 +44,14 @@ public:
 	class Material* FindMaterial(std::string&& name) const;
 	class Sound* FindSound(std::string&& name) const;
 	struct Texture* FindTexture(std::string&& name) const;
-	struct Texture* FindCubeTexture(std::string&& name) const;
 
 	// Shader Resource View를 만들기 위한 texNames의 인덱스에 따라 텍스처의 리소스를 돌려주는 함수
 	ID3D12Resource* GetTextureResource(UINT index) const;
-	ID3D12Resource* GetCubeTextureResource(UINT index) const;
 
 public:
 	inline const std::unordered_map<std::string, std::unique_ptr<class Mesh>>& GetMeshes() const { return mMeshes; }
 	inline const std::unordered_map<std::string, std::unique_ptr<class Material>>& GetMaterials() const { return mMaterials; }
 	inline const std::unordered_map<std::string, std::unique_ptr<struct Texture>>& GetTextures() const { return mTextures; }
-	inline const std::unordered_map<std::string, std::unique_ptr<struct Texture>>& GetCubeTextures() const { return mCubeTextures; }
 	inline const std::unordered_map<std::string, std::unique_ptr<class Sound>>& GetSounds() const { return mSounds; }
 
 private:
@@ -76,7 +73,6 @@ private:
 	std::unordered_map<std::string, std::unique_ptr<class Mesh>> mMeshes;
 	std::unordered_map<std::string, std::unique_ptr<class Material>> mMaterials;
 	std::unordered_map<std::string, std::unique_ptr<struct Texture>> mTextures;
-	std::unordered_map<std::string, std::unique_ptr<struct Texture>> mCubeTextures;
 	std::unordered_map<std::string, std::unique_ptr<class Sound>> mSounds;
 
 	// 텍스처의 이름과 경로를 pair로 묶음
@@ -92,12 +88,7 @@ private:
 		{"Default_nmap", L"Textures/Default_nmap.dds"},
 		{"WireFence", L"Textures/WireFence.dds"},
 		{"Tree01S", L"Textures/Tree01S.dds"},
-	};
-
-	// 큐브 맵은 리소스 뷰에서 다르게 만들어지기 때문에 기존의 텍스처와 분리한다.
-	const std::vector<TextureInfo> mCubeTexInfos =
-	{
-		{"Grasscube1024", L"Textures/Grasscube1024.dds"},
+		{"Clouds", L"Textures/Clouds.dds"},
 	};
 
 	// h3d 모델의 이름과 함께 충돌 타입을 설정한다.

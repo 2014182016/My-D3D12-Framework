@@ -77,7 +77,7 @@ struct PassConstants
 	DirectX::XMFLOAT4X4 mViewProjTex = DirectX::Identity4x4f();
 	DirectX::XMFLOAT4X4 mIdentity = DirectX::Identity4x4f();
 	DirectX::XMFLOAT3 mEyePosW = { 0.0f, 0.0f, 0.0f };
-	float mPadding1;
+	float mPadding0;
 	DirectX::XMFLOAT2 mRenderTargetSize = { 0.0f, 0.0f };
 	DirectX::XMFLOAT2 mInvRenderTargetSize = { 0.0f, 0.0f };
 	float mNearZ = 0.0f;
@@ -95,7 +95,7 @@ struct PassConstants
 	float mFogDensity = 0.0f; // Exponential Fog
 	std::uint32_t mFogEnabled = false;
 	std::uint32_t mFogType = (std::uint32_t)FogType::Exponential;
-	std::uint32_t mCurrentSkyCubeMapIndex;
+	float mPadding1;
 	float mPadding2;
 	float mPadding3;
 };
