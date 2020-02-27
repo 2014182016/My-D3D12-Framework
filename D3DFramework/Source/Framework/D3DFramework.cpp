@@ -121,14 +121,15 @@ void D3DFramework::InitFramework()
 	CreateObjects();
 	CreateLights();
 	CreateWidgets(md3dDevice.Get(), mMainCommandList.Get());
-	CreateParticles(md3dDevice.Get(), mMainCommandList.Get());
+	//CreateParticles(md3dDevice.Get(), mMainCommandList.Get());
 	CreateFrameResources(md3dDevice.Get());
 	CreateThreads();
 
 	UINT textureNum = (UINT)AssetManager::GetInstance()->GetTextures().size();
 	UINT shadowMapNum = (UINT)LIGHT_NUM;
 
-	CreateRootSignatures(textureNum, shadowMapNum);
+	CreateCommonRootSignature(textureNum, shadowMapNum);
+	CreateSsaoRootSignature();
 	CreateDescriptorHeaps(textureNum, shadowMapNum);
 	CreatePSOs();
 
@@ -151,8 +152,7 @@ void D3DFramework::CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum)
 	mSsaoMapHeapIndex = textureNum + DEFERRED_BUFFER_COUNT + 1;
 #ifdef SSAO
 	mSsao->BuildDescriptors(md3dDevice.Get(),
-		GetGpuSrv(textureNum + 2),
-		GetGpuSrv(textureNum + DEFERRED_BUFFER_COUNT),
+		GetGpuSrv(textureNum + DEFERRED_BUFFER_COUNT - 1), // Normal Map 
 		GetCpuSrv(mSsaoMapHeapIndex),
 		GetGpuSrv(mSsaoMapHeapIndex),
 		GetRtv(SWAP_CHAIN_BUFFER_COUNT + DEFERRED_BUFFER_COUNT),
@@ -183,25 +183,21 @@ void D3DFramework::SetCommonState(ID3D12GraphicsCommandList* cmdList)
 	cmdList->SetGraphicsRootSignature(mRootSignatures["Common"].Get());
 
 	// 이 장면에 사용되는 Pass 상수 버퍼를 묶는다.
-	cmdList->SetGraphicsRootConstantBufferView(RP_PASS, mCurrentFrameResource->GetPassVirtualAddress());
+	cmdList->SetGraphicsRootConstantBufferView((int)RpCommon::Pass, mCurrentFrameResource->GetPassVirtualAddress());
 
 	// 구조적 버퍼는 힙을 생략하고 그냥 하나의 루트 서술자로 묶을 수 있다.
-	cmdList->SetGraphicsRootShaderResourceView(RP_LIGHT, mCurrentFrameResource->GetLightVirtualAddress());
-	cmdList->SetGraphicsRootShaderResourceView(RP_MATERIAL, mCurrentFrameResource->GetMaterialVirtualAddress());
-
-#ifdef SSAO
-	cmdList->SetGraphicsRootDescriptorTable(RP_SSAOMAP, GetGpuSrv(mSsaoMapHeapIndex));
-#endif
+	cmdList->SetGraphicsRootShaderResourceView((int)RpCommon::Light, mCurrentFrameResource->GetLightVirtualAddress());
+	cmdList->SetGraphicsRootShaderResourceView((int)RpCommon::Material, mCurrentFrameResource->GetMaterialVirtualAddress());
 
 	// 이 장면에 사용되는 모든 텍스처를 묶는다. 테이블의 첫 서술자만 묶으면
 	// 테이블에 몇 개의 서술자가 있는지는 Root Signature에 설정되어 있다.
-	cmdList->SetGraphicsRootDescriptorTable(RP_TEXTURE, GetGpuSrv(0));
+	cmdList->SetGraphicsRootDescriptorTable((int)RpCommon::Texture, GetGpuSrv(0));
 
 	// G-Buffer에 사용될 렌더 타겟들을 파이프라인에 바인딩한다.
-	cmdList->SetGraphicsRootDescriptorTable(RP_G_BUFFER, GetGpuSrv(mDeferredBufferHeapIndex));
+	cmdList->SetGraphicsRootDescriptorTable((int)RpCommon::GBuffer, GetGpuSrv(mDeferredBufferHeapIndex));
 
 	// 그림자 맵을 파이프라인에 바인딩한다.
-	cmdList->SetGraphicsRootDescriptorTable(RP_SHADOWMAP, GetGpuSrv(mShadowMapHeapIndex));
+	cmdList->SetGraphicsRootDescriptorTable((int)RpCommon::ShadowMap, GetGpuSrv(mShadowMapHeapIndex));
 }
 
 void D3DFramework::Render()
@@ -274,7 +270,6 @@ void D3DFramework::Tick(float deltaTime)
 	mWorldCamFrustum = mCamera->GetWorldCameraBounding();
 
 	DestroyGameObjects();
-	DestroyParticles();
 
 	mOctreeRoot->Update(deltaTime);
 	UpdateObjectBuffer(deltaTime);
@@ -282,7 +277,6 @@ void D3DFramework::Tick(float deltaTime)
 	UpdateMaterialBuffer(deltaTime);
 	UpdateMainPassBuffer(deltaTime);
 	UpdateWidgetBuffer(deltaTime);
-	UpdateParticleBuffer(deltaTime);
 
 #ifdef SSAO
 	UpdateSsaoBuffer(deltaTime);
@@ -318,25 +312,6 @@ void D3DFramework::DestroyGameObjects()
 	mOctreeRoot->DestroyObjects();
 }
 
-void D3DFramework::DestroyParticles()
-{
-	for (auto iter = mParticles.begin(); iter != mParticles.end();)
-	{
-		auto& particle = *iter;
-		if (particle->GetIsDestroyesd())
-		{
-			auto& particleVBs = mCurrentFrameResource->mParticleVBs;
-			auto vbIter = particleVBs.begin() + particle->GetCBIndex();
-			particleVBs.erase(vbIter);
-			iter = mParticles.erase(iter);
-			continue;
-		}
-		else
-		{
-			++iter;
-		}
-	}
-}
 
 void D3DFramework::UpdateObjectBuffer(float deltaTime)
 {
@@ -478,6 +453,7 @@ void D3DFramework::UpdateMainPassBuffer(float deltaTime)
 	mMainPassCB->mFogDensity = 0.1f;
 	mMainPassCB->mFogEnabled = GetOptionEnabled(Option::Fog);
 	mMainPassCB->mFogType = (std::uint32_t)FogType::Exponential;
+	mMainPassCB->mSsaoContrast = 3.0f;
 
 	auto passCB = mCurrentFrameResource->mPassPool->GetBuffer();
 	passCB->CopyData(0, *mMainPassCB);
@@ -488,7 +464,7 @@ void D3DFramework::UpdateWidgetBuffer(float deltaTime)
 	// [0, 1]범위로 설정된 위젯의 정점 위치를 동차 좌표계의 [-1, 1]범위로 변환한다.
 	static std::function<float(float)> transformHomogenous = [](float x) { return x * 2.0f - 1.0f; };
 
-	auto currWidgetPool = mCurrentFrameResource->mWidgetPool->GetBuffer();
+	auto currWidgetCB = mCurrentFrameResource->mWidgetPool->GetBuffer();
 	auto& currWidgetVBs = mCurrentFrameResource->mWidgetVBs;
 	UINT widgetIndex = 0;
 
@@ -503,11 +479,9 @@ void D3DFramework::UpdateWidgetBuffer(float deltaTime)
 
 		if (widget->IsUpdate())
 		{
-			WidgetConstants widgetConstants;
-
-			if(widget->GetMaterial())
-				widgetConstants.mMaterialIndex = widget->GetMaterial()->GetMaterialIndex();
-			currWidgetPool->CopyData(widgetIndex, widgetConstants);
+			ObjectConstants objConstants;
+			objConstants.mMaterialIndex = widget->GetMaterial()->GetDiffuseIndex();
+			currWidgetCB->CopyData(widgetIndex, objConstants);
 
 			float posX = (float)widget->GetPosX();
 			float posY = (float)widget->GetPosY();
@@ -543,50 +517,6 @@ void D3DFramework::UpdateWidgetBuffer(float deltaTime)
 	}
 }
 
-void D3DFramework::UpdateParticleBuffer(float deltaTime)
-{
-	auto currParticlePool = mCurrentFrameResource->mParticlePool->GetBuffer();
-	auto& currParticleVBs = mCurrentFrameResource->mParticleVBs;
-	UINT particleIndex = 0;
-
-	for (const auto& particle : mParticles)
-	{
-		particle->Tick(deltaTime);
-		if (particleIndex != particle->GetCBIndex())
-		{
-			particle->SetCBIndex(particleIndex);
-			particle->UpdateNumFrames();
-		}
-
-		if (particle->IsUpdate())
-		{
-			ParticleConstants particleConstants;
-
-			particleConstants.mMaterialIndex = particle->GetMaterial()->GetMaterialIndex();
-			particleConstants.mFacingCamera = true;
-
-			currParticlePool->CopyData(particleIndex, particleConstants);
-
-			auto& particleDatas = particle->GetParticleDatas();
-			UINT vertexIndex = 0;
-			for (auto& paritlceData : particleDatas)
-			{
-				ParticleVertex v;
-				v.mPos = paritlceData->mPosition;
-				v.mColor = paritlceData->mColor;
-				v.mNormal = paritlceData->mNormal;
-				v.mSize = paritlceData->mSize;
-				currParticleVBs[particleIndex]->CopyData(vertexIndex++, v);
-			}
-			particle->GetMesh()->SetDynamicVertexBuffer(currParticleVBs[particleIndex]->GetResource(),
-				vertexIndex, (UINT)sizeof(ParticleVertex));
-
-			particle->DecreaseNumFrames();
-		}
-		++particleIndex;
-	}
-}
-
 void D3DFramework::UpdateSsaoBuffer(float deltaTime)
 {
 	static const XMMATRIX T(
@@ -608,15 +538,13 @@ void D3DFramework::UpdateSsaoBuffer(float deltaTime)
 	ssaoCB.mOcclusionFadeEnd = 1.0f;
 	ssaoCB.mSurfaceEpsilon = 0.05f;
 
-	ssaoCB.mSsaoContrast = 4.0f;
-
 	auto currSsaoCB = mCurrentFrameResource->mSsaoPool->GetBuffer();
 	currSsaoCB->CopyData(0, ssaoCB);
 }
 
 void D3DFramework::UpdateObjectBufferPool()
 {
-	UINT allObjectCount = (UINT)mGameObjects.size();
+	UINT allObjectCount = (UINT)mGameObjects.size() + (UINT)mWidgets.size();
 
 	if (mCurrentFrameResource)
 	{
@@ -702,14 +630,6 @@ void D3DFramework::CreateLights()
 void D3DFramework::CreateWidgets(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList)
 {
 	std::shared_ptr<Widget> widget;
-
-	widget = std::make_shared<Widget>("RenderTarget"s, device, cmdList);
-	widget->SetSize(mScreenWidth, mScreenHeight);
-	widget->SetAnchor(0.0f, 0.0f);
-	widget->SetMaterial(AssetManager::GetInstance()->FindMaterial("Default"s));
-	widget->SetVisible(false);
-	mRenderableObjects[(int)RenderLayer::Widget].push_back(widget);
-	mWidgets.push_back(std::move(widget));
 
 	widget = std::make_shared<Widget>("DiffuseMapDebug"s, device, cmdList);
 	widget->SetPosition(0, -120);
@@ -805,20 +725,13 @@ void D3DFramework::CreateFrameResources(ID3D12Device* device)
 	{
 		mFrameResources[i] = std::make_unique<FrameResource>(device, false,
 			1 + LIGHT_NUM, (UINT)mGameObjects.size() * 2, LIGHT_NUM,
-			(UINT)AssetManager::GetInstance()->GetMaterials().size(), (UINT)mWidgets.size(), (UINT)mParticles.size());
+			(UINT)AssetManager::GetInstance()->GetMaterials().size(), (UINT)mWidgets.size());
 
 		mFrameResources[i]->mWidgetVBs.reserve((UINT)mWidgets.size());
 		for (const auto& widget : mWidgets)
 		{
 			std::unique_ptr<UploadBuffer<WidgetVertex>> vb = std::make_unique<UploadBuffer<WidgetVertex>>(device, 4, false);
 			mFrameResources[i]->mWidgetVBs.push_back(std::move(vb));
-		}
-
-		mFrameResources[i]->mParticleVBs.reserve((UINT)mParticles.size());
-		for (const auto& particle : mParticles)
-		{
-			std::unique_ptr<UploadBuffer<ParticleVertex>> vb = std::make_unique<UploadBuffer<ParticleVertex>>(device, particle->GetMaxParticleNum(), false);
-			mFrameResources[i]->mParticleVBs.push_back(std::move(vb));
 		}
 	}
 }
@@ -873,19 +786,16 @@ void D3DFramework::RenderObjects(ID3D12GraphicsCommandList* cmdList, const std::
 void D3DFramework::RenderActualObjects(ID3D12GraphicsCommandList* cmdList, DirectX::BoundingFrustum* frustum)
 {
 	auto currObjectCB = mCurrentFrameResource->mObjectPool->GetBuffer();
-	D3D12_GPU_VIRTUAL_ADDRESS addressStarat = currObjectCB->GetResource()->GetGPUVirtualAddress();
+	D3D12_GPU_VIRTUAL_ADDRESS addressStart = currObjectCB->GetResource()->GetGPUVirtualAddress();
 
-	for (const auto& obj : mRenderableObjects[(int)RenderLayer::Opaque])
-		RenderObject(cmdList, obj.get(), addressStarat, RP_OBJECT, objCBByteSize, true, frustum);
-
-	for (const auto& obj : mRenderableObjects[(int)RenderLayer::AlphaTested])
-		RenderObject(cmdList, obj.get(), addressStarat, RP_OBJECT, objCBByteSize, true, frustum);
-
-	for (const auto& obj : mRenderableObjects[(int)RenderLayer::Billborad])
-		RenderObject(cmdList, obj.get(), addressStarat, RP_OBJECT, objCBByteSize, true, frustum);
-
-	for (const auto& obj : mRenderableObjects[(int)RenderLayer::Transparent])
-		RenderObject(cmdList, obj.get(), addressStarat, RP_OBJECT, objCBByteSize, true, frustum);
+	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Opaque], addressStart,
+		(int)RpCommon::Object, objCBByteSize, true, frustum);
+	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::AlphaTested], addressStart,
+		(int)RpCommon::Object, objCBByteSize, true, frustum);
+	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Billborad], addressStart,
+		(int)RpCommon::Object, objCBByteSize, true, frustum);
+	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Transparent], addressStart,
+		(int)RpCommon::Object, objCBByteSize, true, frustum);
 }
 
 GameObject* D3DFramework::Picking(int screenX, int screenY, float distance, bool isMeshCollision) const
@@ -997,7 +907,7 @@ void D3DFramework::ShadowMapPass(ID3D12GraphicsCommandList* cmdList)
 	for (const auto& light : mLights)
 	{
 		D3D12_GPU_VIRTUAL_ADDRESS shadowPassCBAddress = mCurrentFrameResource->GetPassVirtualAddress() + (1 + i++) * passCBByteSize;
-		cmdList->SetGraphicsRootConstantBufferView(RP_PASS, shadowPassCBAddress);
+		cmdList->SetGraphicsRootConstantBufferView((int)RpCommon::Pass, shadowPassCBAddress);
 
 		light->RenderSceneToShadowMap(cmdList);
 	}
@@ -1018,10 +928,12 @@ void D3DFramework::GBufferPass(ID3D12GraphicsCommandList* cmdList)
 
 void D3DFramework::SsaoPass(ID3D12GraphicsCommandList* cmdList)
 {
-	mSsao->ComputeSsao(cmdList, mPSOs["Ssao"].Get(), mCurrentFrameResource->GetSsaoVirtualAddress());
-	mSsao->BlurAmbientMap(cmdList, mPSOs["SsaoBlur"].Get(), mCurrentFrameResource->GetSsaoVirtualAddress(), 3);
+	cmdList->SetGraphicsRootSignature(mRootSignatures["Ssao"].Get());
+	mSsao->ComputeSsao(cmdList, mPSOs["Ssao"].Get(), mCurrentFrameResource->GetSsaoVirtualAddress(), mCurrentFrameResource->GetPassVirtualAddress());
+	mSsao->BlurAmbientMap(cmdList, mPSOs["SsaoBlur"].Get(), 3);
 
 	SetCommonState(cmdList);
+	cmdList->SetGraphicsRootDescriptorTable((int)RpCommon::Ssao, GetGpuSrv(mSsaoMapHeapIndex));
 }
 
 void D3DFramework::LightingPass(ID3D12GraphicsCommandList* cmdList)
@@ -1029,8 +941,10 @@ void D3DFramework::LightingPass(ID3D12GraphicsCommandList* cmdList)
 	cmdList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, nullptr);
 	cmdList->SetPipelineState(mPSOs["LightingPass"].Get());
 
-	auto iter = mWidgets.begin();
-	RenderObject(cmdList, (*iter).get(), mCurrentFrameResource->GetWidgetVirtualAddress(), RP_WIDGET, widgetCBByteSize, false);
+	cmdList->IASetVertexBuffers(0, 0, nullptr);
+	cmdList->IASetIndexBuffer(nullptr);
+	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	cmdList->DrawInstanced(6, 1, 0, 0);
 }
 
 void D3DFramework::ForwardPass(ID3D12GraphicsCommandList* cmdList)
@@ -1041,17 +955,13 @@ void D3DFramework::ForwardPass(ID3D12GraphicsCommandList* cmdList)
 
 	cmdList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
 
-	cmdList->SetPipelineState(mPSOs["Particle"].Get());
-	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Particle], mCurrentFrameResource->GetParticleVirtualAddress(),
-		RP_PARTICLE, particleCBByteSize, true, &mWorldCamFrustum);
-
 	cmdList->SetPipelineState(mPSOs["Sky"].Get());
 	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Sky], mCurrentFrameResource->GetObjectVirtualAddress(),
-		RP_OBJECT, objCBByteSize);
+		(int)RpCommon::Object, objCBByteSize);
 
 	cmdList->SetPipelineState(mPSOs["Transparent"].Get());
 	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Transparent], mCurrentFrameResource->GetObjectVirtualAddress(),
-		RP_OBJECT, objCBByteSize, true, &mWorldCamFrustum);
+		(int)RpCommon::Object, objCBByteSize, true, &mWorldCamFrustum);
 
 	CD3DX12_RESOURCE_BARRIER transitionsPost = CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
 		D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ);
@@ -1063,43 +973,43 @@ void D3DFramework::WidgetPass(ID3D12GraphicsCommandList* cmdList)
 	cmdList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, nullptr);
 	cmdList->SetPipelineState(mPSOs["Widget"].Get());
 	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Widget], mCurrentFrameResource->GetWidgetVirtualAddress(),
-		RP_WIDGET, widgetCBByteSize);
+		(int)RpCommon::Object, objCBByteSize);
 
 #if defined(DEBUG) || defined(_DEBUG)
 	if (GetOptionEnabled(Option::Debug_GBuffer))
 	{
-		// 위젯의 1~6번째까지는 G-Buffer를 그리는 위젯이다.
+		// 위젯의 0~5번째까지는 G-Buffer를 그리는 위젯이다.
 		auto iter = mWidgets.begin();
-		++iter;
 
 		cmdList->SetPipelineState(mPSOs["DiffuseMapDebug"].Get());
-		RenderObject(cmdList, (*iter).get(), mCurrentFrameResource->GetWidgetVirtualAddress(), RP_WIDGET, widgetCBByteSize, false);
-		++iter;
+		RenderObject(cmdList, (*iter++).get(), mCurrentFrameResource->GetWidgetVirtualAddress(), 
+			(int)RpCommon::Object, objCBByteSize, false);
 
 		cmdList->SetPipelineState(mPSOs["SpecularMapDebug"].Get());
-		RenderObject(cmdList, (*iter).get(), mCurrentFrameResource->GetWidgetVirtualAddress(), RP_WIDGET, widgetCBByteSize, false);
-		++iter;
+		RenderObject(cmdList, (*iter++).get(), mCurrentFrameResource->GetWidgetVirtualAddress(),
+			(int)RpCommon::Object, objCBByteSize, false);
 
 		cmdList->SetPipelineState(mPSOs["RoughnessMapDebug"].Get());
-		RenderObject(cmdList, (*iter).get(), mCurrentFrameResource->GetWidgetVirtualAddress(), RP_WIDGET, widgetCBByteSize, false);
-		++iter;
+		RenderObject(cmdList, (*iter++).get(), mCurrentFrameResource->GetWidgetVirtualAddress(),
+			(int)RpCommon::Object, objCBByteSize, false);
 
 		cmdList->SetPipelineState(mPSOs["NormalMapDebug"].Get());
-		RenderObject(cmdList, (*iter).get(), mCurrentFrameResource->GetWidgetVirtualAddress(), RP_WIDGET, widgetCBByteSize, false);
-		++iter;
+		RenderObject(cmdList, (*iter++).get(), mCurrentFrameResource->GetWidgetVirtualAddress(),
+			(int)RpCommon::Object, objCBByteSize, false);
 
 		cmdList->SetPipelineState(mPSOs["DepthMapDebug"].Get());
-		RenderObject(cmdList, (*iter).get(), mCurrentFrameResource->GetWidgetVirtualAddress(), RP_WIDGET, widgetCBByteSize, false);
-		++iter;
+		RenderObject(cmdList, (*iter++).get(), mCurrentFrameResource->GetWidgetVirtualAddress(),
+			(int)RpCommon::Object, objCBByteSize, false);
 
 #ifdef SSAO
 		cmdList->SetPipelineState(mPSOs["SsaoMapDebug"].Get());
-		RenderObject(cmdList, (*iter).get(), mCurrentFrameResource->GetWidgetVirtualAddress(), RP_WIDGET, widgetCBByteSize, false);
-		++iter;
+		RenderObject(cmdList, (*iter++).get(), mCurrentFrameResource->GetWidgetVirtualAddress(),
+			(int)RpCommon::Object, objCBByteSize, false);
 #endif
 
 		cmdList->SetPipelineState(mPSOs["ShadowMapDebug"].Get());
-		RenderObject(cmdList, (*iter).get(), mCurrentFrameResource->GetWidgetVirtualAddress(), RP_WIDGET, widgetCBByteSize, false);
+		RenderObject(cmdList, (*iter++).get(), mCurrentFrameResource->GetWidgetVirtualAddress(),
+			(int)RpCommon::Object, objCBByteSize, false);
 	}
 #endif
 }
@@ -1177,15 +1087,15 @@ void D3DFramework::WorkerThread(UINT threadIndex)
 
 		cmdList->SetPipelineState(mPSOs["Opaque"].Get());
 		RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Opaque], mCurrentFrameResource->GetObjectVirtualAddress(),
-			RP_OBJECT, objCBByteSize, true, &mWorldCamFrustum, threadIndex, threadNum);
+			(int)RpCommon::Object, objCBByteSize, true, &mWorldCamFrustum, threadIndex, threadNum);
 
 		cmdList->SetPipelineState(mPSOs["AlphaTested"].Get());
 		RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::AlphaTested], mCurrentFrameResource->GetObjectVirtualAddress(),
-			RP_OBJECT, objCBByteSize, true, &mWorldCamFrustum, threadIndex, threadNum);
+			(int)RpCommon::Object, objCBByteSize, true, &mWorldCamFrustum, threadIndex, threadNum);
 
 		cmdList->SetPipelineState(mPSOs["Billborad"].Get());
 		RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Billborad], mCurrentFrameResource->GetObjectVirtualAddress(),
-			RP_OBJECT, objCBByteSize, true, &mWorldCamFrustum, threadIndex, threadNum);
+			(int)RpCommon::Object, objCBByteSize, true, &mWorldCamFrustum, threadIndex, threadNum);
 
 		ThrowIfFailed(cmdList->Close());
 

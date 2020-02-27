@@ -43,7 +43,7 @@ VertexOut VS(VertexIn vin)
 void GS(point VertexOut gin[1], // Primitive는 Point이므로 들어오는 정점은 하나이다.
 	inout TriangleStream<GeoOut> triStream)
 {
-	MaterialData matData = gMaterialData[gParticleMaterialIndex];
+	MaterialData matData = gMaterialData[gObjMaterialIndex];
 
 	float4 v[4];
 
@@ -55,7 +55,7 @@ void GS(point VertexOut gin[1], // Primitive는 Point이므로 들어오는 정점은 하나�
 	float3 look;
 	float3 right;
 
-	if (gParticleFacingCamera)
+	if (true)
 	{
 		// 빌보드가 xz 평면에 붙어서 y 방향으로 세워진 상태에서 카메라를
 		// 향하게 만드는 세계 공간 기준 빌보드 지역 좌표계를 계산한다.
@@ -100,7 +100,7 @@ void GS(point VertexOut gin[1], // Primitive는 Point이므로 들어오는 정점은 하나�
 float4 PS(GeoOut pin) : SV_Target
 {
 	// 이 픽셀에 사용할 Material Data를 가져온다.
-	MaterialData matData = gMaterialData[gParticleMaterialIndex];
+	MaterialData matData = gMaterialData[gObjMaterialIndex];
 	float4 diffuseAlbedo = matData.mDiffuseAlbedo;
 	uint diffuseMapIndex = matData.mDiffuseMapIndex;
 

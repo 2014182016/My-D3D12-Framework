@@ -52,7 +52,6 @@ private:
 	void UpdateMaterialBuffer(float deltaTime);
 	void UpdateMainPassBuffer(float deltaTime);
 	void UpdateWidgetBuffer(float deltaTime);
-	void UpdateParticleBuffer(float deltaTime);
 	void UpdateSsaoBuffer(float deltaTime);
 	void UpdateObjectBufferPool();
 
@@ -69,7 +68,6 @@ private:
 	void Finish(ID3D12GraphicsCommandList* cmdList);
 
 	void DestroyGameObjects();
-	void DestroyParticles();
 
 	void SetCommonState(ID3D12GraphicsCommandList* cmdList);
 

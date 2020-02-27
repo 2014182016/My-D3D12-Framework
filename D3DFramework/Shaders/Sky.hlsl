@@ -21,9 +21,6 @@ VertexOut VS(VertexIn vin)
 {
 	VertexOut vout = (VertexOut)0.0f;
 
-	// 이 정점에 사용할 Material을 가져온다.
-	MaterialData matData = gMaterialData[gObjMaterialIndex];
-
 	// World Space로 변환한다.
 	float4 posW = mul(float4(vin.mPosL, 1.0f), gObjWorld);
 	vout.mPosW = posW.xyz;
@@ -32,7 +29,7 @@ VertexOut VS(VertexIn vin)
 	vout.mPosH = mul(posW, gViewProj).xyww;
 
 	// 출력 정점 특성들은 이후 삼각형을 따라 보간된다.
-	vout.mTexC = mul(float4(vin.mTexC, 0.0f, 1.0f), matData.mMatTransform).xy;
+	vout.mTexC = mul(float4(vin.mTexC, 0.0f, 1.0f), GetMaterialTransform(gObjMaterialIndex)).xy;
 
 	return vout;
 }
@@ -48,7 +45,7 @@ float4 PS(VertexOut pin) : SV_Target
 	// 텍스처 배열의 텍스처를 동적으로 조회한다.
 	if (diffuseMapIndex != DISABLED)
 	{
-		diffuseIntensity = gTextureMaps[diffuseMapIndex].Sample(gsamLinearWrap, pin.mTexC).r;
+		diffuseIntensity = gTextureMaps[diffuseMapIndex].Sample(gsamAnisotropicWrap, pin.mTexC).r;
 	}
 
 	float height = pin.mPosW.y / skyScale;

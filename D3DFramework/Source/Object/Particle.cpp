@@ -2,6 +2,7 @@
 #include "Particle.h"
 #include "Mesh.h"
 #include "Structures.h"
+#include "Random.h"
 
 using namespace std::literals;
 using namespace DirectX;
@@ -37,7 +38,7 @@ void Particle::Tick(float deltaTime)
 		{
 			for (UINT i = 0; i < mBurstNum; ++i)
 				SpawnParticleData();
-;			mSpawnTime = GetRandomFloat(mSpawnTimeRange.first, mSpawnTimeRange.second);
+;			mSpawnTime = Random::GetRandomFloat(mSpawnTimeRange.first, mSpawnTimeRange.second);
 		}
 
 		UpdateParticleData(deltaTime);
@@ -53,14 +54,14 @@ void Particle::SpawnParticleData()
 
 	ParticleData* particleData = mParitlcePool->Acquire();
 
-	particleData->mPosition = mPosition + GetRandomFloat3(mSpawnDistanceRange.first, mSpawnDistanceRange.second);
-	particleData->mVelocity = GetRandomFloat3(mVelocityRange.first, mVelocityRange.second);
-	particleData->mSize = GetRandomFloat2(mSizeRange.first, mSizeRange.second);
-	particleData->mLifeTime = GetRandomFloat(mLifeTimeRange.first, mLifeTimeRange.second);
-	particleData->mColor = GetRandomFloat4(mColorRange.first, mColorRange.second);
+	particleData->mPosition = mPosition + Random::GetRandomFloat3(mSpawnDistanceRange.first, mSpawnDistanceRange.second);
+	particleData->mVelocity = Random::GetRandomFloat3(mVelocityRange.first, mVelocityRange.second);
+	particleData->mSize = Random::GetRandomFloat2(mSizeRange.first, mSizeRange.second);
+	particleData->mLifeTime = Random::GetRandomFloat(mLifeTimeRange.first, mLifeTimeRange.second);
+	particleData->mColor = Random::GetRandomFloat4(mColorRange.first, mColorRange.second);
 
 	if (mFacingCamera)
-		particleData->mNormal = GetRandomNormal();
+		particleData->mNormal = Random::GetRandomNormal();
 
 	mParticleDatas.push_back(particleData);
 }

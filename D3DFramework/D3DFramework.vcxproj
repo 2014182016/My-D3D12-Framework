@@ -110,7 +110,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
-    <FxCompile Include="Shaders\SsaoInclude.hlsl">
+    <FxCompile Include="Shaders\SsaoRS.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
@@ -169,6 +169,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="Source\Framework\Random.cpp" />
     <ClCompile Include="Source\Framework\SimpleShadowMap.cpp" />
     <ClCompile Include="Source\Framework\Ssao.cpp" />
     <ClCompile Include="Source\Framework\WinApp.cpp" />
@@ -185,6 +186,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Random.h" />
     <ClInclude Include="Source\Component\Component.h" />
     <ClInclude Include="Source\Component\Material.h" />
     <ClInclude Include="Source\Component\Mesh.h" />
@@ -284,6 +286,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <SourcePath>$(SourcePath)</SourcePath>
+    <IncludePath>D:\Visual Studio 2017\Projects\D3DFramework\D3DFramework\Source\Framework;D:\Visual Studio 2017\Projects\D3DFramework\D3DFramework\Source\Component;D:\Visual Studio 2017\Projects\D3DFramework\D3DFramework\Source\Object;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>

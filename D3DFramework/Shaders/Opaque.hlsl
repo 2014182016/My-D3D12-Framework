@@ -7,10 +7,6 @@ struct VertexIn
 	float3 mTangentU : TANGENT;
 	float3 mBinormalU: BINORMAL;
 	float2 mTexC     : TEXCOORD;
-#ifdef SKINNED
-	float3 mBoneWeights  : WEIGHTS;
-	uint4  mBoneIndices  : BONEINDICES;
-#endif
 };
 
 struct VertexOut
@@ -26,39 +22,15 @@ struct VertexOut
 struct PixelOut
 {
 	float4 mDiffuse  : SV_TARGET0;
-	float4 mSpecularAndRoughness : SV_TARGET1;
-	float4 mNormal   : SV_TARGET2;
-	float4 mPosition : SV_TARGET3;
+	float4 mSpecularRoughness : SV_TARGET1;
+	float4 mPosition : SV_TARGET2;
+	float4 mNormal   : SV_TARGET3;
+	float4 mNormalx  : SV_TARGET4;
 };
 
 VertexOut VS(VertexIn vin)
 {
 	VertexOut vout = (VertexOut)0.0f;
-
-	// 이 정점에 사용할 Material을 가져온다.
-	MaterialData matData = gMaterialData[gObjMaterialIndex];
-
-#ifdef SKINNED
-	float weights[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-	weights[0] = vin.mBoneWeights.x;
-	weights[1] = vin.mBoneWeights.y;
-	weights[2] = vin.mBoneWeights.z;
-	weights[3] = 1.0f - weights[0] - weights[1] - weights[2];
-
-	float3 posL = float3(0.0f, 0.0f, 0.0f);
-	float3 normalL = float3(0.0f, 0.0f, 0.0f);
-	float3 tangentL = float3(0.0f, 0.0f, 0.0f);
-	for (int i = 0; i < 4; ++i)
-	{
-		posL += weights[i] * mul(float4(vin.mPosL, 1.0f), gBoneTransforms[vin.mBoneIndices[i]]).xyz;
-		normalL += weights[i] * mul(vin.mNormalL, (float3x3)gBoneTransforms[vin.mBoneIndices[i]]);
-		tangentL += weights[i] * mul(vin.mTangentL.xyz, (float3x3)gBoneTransforms[vin.mBoneIndices[i]]);
-	}
-
-	vin.mPosL = posL;
-	vin.mNormalL = normalL;
-	vin.mTangentL.xyz = tangentL;
-#endif
 
 	// World Space로 변환한다.
 	float4 posW = mul(float4(vin.mPosL, 1.0f), gObjWorld);
@@ -74,7 +46,7 @@ VertexOut VS(VertexIn vin)
 	vout.mBinormalW = mul(vin.mBinormalU, (float3x3)gObjWorld);
 
 	// 출력 정점 특성들은 이후 삼각형을 따라 보간된다.
-	vout.mTexC = mul(float4(vin.mTexC, 0.0f, 1.0f), matData.mMatTransform).xy;
+	vout.mTexC = mul(float4(vin.mTexC, 0.0f, 1.0f), GetMaterialTransform(gObjMaterialIndex)).xy;
 
 	return vout;
 }
@@ -83,43 +55,41 @@ PixelOut PS(VertexOut pin)
 {
 	PixelOut pout = (PixelOut)0.0f;
 
-	// 이 픽셀에 사용할 Material Data를 가져온다.
-	MaterialData matData = gMaterialData[gObjMaterialIndex];
-	float4 diffuseAlbedo = matData.mDiffuseAlbedo;
-	float3 specular = matData.mSpecular;
-	float roughness = matData.mRoughness;
-	uint diffuseMapIndex = matData.mDiffuseMapIndex;
-	uint normalMapIndex = matData.mNormalMapIndex;
+	float4 diffuse; float3 specular; float roughness;
+	GetMaterialAttibute(gObjMaterialIndex, diffuse, specular, roughness);
 
-	// 텍스처 배열의 텍스처를 동적으로 조회한다.
-	if (diffuseMapIndex != DISABLED)
-	{
-		diffuseAlbedo *= gTextureMaps[diffuseMapIndex].Sample(gsamAnisotropicWrap, pin.mTexC);
-	}
+	diffuse *= GetDiffuseMapSample(gObjMaterialIndex, pin.mTexC);
 
 	// 텍스처 알파가 0.1보다 작으면 픽셀을 폐기한다. 
-	clip(diffuseAlbedo.a - 0.1f);
+	clip(diffuse.a - 0.1f);
 
 	// 법선을 보간하면 단위 길이가 아니게 될 수 있으므로 다시 정규화한다.
 	pin.mNormalW = normalize(pin.mNormalW);
 	pin.mTangentW = normalize(pin.mTangentW);
 	pin.mBinormalW = normalize(pin.mBinormalW);
+
+#ifdef SSAO
+	// SSAO에서 사용하기 위하여 노멀 맵을 사용하지 않는 노멀을 추출한다.
+	pout.mNormalx = float4(pin.mNormalW, 1.0f);
+#endif
+
 	float3 bumpedNormalW = pin.mNormalW;
 
+	float4 normalMapSample = GetNormalMapSample(gObjMaterialIndex, pin.mTexC);
 	// 노멀맵에서 Tangent Space의 노멀을 World Space의 노멀로 변환한다.
-	if (normalMapIndex != DISABLED)
+	if (any(normalMapSample))
 	{
-		float4 normalMapSample = gTextureMaps[normalMapIndex].Sample(gsamAnisotropicWrap, pin.mTexC);
+		// 노멀맵에서 Tangent Space의 노멀을 World Space의 노멀로 변환한다.
 		float3 normalT = 2.0f * normalMapSample.rgb - 1.0f;
 		float3x3 tbn = float3x3(pin.mTangentW, pin.mBinormalW, pin.mNormalW);
 		bumpedNormalW = mul(normalT, tbn);
 		bumpedNormalW = normalize(bumpedNormalW);
 	}
 
-	pout.mDiffuse = diffuseAlbedo;
-	pout.mSpecularAndRoughness = float4(specular, roughness);
-	pout.mNormal = float4(bumpedNormalW, 1.0f);
+	pout.mDiffuse = diffuse;
+	pout.mSpecularRoughness = float4(specular, roughness);
 	pout.mPosition = float4(pin.mPosW, 1.0f);
+	pout.mNormal = float4(bumpedNormalW, 1.0f);
 
 	return pout;
 }

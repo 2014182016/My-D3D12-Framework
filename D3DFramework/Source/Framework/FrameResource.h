@@ -13,8 +13,7 @@ struct FrameResource
 {
 public:
 	FrameResource(ID3D12Device* device, bool singleThread,
-		UINT passCount, UINT objectCount, UINT lightCount, UINT materialCount,
-		UINT widgetCount, UINT particleCount);
+		UINT passCount, UINT objectCount, UINT lightCount, UINT materialCount, UINT widgetCount);
 	FrameResource(const FrameResource& rhs) = delete;
 	FrameResource& operator=(const FrameResource& rhs) = delete;
 	~FrameResource();
@@ -28,12 +27,11 @@ public:
 		if (mLightBufferPool->GetBuffer()) return mLightBufferPool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0; }
 	D3D12_GPU_VIRTUAL_ADDRESS GetMaterialVirtualAddress() const {
 		if (mMaterialBufferPool->GetBuffer()) return mMaterialBufferPool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0; }
-	D3D12_GPU_VIRTUAL_ADDRESS GetWidgetVirtualAddress() const { 
-		if (mWidgetPool->GetBuffer()) return mWidgetPool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0; }
-	D3D12_GPU_VIRTUAL_ADDRESS GetParticleVirtualAddress() const {
-		if (mParticlePool->GetBuffer()) return mParticlePool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0; }
 	D3D12_GPU_VIRTUAL_ADDRESS GetSsaoVirtualAddress() const {
 		if (mSsaoPool->GetBuffer()) return mSsaoPool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0; }
+	D3D12_GPU_VIRTUAL_ADDRESS GetWidgetVirtualAddress() const {
+		if (mWidgetPool->GetBuffer()) return mWidgetPool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0;
+	}
  
 public:
 	static inline UINT processorCoreNum = 0;
@@ -56,10 +54,8 @@ public:
 	std::unique_ptr<BufferMemoryPool<ObjectConstants>> mObjectPool = nullptr;
 	std::unique_ptr<BufferMemoryPool<LightData>> mLightBufferPool = nullptr;
 	std::unique_ptr<BufferMemoryPool<MaterialData>> mMaterialBufferPool = nullptr;
-	std::unique_ptr<BufferMemoryPool<WidgetConstants>> mWidgetPool = nullptr;
-	std::unique_ptr<BufferMemoryPool<ParticleConstants>> mParticlePool = nullptr;
 	std::unique_ptr<BufferMemoryPool<SsaoConstants>> mSsaoPool = nullptr;
+	std::unique_ptr<BufferMemoryPool<ObjectConstants>> mWidgetPool = nullptr;
 
 	std::vector<std::unique_ptr<UploadBuffer<WidgetVertex>>> mWidgetVBs;
-	std::vector<std::unique_ptr<UploadBuffer<ParticleVertex>>> mParticleVBs;
 };

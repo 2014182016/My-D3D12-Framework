@@ -12,19 +12,6 @@
 #define FOG_EXPONENTIAL 1
 #define FOG_EXPONENTIAL2 2 
 
-static const int gSampleCount = 14;
-static const int gBlurRadius = 5;
-
-static const float2 gTexCoords[6] =
-{
-	float2(0.0f, 1.0f),
-	float2(0.0f, 0.0f),
-	float2(1.0f, 0.0f),
-	float2(0.0f, 1.0f),
-	float2(1.0f, 0.0f),
-	float2(1.0f, 1.0f)
-};
-
 struct MaterialData
 {
 	float4x4 mMatTransform;
@@ -40,18 +27,16 @@ struct MaterialData
 Texture2D gTextureMaps[TEX_NUM] : register(t0, space0);
 Texture2D gShadowMaps[LIGHT_NUM]: register(t0, space1);
 
-Texture2D gSsaoMap : register(t0, space2);
-Texture2D gSsaoMap2 : register(t1, space2);
-Texture2D gRandomVecMap : register(t2, space2);
+Texture2D gDiffuseMap : register(t0, space2);
+Texture2D gSpecularRoughnessMap : register(t1, space2);
+Texture2D gPositonMap : register(t2, space2);
+Texture2D gNormalMap : register(t3, space2);
+Texture2D gNormalxMap : register(t4, space2); // Normal Map x
+Texture2D gDepthMap : register(t5, space2);
+Texture2D gSsaoMap : register(t6, space2);
 
 StructuredBuffer<Light> gLights : register(t0, space3);
 StructuredBuffer<MaterialData> gMaterialData : register(t1, space3);
-
-Texture2D gDiffuseMap : register(t0, space4);
-Texture2D gSpecularAndRoughnessMap : register(t1, space4);
-Texture2D gNormalMap : register(t2, space4);
-Texture2D gPositonMap : register(t3, space4);
-Texture2D gDepthMap : register(t4, space4);
 
 SamplerState gsamPointWrap        : register(s0);
 SamplerState gsamPointClamp       : register(s1);
@@ -60,7 +45,6 @@ SamplerState gsamLinearClamp      : register(s3);
 SamplerState gsamAnisotropicWrap  : register(s4);
 SamplerState gsamAnisotropicClamp : register(s5);
 SamplerComparisonState gsamShadow : register(s6);
-SamplerState gsamDepthMap : register(s7);
 
 cbuffer cbPerObject : register(b0)
 {
@@ -101,50 +85,6 @@ cbuffer cbPass : register(b1)
 	float gPadding2;
 	float gPadding3;
 };
-
-cbuffer cbWidget : register(b2)
-{
-	uint gWidgetMaterialIndex;
-	float gWidgetPadding0;
-	float gWidgetPadding1;
-	float gWidgetPadding2;
-}
-
-cbuffer cbParticle : register(b3)
-{
-	uint gParticleMaterialIndex;
-	bool gParticleFacingCamera;
-	float gParticlePadding0;
-	float gParticlePadding1;
-}
-
-cbuffer cbSsao : register(b4)
-{
-	float4 gOffsetVectors[14];
-	float4 gBlurWeights[3];
-
-	float gOcclusionRadius;
-	float gOcclusionFadeStart;
-	float gOcclusionFadeEnd;
-	float gSurfaceEpsilon;
-
-	float gSsaoContrast;
-	float gSsaoPadding0;
-	float gSsaoPadding1;
-	float gSsaoPadding2;
-};
-
-cbuffer cbRootConstants : register(b5)
-{
-	bool gHorizontalBlur;
-};
-
-#ifdef SKINNED
-cbuffer cbSkinned : register(b1)
-{
-	float4x4 gBoneTransforms[96];
-};
-#endif
 
 // 법선 맵 표본을 World Space로 변환한다.
 float3 NormalSampleToWorldSpace(float3 normalMapSample, float3 unitNormalW, float3 tangentW)
@@ -254,31 +194,82 @@ float4 ComputeShadowLighting(StructuredBuffer<Light> lights, Material mat, float
 	return float4(result, 0.0f);
 }
 
-float NdcDepthToViewDepth(float z_ndc)
+float4 GetFogBlend(float4 litColor, float distToEye)
 {
-	// z 성분에 대해 NDC 공간에서 시야 공간으로의 계산을
-	// 역으로 수행할 수 있다. A = gProj[2, 2], B = gProj[3, 2]로
-	// 두었을 때, z_ndc = A + B / viewZ이다.
-	float viewZ = gProj[3][2] / (z_ndc - gProj[2][2]);
-	return viewZ;
-}
+	float4 result = 0.0f;
 
-float OcclusionFunction(float distZ)
-{
-	// 만일 depth(q)가 depth(p)의 뒤에 있다면 q는 p를 가릴 수 없다.
-	// 또한, depth(q)와 depth(p)가 충분히 가까울 때에도 q가 p를 가리지
-	// 않는 것으로 판정한다. 왜냐하면 q가 p를 가리기 위해서는 q가 적어도
-	// Epsilon만큼 p보다 앞에 있어야 하기 때문이다.
-
-	float occlusion = 0.0f;
-	if (distZ > gSurfaceEpsilon)
+	switch (gFogType)
 	{
-		float fadeLength = gOcclusionFadeEnd - gOcclusionFadeStart;
-
-		// distZ가 gOcclusionFadeStart에서 gOcclusionFadeEnd로 증가함에
-		// 따라 차폐도를 1에서 0으로 선형 감소한다.
-		occlusion = saturate((gOcclusionFadeEnd - distZ) / fadeLength);
+	case FOG_LINEAR:
+	{
+		// 거리에 따라 안개 색상을 선형 감쇠로 계산한다.
+		float fogAmount = saturate((distToEye - gFogStart) / gFogRange);
+		result = lerp(litColor, gFogColor, fogAmount);
+		break;
+	}
+	case FOG_EXPONENTIAL:
+	{
+		// 지수적으로 멀리 있을수록 안개가 더 두꺼워진다.
+		float fogAmount = exp(-distToEye * gFogDensity);
+		result = lerp(gFogColor, litColor, fogAmount);
+		break;
+	}
+	case FOG_EXPONENTIAL2:
+	{
+		// 매우 두꺼운 안개를 나타낸다.
+		float fogAmount = exp(-pow(distToEye * gFogDensity, 2));
+		result = lerp(gFogColor, litColor, fogAmount);
+		break;
+	}
 	}
 
-	return occlusion;
+	return result;
+}
+
+float4x4 GetMaterialTransform(in uint materialIndex)
+{
+	if (materialIndex == DISABLED)
+		return gIdentity;
+	return gMaterialData[materialIndex].mMatTransform;
+}
+
+void GetMaterialAttibute(in uint materialIndex, out float4 diffuse, out float3 specular, out float roughness)
+{
+	diffuse = gMaterialData[materialIndex].mDiffuseAlbedo;
+	specular = gMaterialData[materialIndex].mSpecular;
+	roughness = gMaterialData[materialIndex].mRoughness;
+}
+
+float4 GetDiffuseMapSample(uint materialIndex, float2 tex)
+{
+	if (materialIndex == DISABLED)
+		return 0.0f;
+	return gTextureMaps[gMaterialData[materialIndex].mDiffuseMapIndex].Sample(gsamAnisotropicWrap, tex);
+}
+
+float4 GetNormalMapSample(uint materialIndex, float2 tex)
+{
+	if (materialIndex == DISABLED)
+		return 0.0f;
+	return gTextureMaps[gMaterialData[materialIndex].mNormalMapIndex].Sample(gsamAnisotropicWrap, tex);
+}
+
+void GetGBufferAttribute(in uint3 tex, out float4 diffuse, out float3 specular, out float roughness,
+	out float3 position, out float3 normal, out float depth)
+{
+	diffuse = gDiffuseMap.Load(tex);
+	float4 specularAndroughness = gSpecularRoughnessMap.Load(tex);
+	specular = specularAndroughness.rgb;
+	roughness = specularAndroughness.a;
+	position = gPositonMap.Load(tex).xyz;
+	normal = gNormalMap.Load(tex).xyz;
+	depth = gDepthMap.Load(tex).r;
+}
+
+float4 GetAmbientAccess(float3 posW)
+{
+	float4 ssaoPosH = mul(float4(posW, 1.0f), gViewProjTex);
+	ssaoPosH /= ssaoPosH.w;
+	float ambientAccess = gSsaoMap.Sample(gsamLinearClamp, ssaoPosH.xy, 0.0f).r;
+	return ambientAccess;
 }

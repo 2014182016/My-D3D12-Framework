@@ -84,4 +84,27 @@ enum class CubeMapFace : int
 	NegativeZ = 5
 };
 
+enum class RpCommon : int
+{
+	Object = 0,
+	Pass,
+	Light,
+	Material,
+	Texture,
+	ShadowMap,
+	GBuffer,
+	Ssao,
+	Count
+};
+
+enum class RpSsao : int
+{
+	SsaoCB = 0,
+	Pass,
+	Constants,
+	BufferMap,
+	SsaoMap,
+	Count
+};
+
 #endif // ENUMS_H

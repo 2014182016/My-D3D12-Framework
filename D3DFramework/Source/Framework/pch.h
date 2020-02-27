@@ -87,11 +87,4 @@ namespace DirectX
 }
 
 
-float GetRandomFloat(float min, float max);
-DirectX::XMFLOAT2 GetRandomFloat2(const DirectX::XMFLOAT2& min, const DirectX::XMFLOAT2& max);
-DirectX::XMFLOAT3 GetRandomFloat3(const DirectX::XMFLOAT3& min, const DirectX::XMFLOAT3& max);
-DirectX::XMFLOAT4 GetRandomFloat4(const DirectX::XMFLOAT4& min, const DirectX::XMFLOAT4& max);
-DirectX::XMFLOAT3 GetRandomNormal();
-
-
 #endif //PCH_H

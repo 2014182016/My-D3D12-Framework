@@ -12,8 +12,6 @@ D3DApp::D3DApp(HINSTANCE hInstance, int screenWidth, int screenHeight, std::wstr
 {
 	objCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
 	passCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(PassConstants));
-	widgetCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(WidgetConstants));
-	particleCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(ParticleConstants));
 }
 
 D3DApp::~D3DApp()
@@ -89,7 +87,7 @@ void D3DApp::CreateRtvAndDsvDescriptorHeaps(UINT shadowMapNum)
 {
 	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc;
 #ifdef SSAO
-	rtvHeapDesc.NumDescriptors = SWAP_CHAIN_BUFFER_COUNT + DEFERRED_BUFFER_COUNT + 2;
+	rtvHeapDesc.NumDescriptors = SWAP_CHAIN_BUFFER_COUNT + DEFERRED_BUFFER_COUNT + 2; // Back Buffer, Deferred Buffer, Ssao Map
 #else
 	rtvHeapDesc.NumDescriptors = SWAP_CHAIN_BUFFER_COUNT + DEFERRED_BUFFER_COUNT;
 #endif
@@ -545,34 +543,102 @@ void D3DApp::LogOutputDisplayModes(IDXGIOutput* output, DXGI_FORMAT format)
 	}
 }
 
-void D3DApp::CreateRootSignatures(UINT textureNum, UINT shadowMapNum)
+void D3DApp::CreateCommonRootSignature(UINT textureNum, UINT shadowMapNum)
 {
 	// 일반적으로 셰이더 프로그램은 특정 자원들(상수 버퍼, 텍스처, 표본추출기 등)이
 	// 입력된다고 기대한다. 루트 서명은 셰이더 프로그램이 기대하는 자원들을 정의한다.
 
-	std::array<CD3DX12_ROOT_PARAMETER, ROOT_PARAMETER_NUM> slotRootParameter;
+	std::array<CD3DX12_ROOT_PARAMETER, (int)RpCommon::Count> slotRootParameter;
 
 	CD3DX12_DESCRIPTOR_RANGE texTable[4];
-	texTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, textureNum, mRootParameterInfos[RP_TEXTURE].mShaderRegister, mRootParameterInfos[RP_TEXTURE].mRegisterSpace);
-	texTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, shadowMapNum, mRootParameterInfos[RP_SHADOWMAP].mShaderRegister, mRootParameterInfos[RP_SHADOWMAP].mRegisterSpace);
-	texTable[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 3, mRootParameterInfos[RP_SSAOMAP].mShaderRegister, mRootParameterInfos[RP_SSAOMAP].mRegisterSpace);
-	texTable[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, DEFERRED_BUFFER_COUNT + 1, mRootParameterInfos[RP_G_BUFFER].mShaderRegister, mRootParameterInfos[RP_G_BUFFER].mRegisterSpace);
+	texTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, textureNum, 0, 0);
+	texTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, shadowMapNum, 0, 1);
+	texTable[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, DEFERRED_BUFFER_COUNT + 1, 0, 2); // Deferred Map + Depth Map
+	texTable[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, DEFERRED_BUFFER_COUNT + 1, 2); // SSAO Map
 
 	// 퍼포먼스 TIP: 가장 자주 사용하는 것을 앞에 놓는다.
-	slotRootParameter[RP_OBJECT].InitAsConstantBufferView(mRootParameterInfos[RP_OBJECT].mShaderRegister, mRootParameterInfos[RP_OBJECT].mRegisterSpace); // Object 상수 버퍼
-	slotRootParameter[RP_PASS].InitAsConstantBufferView(mRootParameterInfos[RP_PASS].mShaderRegister, mRootParameterInfos[RP_PASS].mRegisterSpace); // Pass 상수 버퍼
-	slotRootParameter[RP_LIGHT].InitAsShaderResourceView(mRootParameterInfos[RP_LIGHT].mShaderRegister, mRootParameterInfos[RP_LIGHT].mRegisterSpace); // Lights
-	slotRootParameter[RP_MATERIAL].InitAsShaderResourceView(mRootParameterInfos[RP_MATERIAL].mShaderRegister, mRootParameterInfos[RP_MATERIAL].mRegisterSpace); // Materials
-	slotRootParameter[RP_TEXTURE].InitAsDescriptorTable(1, &texTable[0], D3D12_SHADER_VISIBILITY_PIXEL); // Textures
-	slotRootParameter[RP_SHADOWMAP].InitAsDescriptorTable(1, &texTable[1], D3D12_SHADER_VISIBILITY_PIXEL); // Shadow Maps
-	slotRootParameter[RP_SSAOMAP].InitAsDescriptorTable(1, &texTable[2], D3D12_SHADER_VISIBILITY_PIXEL); // Ssao Maps
-	slotRootParameter[RP_G_BUFFER].InitAsDescriptorTable(1, &texTable[3], D3D12_SHADER_VISIBILITY_PIXEL); // G-Buffer
-	slotRootParameter[RP_WIDGET].InitAsConstantBufferView(mRootParameterInfos[RP_WIDGET].mShaderRegister, mRootParameterInfos[RP_WIDGET].mRegisterSpace); // Widget
-	slotRootParameter[RP_PARTICLE].InitAsConstantBufferView(mRootParameterInfos[RP_PARTICLE].mShaderRegister, mRootParameterInfos[RP_PARTICLE].mRegisterSpace); // Particle
-	slotRootParameter[RP_SSAO].InitAsConstantBufferView(mRootParameterInfos[RP_SSAO].mShaderRegister, mRootParameterInfos[RP_SSAO].mRegisterSpace); // Ssao
-	slotRootParameter[RP_BLUR].InitAsConstants(1, mRootParameterInfos[RP_BLUR].mShaderRegister); // Blur
+	slotRootParameter[(int)RpCommon::Object].InitAsConstantBufferView(0);
+	slotRootParameter[(int)RpCommon::Pass].InitAsConstantBufferView(1);
+	slotRootParameter[(int)RpCommon::Light].InitAsShaderResourceView(0, 3);
+	slotRootParameter[(int)RpCommon::Material].InitAsShaderResourceView(1, 3);
+	slotRootParameter[(int)RpCommon::Texture].InitAsDescriptorTable(1, &texTable[0], D3D12_SHADER_VISIBILITY_PIXEL);
+	slotRootParameter[(int)RpCommon::ShadowMap].InitAsDescriptorTable(1, &texTable[1], D3D12_SHADER_VISIBILITY_PIXEL);
+	slotRootParameter[(int)RpCommon::GBuffer].InitAsDescriptorTable(1, &texTable[2], D3D12_SHADER_VISIBILITY_PIXEL);
+	slotRootParameter[(int)RpCommon::Ssao].InitAsDescriptorTable(1, &texTable[3], D3D12_SHADER_VISIBILITY_PIXEL);
 
-	auto staticSamplers = GetStaticSamplers();
+	// 그래픽 응용 프로그램이 사용하는 표본추출기의 수는 그리 많지 않으므로
+	// 미리 만들어서 Root Signature에 포함시켜 둔다.
+
+	// 점 필터링, 순환 좌표 지정 모드
+	const CD3DX12_STATIC_SAMPLER_DESC pointWrap(
+		0, // shaderRegister
+		D3D12_FILTER_MIN_MAG_MIP_POINT, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP); // addressW
+
+	// 점 필터링, 한정 좌표 지정 모드
+	const CD3DX12_STATIC_SAMPLER_DESC pointClamp(
+		1, // shaderRegister
+		D3D12_FILTER_MIN_MAG_MIP_POINT, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP); // addressW
+
+	// 선형 필터링, 순환 좌표 지정 모드
+	const CD3DX12_STATIC_SAMPLER_DESC linearWrap(
+		2, // shaderRegister
+		D3D12_FILTER_MIN_MAG_MIP_LINEAR, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP); // addressW
+
+	// 선형 필터링, 한정 좌표 지정 모드
+	const CD3DX12_STATIC_SAMPLER_DESC linearClamp(
+		3, // shaderRegister
+		D3D12_FILTER_MIN_MAG_MIP_LINEAR, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP); // addressW
+
+	// 비등방 필터링, 순환 좌표 지정 모드
+	const CD3DX12_STATIC_SAMPLER_DESC anisotropicWrap(
+		4, // shaderRegister
+		D3D12_FILTER_ANISOTROPIC, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressW
+		0.0f,                             // mipLODBias
+		8);                               // maxAnisotropy
+
+	// 비등방 필터링, 한정 좌표 지정 모드
+	const CD3DX12_STATIC_SAMPLER_DESC anisotropicClamp(
+		5, // shaderRegister
+		D3D12_FILTER_ANISOTROPIC, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressW
+		0.0f,                              // mipLODBias
+		8);                                // maxAnisotropy
+
+	// 그림자를 위한 비교 표폰추출기
+	// 하드웨어가 그림자 맵 비교 판정들을 수행할 수 있게 하기 위한 것
+	// PCF(Percenatge Colser Filtering) : 비율 근접 필터링
+	const CD3DX12_STATIC_SAMPLER_DESC shadow(
+		6, // shaderRegister
+		D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressW
+		0.0f,                               // mipLODBias
+		16,                                 // maxAnisotropy
+		D3D12_COMPARISON_FUNC_LESS_EQUAL,
+		D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK);
+
+	std::array<CD3DX12_STATIC_SAMPLER_DESC, 7> staticSamplers = { 
+		pointWrap, pointClamp,
+		linearWrap, linearClamp,
+		anisotropicWrap, anisotropicClamp, shadow };
 
 	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc((UINT)slotRootParameter.size(), slotRootParameter.data(),
 		(UINT)staticSamplers.size(), staticSamplers.data(),
@@ -595,20 +661,25 @@ void D3DApp::CreateRootSignatures(UINT textureNum, UINT shadowMapNum)
 		serializedRootSig->GetBufferPointer(),
 		serializedRootSig->GetBufferSize(),
 		IID_PPV_ARGS(&mRootSignatures["Common"])));
+}
 
-	/*
-#ifdef SSAO
-	CD3DX12_DESCRIPTOR_RANGE ssaoTexTable[3];
-	ssaoTexTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
-	ssaoTexTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0);
-	ssaoTexTable[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2, 0);
+void D3DApp::CreateSsaoRootSignature()
+{
+	// 일반적으로 셰이더 프로그램은 특정 자원들(상수 버퍼, 텍스처, 표본추출기 등)이
+	// 입력된다고 기대한다. 루트 서명은 셰이더 프로그램이 기대하는 자원들을 정의한다.
 
-	std::array<CD3DX12_ROOT_PARAMETER, 5> ssaoSlotRootParameter;
-	ssaoSlotRootParameter[0].InitAsConstantBufferView(0);
-	ssaoSlotRootParameter[1].InitAsConstants(1, 1);
-	ssaoSlotRootParameter[2].InitAsDescriptorTable(1, &ssaoTexTable[0], D3D12_SHADER_VISIBILITY_PIXEL);
-	ssaoSlotRootParameter[3].InitAsDescriptorTable(1, &ssaoTexTable[1], D3D12_SHADER_VISIBILITY_PIXEL);
-	ssaoSlotRootParameter[4].InitAsDescriptorTable(1, &ssaoTexTable[2], D3D12_SHADER_VISIBILITY_PIXEL);
+	CD3DX12_DESCRIPTOR_RANGE texTables[2];
+	texTables[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 0, 0);
+	texTables[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2, 0);
+
+	std::array<CD3DX12_ROOT_PARAMETER, (int)RpSsao::Count> slotRootParameter;
+
+	// 퍼포먼스 TIP: 가장 자주 사용하는 것을 앞에 놓는다.
+	slotRootParameter[(int)RpSsao::SsaoCB].InitAsConstantBufferView(0);
+	slotRootParameter[(int)RpSsao::Pass].InitAsConstantBufferView(1);
+	slotRootParameter[(int)RpSsao::Constants].InitAsConstants(1, 2);
+	slotRootParameter[(int)RpSsao::BufferMap].InitAsDescriptorTable(1, &texTables[0], D3D12_SHADER_VISIBILITY_PIXEL);
+	slotRootParameter[(int)RpSsao::SsaoMap].InitAsDescriptorTable(1, &texTables[1], D3D12_SHADER_VISIBILITY_PIXEL);
 
 	const CD3DX12_STATIC_SAMPLER_DESC pointClamp(
 		0, // shaderRegister
@@ -642,18 +713,16 @@ void D3DApp::CreateRootSignatures(UINT textureNum, UINT shadowMapNum)
 		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
 		D3D12_TEXTURE_ADDRESS_MODE_WRAP); // addressW
 
-	std::array<CD3DX12_STATIC_SAMPLER_DESC, 4> ssaoStaticSamplers =
-	{
-		pointClamp, linearClamp, depthMapSam, linearWrap
-	};
+	std::array<CD3DX12_STATIC_SAMPLER_DESC, 4> staticSamplers = { pointClamp, linearClamp, depthMapSam, linearWrap };
 
-	CD3DX12_ROOT_SIGNATURE_DESC ssaoRootSigDesc((UINT)ssaoSlotRootParameter.size(), ssaoSlotRootParameter.data(),
-		(UINT)ssaoStaticSamplers.size(), ssaoStaticSamplers.data(),
+	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc((UINT)slotRootParameter.size(), slotRootParameter.data(),
+		(UINT)staticSamplers.size(), staticSamplers.data(),
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
-	serializedRootSig = nullptr;
-	errorBlob = nullptr;
-	hr = D3D12SerializeRootSignature(&ssaoRootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+	// Root Signature를 직렬화한 후 객체를 생성한다.
+	ComPtr<ID3DBlob> serializedRootSig = nullptr;
+	ComPtr<ID3DBlob> errorBlob = nullptr;
+	HRESULT hr = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
 		serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
 
 	if (errorBlob != nullptr)
@@ -667,8 +736,6 @@ void D3DApp::CreateRootSignatures(UINT textureNum, UINT shadowMapNum)
 		serializedRootSig->GetBufferPointer(),
 		serializedRootSig->GetBufferSize(),
 		IID_PPV_ARGS(&mRootSignatures["Ssao"])));
-#endif
-	*/
 }
 
 
@@ -717,6 +784,7 @@ void D3DApp::CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum)
 		hDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
 	}
 
+	
 	srvDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
 	// G-Buffer에 사용되는 깊이 버퍼에 대한 SRV를 생성한다.
 	md3dDevice->CreateShaderResourceView(mDepthStencilBuffer.Get(), &srvDesc, hDescriptor);
@@ -743,7 +811,7 @@ void D3DApp::CreateShadersAndInputLayout()
 	mShaders["ForwardPS"] = D3DUtil::CompileShader(L"Shaders\\Forward.hlsl", defines, "PS", "ps_5_1");
 
 	mShaders["OpaqueVS"] = D3DUtil::CompileShader(L"Shaders\\Opaque.hlsl", nullptr, "VS", "vs_5_1");
-	mShaders["OpaquePS"] = D3DUtil::CompileShader(L"Shaders\\Opaque.hlsl", nullptr, "PS", "ps_5_1");
+	mShaders["OpaquePS"] = D3DUtil::CompileShader(L"Shaders\\Opaque.hlsl", defines, "PS", "ps_5_1");
 
 	mShaders["WireframeVS"] = D3DUtil::CompileShader(L"Shaders\\Wireframe.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["WireframePS"] = D3DUtil::CompileShader(L"Shaders\\Wireframe.hlsl", nullptr, "PS", "ps_5_1");
@@ -763,7 +831,7 @@ void D3DApp::CreateShadersAndInputLayout()
 
 	mShaders["BillboardVS"] = D3DUtil::CompileShader(L"Shaders\\Billboard.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["BillboardGS"] = D3DUtil::CompileShader(L"Shaders\\Billboard.hlsl", nullptr, "GS", "gs_5_1");
-	mShaders["BillboardPS"] = D3DUtil::CompileShader(L"Shaders\\Billboard.hlsl", nullptr, "PS", "ps_5_1");
+	mShaders["BillboardPS"] = D3DUtil::CompileShader(L"Shaders\\Billboard.hlsl", defines, "PS", "ps_5_1");
 
 	mShaders["DiffuseMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "DiffuseMapDebugPS", "ps_5_1");
 	mShaders["SpecularMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "SpecularMapDebugPS", "ps_5_1");
@@ -774,6 +842,7 @@ void D3DApp::CreateShadersAndInputLayout()
 	mShaders["ShadowMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "ShadowMapDebugPS", "ps_5_1");
 	mShaders["SsaoMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "SsaoMapDebugPS", "ps_5_1");
 
+	mShaders["LightingPassVS"] = D3DUtil::CompileShader(L"Shaders\\LightingPass.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["LightingPassPS"] = D3DUtil::CompileShader(L"Shaders\\LightingPass.hlsl", defines, "PS", "ps_5_1");
 
 	mShaders["SsaoVS"] = D3DUtil::CompileShader(L"Shaders\\Ssao.hlsl", nullptr, "VS", "vs_5_1");
@@ -1018,7 +1087,7 @@ void D3DApp::CreatePSOs()
 	// PSO for Ssao
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC ssaoPsoDesc = forwardPsoDesc;
 	ssaoPsoDesc.InputLayout = { nullptr, 0 };
-	ssaoPsoDesc.pRootSignature = mRootSignatures["Common"].Get();
+	ssaoPsoDesc.pRootSignature = mRootSignatures["Ssao"].Get();
 	ssaoPsoDesc.VS =
 	{
 		reinterpret_cast<BYTE*>(mShaders["SsaoVS"]->GetBufferPointer()),
@@ -1143,12 +1212,20 @@ void D3DApp::CreatePSOs()
 
 	// PSO for LightingPass
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC lightingPassPsoDesc = widgetPsoDesc;
+	lightingPassPsoDesc.InputLayout = { nullptr, 0 };
+	lightingPassPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["LightingPassVS"]->GetBufferPointer()),
+		mShaders["LightingPassVS"]->GetBufferSize()
+	};
 	lightingPassPsoDesc.PS =
 	{
 		reinterpret_cast<BYTE*>(mShaders["LightingPassPS"]->GetBufferPointer()),
 		mShaders["LightingPassPS"]->GetBufferSize()
 	};
+	lightingPassPsoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&lightingPassPsoDesc, IID_PPV_ARGS(&mPSOs["LightingPass"])));
+
 }
 
 void D3DApp::SetGamma(float gamma)
@@ -1206,96 +1283,6 @@ void D3DApp::ApplyOption(Option option)
 			Set4xMsaaState(optionState);
 			break;
 	}
-}
-
-std::array<const CD3DX12_STATIC_SAMPLER_DESC, 8> D3DApp::GetStaticSamplers()
-{
-	// 그래픽 응용 프로그램이 사용하는 표본추출기의 수는 그리 많지 않으므로
-	// 미리 만들어서 Root Signature에 포함시켜 둔다.
-
-	// 점 필터링, 순환 좌표 지정 모드
-	const CD3DX12_STATIC_SAMPLER_DESC pointWrap(
-		0, // shaderRegister
-		D3D12_FILTER_MIN_MAG_MIP_POINT, // filter
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP); // addressW
-
-	// 점 필터링, 한정 좌표 지정 모드
-	const CD3DX12_STATIC_SAMPLER_DESC pointClamp(
-		1, // shaderRegister
-		D3D12_FILTER_MIN_MAG_MIP_POINT, // filter
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP); // addressW
-
-	// 선형 필터링, 순환 좌표 지정 모드
-	const CD3DX12_STATIC_SAMPLER_DESC linearWrap(
-		2, // shaderRegister
-		D3D12_FILTER_MIN_MAG_MIP_LINEAR, // filter
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP); // addressW
-
-	// 선형 필터링, 한정 좌표 지정 모드
-	const CD3DX12_STATIC_SAMPLER_DESC linearClamp(
-		3, // shaderRegister
-		D3D12_FILTER_MIN_MAG_MIP_LINEAR, // filter
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP); // addressW
-
-	// 비등방 필터링, 순환 좌표 지정 모드
-	const CD3DX12_STATIC_SAMPLER_DESC anisotropicWrap(
-		4, // shaderRegister
-		D3D12_FILTER_ANISOTROPIC, // filter
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressW
-		0.0f,                             // mipLODBias
-		8);                               // maxAnisotropy
-
-	// 비등방 필터링, 한정 좌표 지정 모드
-	const CD3DX12_STATIC_SAMPLER_DESC anisotropicClamp(
-		5, // shaderRegister
-		D3D12_FILTER_ANISOTROPIC, // filter
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressW
-		0.0f,                              // mipLODBias
-		8);                                // maxAnisotropy
-
-	// 그림자를 위한 비교 표폰추출기
-	// 하드웨어가 그림자 맵 비교 판정들을 수행할 수 있게 하기 위한 것
-	// PCF(Percenatge Colser Filtering) : 비율 근접 필터링
-	const CD3DX12_STATIC_SAMPLER_DESC shadow(
-		6, // shaderRegister
-		D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT, // filter
-		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressW
-		0.0f,                               // mipLODBias
-		16,                                 // maxAnisotropy
-		D3D12_COMPARISON_FUNC_LESS_EQUAL,
-		D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK);
-
-	const CD3DX12_STATIC_SAMPLER_DESC depthMapSam(
-		7, // shaderRegister
-		D3D12_FILTER_MIN_MAG_MIP_LINEAR, // filter
-		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressW
-		0.0f,
-		0,
-		D3D12_COMPARISON_FUNC_LESS_EQUAL,
-		D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE);
-
-	return {
-		pointWrap, pointClamp,
-		linearWrap, linearClamp,
-		anisotropicWrap, anisotropicClamp,
-		shadow, depthMapSam
-	};
 }
 
 void D3DApp::Reset(ID3D12GraphicsCommandList* cmdList, ID3D12CommandAllocator* cmdAlloc)

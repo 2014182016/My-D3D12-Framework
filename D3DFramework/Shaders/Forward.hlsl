@@ -23,9 +23,6 @@ VertexOut VS(VertexIn vin)
 {
 	VertexOut vout = (VertexOut)0.0f;
 
-	// 이 정점에 사용할 Material을 가져온다.
-	MaterialData matData = gMaterialData[gObjMaterialIndex];
-	
     // World Space로 변환한다.
     float4 posW = mul(float4(vin.mPosL, 1.0f), gObjWorld);
     vout.mPosW = posW.xyz;
@@ -40,29 +37,20 @@ VertexOut VS(VertexIn vin)
 	vout.mBinormalW = mul(vin.mBinormalU, (float3x3)gObjWorld);
 	
 	// 출력 정점 특성들은 이후 삼각형을 따라 보간된다.
-	vout.mTexC = mul(float4(vin.mTexC, 0.0f, 1.0f), matData.mMatTransform).xy;
+	vout.mTexC = mul(float4(vin.mTexC, 0.0f, 1.0f), GetMaterialTransform(gObjMaterialIndex)).xy;
 	
     return vout;
 }
 
 float4 PS(VertexOut pin) : SV_Target
 {
-	// 이 픽셀에 사용할 Material Data를 가져온다.
-	MaterialData matData = gMaterialData[gObjMaterialIndex];
-	float4 diffuseAlbedo = matData.mDiffuseAlbedo;
-	float3 specular = matData.mSpecular;
-	float roughness = matData.mRoughness;
-	uint diffuseMapIndex = matData.mDiffuseMapIndex;
-	uint normalMapIndex = matData.mNormalMapIndex;
+	float4 diffuse; float3 specular; float roughness;
+	GetMaterialAttibute(gObjMaterialIndex, diffuse, specular, roughness);
 
-	// 텍스처 배열의 텍스처를 동적으로 조회한다.
-	if (diffuseMapIndex != DISABLED)
-	{
-		diffuseAlbedo *= gTextureMaps[diffuseMapIndex].Sample(gsamAnisotropicWrap, pin.mTexC);
-	}
+	diffuse *= GetDiffuseMapSample(gObjMaterialIndex, pin.mTexC);
 
     // 텍스처 알파가 0.1보다 작으면 픽셀을 폐기한다. 
-    clip(diffuseAlbedo.a - 0.1f);
+    clip(diffuse.a - 0.1f);
 
 	// 법선을 보간하면 단위 길이가 아니게 될 수 있으므로 다시 정규화한다.
     pin.mNormalW = normalize(pin.mNormalW);
@@ -70,10 +58,10 @@ float4 PS(VertexOut pin) : SV_Target
 	pin.mBinormalW = normalize(pin.mBinormalW);
 	float3 bumpedNormalW = pin.mNormalW;
 	
-	// 노멀맵에서 Tangent Space의 노멀을 World Space의 노멀로 변환한다.
-	if (normalMapIndex != DISABLED)
+	float4 normalMapSample = GetNormalMapSample(gObjMaterialIndex, pin.mTexC);
+	if (!any(normalMapSample))
 	{
-		float4 normalMapSample = gTextureMaps[normalMapIndex].Sample(gsamAnisotropicWrap, pin.mTexC);
+		// 노멀맵에서 Tangent Space의 노멀을 World Space의 노멀로 변환한다.
 		float3 normalT = 2.0f * normalMapSample.rgb - 1.0f;
 		float3x3 tbn = float3x3(pin.mTangentW, pin.mBinormalW, pin.mNormalW);
 		bumpedNormalW = mul(normalT, tbn);
@@ -86,41 +74,22 @@ float4 PS(VertexOut pin) : SV_Target
 	toEyeW /= distToEye; // normalize
 
 	// Diffuse를 전반적으로 밝혀주는 Ambient항
-	float4 ambient = gAmbientLight * diffuseAlbedo;
+	float4 ambient = gAmbientLight * diffuse;
 
 	// roughness와 normal를 이용하여 shininess를 계산한다.
 	const float shininess = 1.0f - roughness;
-    Material mat = { diffuseAlbedo, specular, shininess };
+    Material mat = { diffuse, specular, shininess };
 
 	// Lighting을 실시한다.
     float4 directLight = ComputeShadowLighting(gLights, mat, pin.mPosW, bumpedNormalW, toEyeW);
 	float4 litColor = ambient + directLight;
 
 	// 분산 재질에서 알파를 가져온다.
-	litColor.a = diffuseAlbedo.a;
+	litColor.a = diffuse.a;
 
 	if (gFogEnabled)
 	{
-		float fogAmount;
-
-		switch(gFogType)
-		{
-		case FOG_LINEAR:
-			// 거리에 따라 안개 색상을 선형 감쇠로 계산한다.
-			fogAmount = saturate((distToEye - gFogStart) / gFogRange);
-			litColor = lerp(litColor, gFogColor, fogAmount);
-			break;
-		case FOG_EXPONENTIAL:
-			// 지수적으로 멀리 있을수록 안개가 더 두꺼워진다.
-			fogAmount = exp(-distToEye * gFogDensity);
-			litColor = lerp(gFogColor, litColor, fogAmount);
-			break;
-		case FOG_EXPONENTIAL2:
-			// 매우 두꺼운 안개를 나타낸다.
-			fogAmount = exp(-pow(distToEye * gFogDensity, 2));
-			litColor = lerp(gFogColor, litColor, fogAmount);
-			break;
-		}
+		litColor = GetFogBlend(litColor, distToEye);
 	}
 
     return litColor;

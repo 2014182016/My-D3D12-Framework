@@ -18,12 +18,12 @@ float4 DiffuseMapDebugPS(VertexOut pin) : SV_Target
 
 float4 SpecularMapDebugPS(VertexOut pin) : SV_Target
 {
-	return float4(gSpecularAndRoughnessMap.Sample(gsamLinearWrap, pin.mTexC).rgb, 1.0f);
+	return float4(gSpecularRoughnessMap.Sample(gsamLinearWrap, pin.mTexC).rgb, 1.0f);
 }
 
 float4 RoughnessMapDebugPS(VertexOut pin) : SV_Target
 {
-	return float4(gSpecularAndRoughnessMap.Sample(gsamLinearWrap, pin.mTexC).aaa, 1.0f);
+	return float4(gSpecularRoughnessMap.Sample(gsamLinearWrap, pin.mTexC).aaa, 1.0f);
 }
 
 float4 NormalMapDebugPS(VertexOut pin) : SV_Target

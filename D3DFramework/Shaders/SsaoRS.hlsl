@@ -4,14 +4,8 @@
 
 cbuffer cbSsao : register(b0)
 {
-	float4x4 gProj;
-	float4x4 gInvProj;
-	float4x4 gProjTex;
 	float4 gOffsetVectors[14];
-
 	float4 gBlurWeights[3];
-
-	float2 gInvRenderTargetSize;
 
 	float gOcclusionRadius;
 	float gOcclusionFadeStart;
@@ -19,14 +13,44 @@ cbuffer cbSsao : register(b0)
 	float gSurfaceEpsilon;
 };
 
-cbuffer cbRootConstants : register(b1)
+cbuffer cbPass : register(b1)
+{
+	float4x4 gView;
+	float4x4 gInvView;
+	float4x4 gProj;
+	float4x4 gInvProj;
+	float4x4 gViewProj;
+	float4x4 gInvViewProj;
+	float4x4 gProjTex;
+	float4x4 gViewProjTex;
+	float4x4 gIdentity;
+	float3 gEyePosW;
+	float gPadding1;
+	float2 gRenderTargetSize;
+	float2 gInvRenderTargetSize;
+	float gNearZ;
+	float gFarZ;
+	float gTotalTime;
+	float gDeltaTime;
+	float4 gAmbientLight;
+	float4 gFogColor;
+	float gFogStart;
+	float gFogRange;
+	float gFogDensity;
+	bool gFogEnabled;
+	uint gFogType;
+	float gSsaoContrast;
+	float gPadding2;
+	float gPadding3;
+};
+
+cbuffer cbRootConstants : register(b2)
 {
 	bool gHorizontalBlur;
 };
 
-Texture2D gNormalMap    : register(t0);
+Texture2D gNormalMap   : register(t0);
 Texture2D gDepthMap     : register(t1);
-Texture2D gRandomVecMap : register(t2);
 
 SamplerState gsamPointClamp : register(s0);
 SamplerState gsamLinearClamp : register(s1);

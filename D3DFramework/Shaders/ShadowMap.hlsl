@@ -20,8 +20,6 @@ VertexOut VS(VertexIn vin)
 {
 	VertexOut vout = (VertexOut)0.0f;
 
-	MaterialData matData = gMaterialData[gObjMaterialIndex];
-
 	// 세계 공간으로 변환한다.
 	float4 posW = mul(float4(vin.mPosL, 1.0f), gObjWorld);
 
@@ -29,7 +27,7 @@ VertexOut VS(VertexIn vin)
 	vout.mPosH = mul(posW, gViewProj);
 
 	// 출력 정점 특성들은 이후 삼각형을 따라 보간된다.
-	vout.mTexC = mul(float4(vin.mTexC, 0.0f, 1.0f), matData.mMatTransform).xy;
+	vout.mTexC = mul(float4(vin.mTexC, 0.0f, 1.0f), GetMaterialTransform(gObjMaterialIndex)).xy;
 
 	return vout;
 }

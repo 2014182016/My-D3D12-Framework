@@ -41,15 +41,6 @@ struct ObjectConstants
 	std::uint32_t mObjPad2;
 };
 
-struct WidgetConstants
-{
-	std::uint32_t mMaterialIndex = -1;
-	float mPadding0;
-	float mPadding1;
-	float mPadding2;
-};
-
-
 struct LightData
 {
 	DirectX::XMFLOAT4X4 mShadowTransform = DirectX::Identity4x4f();
@@ -95,25 +86,20 @@ struct PassConstants
 	float mFogDensity = 0.0f; // Exponential Fog
 	std::uint32_t mFogEnabled = false;
 	std::uint32_t mFogType = (std::uint32_t)FogType::Exponential;
-	float mPadding1;
+	float mSsaoContrast;
 	float mPadding2;
 	float mPadding3;
 };
 
 struct SsaoConstants
 {
-	DirectX::XMFLOAT4   mOffsetVectors[14];
+	DirectX::XMFLOAT4 mOffsetVectors[14];
 	DirectX::XMFLOAT4 mBlurWeights[3];
 
 	float mOcclusionRadius = 0.5f;
 	float mOcclusionFadeStart = 0.2f;
 	float mOcclusionFadeEnd = 2.0f;
 	float mSurfaceEpsilon = 0.05f;
-
-	float mSsaoContrast;
-	float mSsaoPadding0;
-	float mSsaoPadding1;
-	float mSsaoPadding2;
 };
 
 struct MaterialData
@@ -132,14 +118,6 @@ struct MaterialData
 	std::uint32_t mNormalMapIndex = -1;
 	std::uint32_t mMaterialPad1;
 	std::uint32_t mMaterialPad2;
-};
-
-struct ParticleConstants
-{
-	std::uint32_t mMaterialIndex;
-	std::uint32_t mFacingCamera;
-	float mPadding0;
-	float mPadding1;
 };
 
 struct FaceIndex

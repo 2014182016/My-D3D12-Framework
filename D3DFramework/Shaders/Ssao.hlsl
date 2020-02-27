@@ -2,8 +2,9 @@
 // Ssao.hlsl by Frank Luna (C) 2015 All Rights Reserved.
 //=============================================================================
 
-//#include "SsaoInclude.hlsl"
-#include "Common.hlsl"
+#include "SsaoRS.hlsl"
+
+Texture2D gRandomVecMap : register(t2);
 
 struct VertexOut
 {

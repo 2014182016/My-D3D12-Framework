@@ -27,9 +27,10 @@ struct GeoOut
 struct PixelOut
 {
 	float4 mDiffuse  : SV_TARGET0;
-	float4 mSpecularAndRoughness : SV_TARGET1;
-	float4 mNormal   : SV_TARGET2;
-	float4 mPosition : SV_TARGET3;
+	float4 mSpecularRoughness : SV_TARGET1;
+	float4 mPosition : SV_TARGET2;
+	float4 mNormal   : SV_TARGET3;
+	float4 mNormalx  : SV_TARGET4;
 };
 
 VertexOut VS(VertexIn vin)
@@ -94,28 +95,20 @@ PixelOut PS(GeoOut pin)
 {
 	PixelOut pout = (PixelOut)0.0f;
 
-	// 이 픽셀에 사용할 Material Data를 가져온다.
-	MaterialData matData = gMaterialData[gObjMaterialIndex];
-	float4 diffuseAlbedo = matData.mDiffuseAlbedo;
-	float3 specular = matData.mSpecular;
-	float roughness = matData.mRoughness;
-	uint diffuseMapIndex = matData.mDiffuseMapIndex;
-
-	// 텍스처 배열의 텍스처를 동적으로 조회한다.
-	if (diffuseMapIndex != DISABLED)
-	{
-		diffuseAlbedo *= gTextureMaps[diffuseMapIndex].Sample(gsamAnisotropicWrap, pin.mTexC);
-	}
+	float4 diffuse; float3 specular; float roughness;
+	GetMaterialAttibute(gObjMaterialIndex, diffuse, specular, roughness);
+	diffuse *= GetDiffuseMapSample(gObjMaterialIndex, pin.mTexC);
 
 	// 텍스처 알파가 0.1보다 작으면 픽셀을 폐기한다. 
-	clip(diffuseAlbedo.a - 0.1f);
+	clip(diffuse.a - 0.1f);
 
 	// 법선을 보간하면 단위 길이가 아니게 될 수 있으므로 다시 정규화한다.
 	pin.mNormal = normalize(pin.mNormal);
 
-	pout.mDiffuse = diffuseAlbedo;
-	pout.mSpecularAndRoughness = float4(specular, roughness);
+	pout.mDiffuse = diffuse;
+	pout.mSpecularRoughness = float4(specular, roughness);
 	pout.mNormal = float4(pin.mNormal, 1.0f);
+	pout.mNormalx = float4(pin.mNormal, 1.0f);
 	pout.mPosition = float4(pin.mPosW, 1.0f);
 
 	return pout;

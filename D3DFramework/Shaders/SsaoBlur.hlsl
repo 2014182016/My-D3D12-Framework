@@ -8,8 +8,9 @@
 // 많은 수의 텍셀을 담을 수 있다.
 //=============================================================================
 
-//#include "SsaoInclude.hlsl"
-#include "Common.hlsl"
+#include "SsaoRS.hlsl"
+
+Texture2D gInputMap : register(t2);
 
 struct VertexOut
 {
@@ -43,20 +44,18 @@ float4 PS(VertexOut pin) : SV_Target
 	};
 
 	float2 texOffset;
-	float4 color = 0.0f;
 	if (gHorizontalBlur)
 	{
 		texOffset = float2(gInvRenderTargetSize.x, 0.0f);
-		color = blurWeights[gBlurRadius] * gSsaoMap.SampleLevel(gsamPointClamp, pin.mTexC, 0.0);
 	}
 	else
 	{
 		texOffset = float2(0.0f, gInvRenderTargetSize.y);
-		color = blurWeights[gBlurRadius] * gSsaoMap2.SampleLevel(gsamPointClamp, pin.mTexC, 0.0);
 	}
 
 	// 필터 핵 중앙의 값은 항상 총합에 기여한다.
 	float totalWeight = blurWeights[gBlurRadius];
+	float4 color = blurWeights[gBlurRadius] * gInputMap.SampleLevel(gsamPointClamp, pin.mTexC, 0.0);
 
 	for (float i = -gBlurRadius; i <= gBlurRadius; ++i)
 	{
@@ -81,14 +80,7 @@ float4 PS(VertexOut pin) : SV_Target
 			float weight = blurWeights[i + gBlurRadius];
 
 			// 이웃 픽셀들을 추가한다(그러면 현재 픽셀이 더 흐려진다).
-			if (gHorizontalBlur)
-			{
-				color += weight * gSsaoMap.SampleLevel(gsamPointClamp, tex, 0.0);
-			}
-			else
-			{
-				color += weight * gSsaoMap2.SampleLevel(gsamPointClamp, tex, 0.0);
-			}
+			color += weight * gInputMap.SampleLevel(gsamPointClamp, tex, 0.0);
 
 			totalWeight += weight;
 		}

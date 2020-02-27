@@ -21,7 +21,6 @@ public:
 
 	void BuildDescriptors(ID3D12Device* device,
 		CD3DX12_GPU_DESCRIPTOR_HANDLE hNormalGpuSrv,
-		CD3DX12_GPU_DESCRIPTOR_HANDLE hDepthGpuSrv,
 		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
 		CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
 		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
@@ -30,8 +29,9 @@ public:
 
 	void RebuildDescriptors(ID3D12Device* device);
 	void OnResize(ID3D12Device* device, UINT newWidth, UINT newHeight);
-	void ComputeSsao(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* ssaoPso, D3D12_GPU_VIRTUAL_ADDRESS ssaoCBAddress);
-	void BlurAmbientMap(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* blurPso, D3D12_GPU_VIRTUAL_ADDRESS ssaoCBAddress, int blurCount);
+	void ComputeSsao(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* ssaoPso,
+		D3D12_GPU_VIRTUAL_ADDRESS ssaoCBAddress, D3D12_GPU_VIRTUAL_ADDRESS passCBAddress);
+	void BlurAmbientMap(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* blurPso, int blurCount);
 
 	void GetOffsetVectors(DirectX::XMFLOAT4 offsets[14]) { std::copy(&mOffsets[0], &mOffsets[14], &offsets[0]); }
 	UINT GetMapWidth() const { return mRenderTargetWidth; }

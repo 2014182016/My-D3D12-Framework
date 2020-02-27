@@ -2,24 +2,10 @@
 
 #include "WinApp.h"
 
-#define ROOT_PARAMETER_NUM 12
-#define RP_OBJECT 0
-#define RP_PASS 1
-#define RP_LIGHT 2
-#define RP_MATERIAL 3
-#define RP_TEXTURE 4
-#define RP_SHADOWMAP 5
-#define RP_SSAOMAP 6
-#define RP_G_BUFFER 7
-#define RP_WIDGET 8
-#define RP_PARTICLE 9
-#define RP_SSAO 10
-#define RP_BLUR 11
-
-#define DEFERRED_BUFFER_COUNT 4
+#define DEFERRED_BUFFER_COUNT 5
 #define LIGHT_NUM 1
 
-// #define SSAO
+#define SSAO
 
 class D3DApp : public WinApp
 {
@@ -62,7 +48,8 @@ protected:
 	void CreateSwapChain();
 	void CreateSoundBuffer();
 	void CreateRtvAndDsvDescriptorHeaps(UINT shadowMapNum);
-	void CreateRootSignatures(UINT textureNum, UINT shadowMapNum);
+	void CreateCommonRootSignature(UINT textureNum, UINT shadowMapNum);
+	void CreateSsaoRootSignature();
 	void CreateShadersAndInputLayout();
 	void CreatePSOs();
 
@@ -84,8 +71,6 @@ private:
 	void LogAdapters();
 	void LogAdapterOutputs(IDXGIAdapter* adapter);
 	void LogOutputDisplayModes(IDXGIOutput* output, DXGI_FORMAT format);
-
-	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 8> GetStaticSamplers();
 
 protected:
 	Microsoft::WRL::ComPtr<IDXGIFactory4> mdxgiFactory;
@@ -126,8 +111,6 @@ protected:
 
 	UINT objCBByteSize = 0;
 	UINT passCBByteSize = 0;
-	UINT widgetCBByteSize = 0;
-	UINT particleCBByteSize = 0;
 
 	UINT mShadowMapHeapIndex = 0;
 	UINT mDeferredBufferHeapIndex = 0;
@@ -143,34 +126,20 @@ protected:
 	const std::array<DirectX::XMFLOAT4, DEFERRED_BUFFER_COUNT> mDeferredBufferClearColors =
 	{
 		DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f), // Diffuse
-		DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f), // Specular And Roughness
-		DirectX::XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f), // Normal
+		DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f), // Specular Roughness
 		DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f), // Position
+		DirectX::XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f), // Normal
+		DirectX::XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f), // Normal(Normal Map x)
 	};
 
 private:
-	const std::array<RootParameterInfo, ROOT_PARAMETER_NUM> mRootParameterInfos =
-	{
-		RootParameterInfo(0,0), // Object
-		RootParameterInfo(1,0), // Pass
-		RootParameterInfo(0,3), // Lights
-		RootParameterInfo(1,3), // Materials
-		RootParameterInfo(0,0), // Textures
-		RootParameterInfo(0,1), // ShadowMaps
-		RootParameterInfo(0,2), // SsaoMaps
-		RootParameterInfo(0,4), // G-Buffer
-		RootParameterInfo(2,0), // Widget
-		RootParameterInfo(3,0), // Particle
-		RootParameterInfo(4,0), // Ssao
-		RootParameterInfo(5,0), // Blur
-	};
-
 	const std::array<DXGI_FORMAT, DEFERRED_BUFFER_COUNT> mDeferredBufferFormats =
 	{
 		DXGI_FORMAT_R8G8B8A8_UNORM, // Diffuse
-		DXGI_FORMAT_R8G8B8A8_UNORM, // Specular And Roughness
-		DXGI_FORMAT_R32G32B32A32_FLOAT, // Normal
+		DXGI_FORMAT_R8G8B8A8_UNORM, // Specular Roughness
 		DXGI_FORMAT_R32G32B32A32_FLOAT, // Position
+		DXGI_FORMAT_R32G32B32A32_FLOAT, // Normal
+		DXGI_FORMAT_R32G32B32A32_FLOAT, // Normal(Normal Map x)
 	};
 
 	const D3D_DRIVER_TYPE md3dDriverType = D3D_DRIVER_TYPE_HARDWARE;

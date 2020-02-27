@@ -5,6 +5,8 @@
 #include "pch.h"
 #include "Ssao.h"
 #include "D3DUtil.h"
+#include "Enums.h"
+#include "Random.h"
 #include <DirectXPackedVector.h>
 
 using namespace DirectX;
@@ -49,15 +51,14 @@ std::vector<float> Ssao::CalcGaussWeights(float sigma)
 
 void Ssao::BuildDescriptors(ID3D12Device* device, 
 	CD3DX12_GPU_DESCRIPTOR_HANDLE hNormalGpuSrv,
-	CD3DX12_GPU_DESCRIPTOR_HANDLE hDepthGpuSrv,
 	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
 	CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
 	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
 	UINT cbvSrvUavDescriptorSize,
 	UINT rtvDescriptorSize)
 {
-	mhNormalMapGpuSrv = hNormalGpuSrv;
-	mhDepthMapGpuSrv = hDepthGpuSrv;
+	// Normal Map과 Depth Map은 2개가 연속해서 만들어져있다.
+	mhNormalMapGpuSrv = hNormalGpuSrv; 
 
 	mhAmbientMap0CpuSrv = hCpuSrv;
 	mhAmbientMap1CpuSrv = hCpuSrv.Offset(1, cbvSrvUavDescriptorSize);
@@ -117,7 +118,8 @@ void Ssao::OnResize(ID3D12Device* device, UINT newWidth, UINT newHeight)
 	}
 }
 
-void Ssao::ComputeSsao(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* ssaoPso, D3D12_GPU_VIRTUAL_ADDRESS ssaoCBAddress)
+void Ssao::ComputeSsao(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* ssaoPso, 
+	D3D12_GPU_VIRTUAL_ADDRESS ssaoCBAddress, D3D12_GPU_VIRTUAL_ADDRESS passCBAddress)
 {
 	cmdList->RSSetViewports(1, &mViewport);
 	cmdList->RSSetScissorRects(1, &mScissorRect);
@@ -130,11 +132,11 @@ void Ssao::ComputeSsao(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* 
 	cmdList->OMSetRenderTargets(1, &mhAmbientMap0CpuRtv, true, nullptr);
 	cmdList->SetPipelineState(ssaoPso);
 
-	cmdList->SetGraphicsRootConstantBufferView(10, ssaoCBAddress);
-	cmdList->SetGraphicsRoot32BitConstant(11, 0, 0);
-	//cmdList->SetGraphicsRootDescriptorTable(2, mhNormalMapGpuSrv);
-	//cmdList->SetGraphicsRootDescriptorTable(3, mhDepthMapGpuSrv);
-	//cmdList->SetGraphicsRootDescriptorTable(4, mhRandomVectorMapGpuSrv);
+	cmdList->SetGraphicsRootConstantBufferView((int)RpSsao::SsaoCB, ssaoCBAddress);
+	cmdList->SetGraphicsRootConstantBufferView((int)RpSsao::Pass, passCBAddress);
+	cmdList->SetGraphicsRoot32BitConstant((int)RpSsao::Constants, 0, 0);
+	cmdList->SetGraphicsRootDescriptorTable((int)RpSsao::BufferMap, mhNormalMapGpuSrv);
+	cmdList->SetGraphicsRootDescriptorTable((int)RpSsao::SsaoMap, mhRandomVectorMapGpuSrv);
 
 	cmdList->IASetVertexBuffers(0, 0, nullptr);
 	cmdList->IASetIndexBuffer(nullptr);
@@ -145,10 +147,9 @@ void Ssao::ComputeSsao(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* 
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 }
 
-void Ssao::BlurAmbientMap(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* blurPso, D3D12_GPU_VIRTUAL_ADDRESS ssaoCBAddress, int blurCount)
+void Ssao::BlurAmbientMap(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* blurPso, int blurCount)
 {
 	cmdList->SetPipelineState(blurPso);
-	cmdList->SetGraphicsRootConstantBufferView(10, ssaoCBAddress);
 
 	for (int i = 0; i < blurCount; ++i)
 	{
@@ -160,20 +161,22 @@ void Ssao::BlurAmbientMap(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineStat
 void Ssao::BlurAmbientMap(ID3D12GraphicsCommandList* cmdList, bool horzBlur)
 {
 	ID3D12Resource* output = nullptr;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE randomVecSrv;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE inputSrv;
 	CD3DX12_CPU_DESCRIPTOR_HANDLE outputRtv;
 
 	if (horzBlur == true)
 	{
 		output = mAmbientMap1.Get();
+		inputSrv = mhAmbientMap0GpuSrv;
 		outputRtv = mhAmbientMap1CpuRtv;
-		cmdList->SetGraphicsRoot32BitConstant(11, 1, 0);
+		cmdList->SetGraphicsRoot32BitConstant((int)RpSsao::Constants, 1, 0);
 	}
 	else
 	{
 		output = mAmbientMap0.Get();
+		inputSrv = mhAmbientMap1GpuSrv;
 		outputRtv = mhAmbientMap0CpuRtv;
-		cmdList->SetGraphicsRoot32BitConstant(11, 0, 0);
+		cmdList->SetGraphicsRoot32BitConstant((int)RpSsao::Constants, 0, 0);
 	}
 
 	cmdList->RSSetViewports(1, &mViewport);
@@ -185,6 +188,9 @@ void Ssao::BlurAmbientMap(ID3D12GraphicsCommandList* cmdList, bool horzBlur)
 	float clearValue[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 	cmdList->ClearRenderTargetView(outputRtv, clearValue, 0, nullptr);
 	cmdList->OMSetRenderTargets(1, &outputRtv, true, nullptr);
+
+	cmdList->SetGraphicsRootDescriptorTable((int)RpSsao::BufferMap, mhNormalMapGpuSrv);
+	cmdList->SetGraphicsRootDescriptorTable((int)RpSsao::SsaoMap, inputSrv);
 
 	cmdList->IASetVertexBuffers(0, 0, nullptr);
 	cmdList->IASetIndexBuffer(nullptr);
@@ -278,7 +284,7 @@ void Ssao::BuildRandomVectorTexture(ID3D12Device* device, ID3D12GraphicsCommandL
 	{
 		for (int j = 0; j < RANDOM_VECTORMAP_SIZE; ++j)
 		{
-			XMFLOAT3 v(GetRandomFloat(0.0f, 1.0f), GetRandomFloat(0.0f, 1.0f), GetRandomFloat(0.0f, 1.0f));
+			XMFLOAT3 v(Random::GetRandomFloat(0.0f, 1.0f), Random::GetRandomFloat(0.0f, 1.0f), Random::GetRandomFloat(0.0f, 1.0f));
 			initData[i * 256 + j] = XMCOLOR(v.x, v.y, v.z, 0.0f);
 		}
 	}
@@ -326,7 +332,7 @@ void Ssao::BuildOffsetVectors()
 
 	for (int i = 0; i < SAMPLE_COUNT; ++i)
 	{
-		float length = GetRandomFloat(0.25f, 1.0f);
+		float length = Random::GetRandomFloat(0.25f, 1.0f);
 		XMVECTOR offeset = length * XMVector4Normalize(XMLoadFloat4(&mOffsets[i]));
 		XMStoreFloat4(&mOffsets[i], offeset);
 	}

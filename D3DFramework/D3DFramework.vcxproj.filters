@@ -78,7 +78,7 @@
     <FxCompile Include="Shaders\SsaoBlur.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="Shaders\SsaoInclude.hlsl">
+    <FxCompile Include="Shaders\SsaoRS.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>
@@ -178,6 +178,9 @@
     </ClCompile>
     <ClCompile Include="Source\Object\SkySphere.cpp">
       <Filter>소스 파일\Object</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\Random.cpp">
+      <Filter>소스 파일\Framework</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -300,6 +303,9 @@
     </ClInclude>
     <ClInclude Include="Source\Object\SkySphere.h">
       <Filter>헤더 파일\Object</Filter>
+    </ClInclude>
+    <ClInclude Include="Random.h">
+      <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
