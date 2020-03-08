@@ -5,7 +5,7 @@
 #include "Enums.h"
 #include "BufferMemoryPool.hpp"
 
-#define FRAME_PHASE 5
+#define FRAME_PHASE 7
 
 // CPU가 한 프레임의 명령 목록들을 구축하는 데 필요한 자원들을
 // 대표하는 구조체
@@ -13,7 +13,7 @@ struct FrameResource
 {
 public:
 	FrameResource(ID3D12Device* device, bool singleThread,
-		UINT passCount, UINT objectCount, UINT lightCount, UINT materialCount, UINT widgetCount);
+		UINT passCount, UINT objectCount, UINT lightCount, UINT materialCount, UINT widgetCount, UINT particleCount);
 	FrameResource(const FrameResource& rhs) = delete;
 	FrameResource& operator=(const FrameResource& rhs) = delete;
 	~FrameResource();
@@ -30,8 +30,9 @@ public:
 	D3D12_GPU_VIRTUAL_ADDRESS GetSsaoVirtualAddress() const {
 		if (mSsaoPool->GetBuffer()) return mSsaoPool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0; }
 	D3D12_GPU_VIRTUAL_ADDRESS GetWidgetVirtualAddress() const {
-		if (mWidgetPool->GetBuffer()) return mWidgetPool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0;
-	}
+		if (mWidgetPool->GetBuffer()) return mWidgetPool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0; }
+	D3D12_GPU_VIRTUAL_ADDRESS GetParticleVirtualAddress() const {
+		if (mParticlePool->GetBuffer()) return mParticlePool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0; }
  
 public:
 	static inline UINT processorCoreNum = 0;
@@ -56,6 +57,7 @@ public:
 	std::unique_ptr<BufferMemoryPool<MaterialData>> mMaterialBufferPool = nullptr;
 	std::unique_ptr<BufferMemoryPool<SsaoConstants>> mSsaoPool = nullptr;
 	std::unique_ptr<BufferMemoryPool<ObjectConstants>> mWidgetPool = nullptr;
+	std::unique_ptr<BufferMemoryPool<ParticleConstants>> mParticlePool = nullptr;
 
 	std::vector<std::unique_ptr<UploadBuffer<WidgetVertex>>> mWidgetVBs;
 };

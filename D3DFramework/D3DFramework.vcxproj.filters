@@ -54,9 +54,6 @@
     <FxCompile Include="Shaders\Widget.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="Shaders\Particle.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
     <FxCompile Include="Shaders\ShadowMap.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
@@ -79,6 +76,18 @@
       <Filter>Shaders</Filter>
     </FxCompile>
     <FxCompile Include="Shaders\SsaoRS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\ParticleRender.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\Globals.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\ParticleRS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\ParticleCompute.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>

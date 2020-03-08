@@ -84,6 +84,10 @@ float4 PS(VertexOut pin) : SV_Target
     float4 directLight = ComputeShadowLighting(gLights, mat, pin.mPosW, bumpedNormalW, toEyeW);
 	float4 litColor = ambient + directLight;
 
+#ifdef SSAO
+	litColor *= GetAmbientAccess(pin.mPosW);
+#endif
+
 	// 분산 재질에서 알파를 가져온다.
 	litColor.a = diffuse.a;
 

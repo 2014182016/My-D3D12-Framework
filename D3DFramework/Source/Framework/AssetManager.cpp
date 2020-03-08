@@ -515,6 +515,14 @@ void AssetManager::BuildMaterial()
 	mat->SetRoughtness(1.0f);
 	mat->SetScale(2.0f, 2.0f);
 	mMaterials[mat->GetName()] = std::move(mat);
+
+	mat = std::make_unique<Material>("Radial_Gradient"s);
+	mat->SetDiffuseIndex(FindTexture("Radial_Gradient"s)->mTextureIndex);
+	mat->SetNormalIndex(DISABLED);
+	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
+	mat->SetSpecular(0.1f, 0.1f, 0.1f);
+	mat->SetRoughtness(1.0f);
+	mMaterials[mat->GetName()] = std::move(mat);
 }
 
 void AssetManager::BuildGeometry(ID3D12Device* device, ID3D12GraphicsCommandList* commandList)

@@ -1,90 +1,81 @@
 #pragma once
 
 #include "Object.h"
-#include "ObjectPool.hpp"
+#include "../Framework/Structures.h"
 #include "../Framework/Interfaces.h"
 
-#define GA -9.8f
+//#define BUFFER_COPY
+#define NUM_EMIT_THREAD 8.0f
+#define NUM_UPDATE_THREAD 512.0f
 
 class Particle : public Object, public Renderable
 {
-private:
-	struct ParticleData
-	{
-		DirectX::XMFLOAT3 mPosition;
-		DirectX::XMFLOAT4 mColor;
-		DirectX::XMFLOAT3 mVelocity;
-		DirectX::XMFLOAT3 mNormal;
-		DirectX::XMFLOAT2 mSize;
-		float mLifeTime;
-	};
-
 public:
-	Particle(std::string&& name, ID3D12Device* device, ID3D12GraphicsCommandList* commandList, UINT maxParticleNum);
+	Particle(std::string&& name, int maxParticleNum);
 	virtual ~Particle();
 
 public:
 	virtual void Tick(float deltaTime) override;
-	virtual void Render(ID3D12GraphicsCommandList* commandList);
+	virtual void Render(ID3D12GraphicsCommandList* commandList) override;
 
 public:
-	inline UINT GetMaxParticleNum() const { return mMaxParticleNum; }
+	void CreateBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList,
+		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, UINT cbvSrvUavDescriptorSize);
+	void Update(ID3D12GraphicsCommandList* cmdList);
+	void Emit(ID3D12GraphicsCommandList* cmdList);
+	void SetBufferSrv(ID3D12GraphicsCommandList* cmdList);
+	void SetBufferUav(ID3D12GraphicsCommandList* cmdList);
+	void CopyData(ID3D12GraphicsCommandList* cmdList);
 
-	inline void SetSpawnDistanceRange(DirectX::XMFLOAT3 posMin, DirectX::XMFLOAT3 posMax) { mSpawnDistanceRange.first = posMin; mSpawnDistanceRange.second = posMax; }
-	inline void SetVelocityRange(DirectX::XMFLOAT3 velMin, DirectX::XMFLOAT3 velMax) { mVelocityRange.first = velMin; mVelocityRange.second = velMax; }
-	inline void SetColorRange(DirectX::XMFLOAT4 colorMin, DirectX::XMFLOAT4 colorMax) { mColorRange.first = colorMin; mColorRange.second = colorMax; }
-	inline void SetSizeRange(DirectX::XMFLOAT2 sizeMin, DirectX::XMFLOAT2 sizeMax) { mSizeRange.first = sizeMin; mSizeRange.second = sizeMax; }
-	inline void SetSpawnTimeRange(float timeMin, float timeMax) { mSpawnTimeRange.first = timeMin; mSpawnTimeRange.second = timeMax; }
-	inline void SetLifeTimeRange(float timeMin, float timeMax) { mLifeTimeRange.first = timeMin; mLifeTimeRange.second = timeMax; }
+public:
+	inline void SetParticleDataStart(ParticleData& data) { mStart = data; }
+	inline void SetParticleDataEnd(ParticleData& data) { mEnd = data; }
 
-	inline void SetSpawnDistanceRange(DirectX::XMFLOAT3 pos) { mSpawnDistanceRange.first = pos; mSpawnDistanceRange.second = pos; }
-	inline void SetVelocityRange(DirectX::XMFLOAT3 vel) { mVelocityRange.first = vel; mVelocityRange.second = vel; }
-	inline void SetColorRange(DirectX::XMFLOAT4 color) { mColorRange.first = color; mColorRange.second = color; }
-	inline void SetSizeRange(DirectX::XMFLOAT2 size) { mSizeRange.first = size; mSizeRange.second = size; }
+	inline void SetSpawnTimeRange(float min, float max) { mSpawnTimeRange.first = min; mSpawnTimeRange.second = max; }
 	inline void SetSpawnTimeRange(float time) { mSpawnTimeRange.first = time; mSpawnTimeRange.second = time; }
-	inline void SetLifeTimeRange(float time) { mLifeTimeRange.first = time; mLifeTimeRange.second = time; }
+	inline float GetSpawnTime() const { return mSpawnTime; }
 
 	inline void SetLifeTime(float time) { mLifeTime = time; }
-	inline void SetBurstNum(UINT num) { mBurstNum = num; }
+	inline float GetLifeTime() const { return mLifeTime; }
 
 	inline void SetActive(bool value) { mIsActive = value; }
 	inline bool GetIsActive() const { return mIsActive; }
 
-	inline void SetFacingCamera(bool value) { mFacingCamera = value; }
+	inline void SetEmitNum(UINT num) { mEmitNum = num; }
+	inline UINT GetEmitNum() const { return mEmitNum; }
+
 	inline void SetEnabledGravity(bool value) { mEnabledGravity = value; }
 	inline void SetEnabledInfinite(bool value) { mIsInfinite = value; }
 	inline void SetInfinite(bool value) { mIsInfinite = value; }
-	inline bool GetIsFacingCamera() const { return mFacingCamera; }
-	inline float GetLifeTime() const { return mLifeTime; }
 
-	inline const std::list<ParticleData*>& GetParticleDatas() const { return mParticleDatas; }
+	inline int GetMaxParticleNum() const { return mMaxParticleNum; }
+	inline int GetCurrentParticleNum() const { return mCurrentParticleNum; }
 
-private:
-	void SpawnParticleData();
-	void DestroyParticleData();
-	void UpdateParticleData(float deltaTime);
+	void SetParticleConstants(ParticleConstants& constants);
 
 protected:
-	UINT mMaxParticleNum = 0;
+	int mMaxParticleNum = 0;
+	int mCurrentParticleNum = 0;
 
-	std::pair<DirectX::XMFLOAT3, DirectX::XMFLOAT3> mSpawnDistanceRange;
-	std::pair<DirectX::XMFLOAT3, DirectX::XMFLOAT3> mVelocityRange;
-	std::pair<DirectX::XMFLOAT4, DirectX::XMFLOAT4> mColorRange;
-	std::pair<DirectX::XMFLOAT2, DirectX::XMFLOAT2> mSizeRange;
-	std::pair<float, float> mLifeTimeRange;
+	ParticleData mStart;
+	ParticleData mEnd;
 
 	std::pair<float, float> mSpawnTimeRange;
 	float mSpawnTime = 0.0f;
 	float mLifeTime = 0.0f;
-	UINT mBurstNum = 1;
+	UINT mEmitNum = 1;
 
 private:
-	std::unique_ptr<ObjectPool<ParticleData>> mParitlcePool;
-	std::list<ParticleData*> mParticleDatas;
-	std::unique_ptr<class Mesh> mParticleMesh;
-
 	bool mIsActive = true;
 	bool mEnabledGravity = false;
-	bool mFacingCamera = true;
 	bool mIsInfinite = false;
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> mBuffer;
+#ifdef BUFFER_COPY
+	Microsoft::WRL::ComPtr<ID3D12Resource> mReadBackBuffer;
+#endif
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> mReadBackCounter;
+	// 0번쨰 값은 현재 존재하는 파티클의 수, 1번쨰 값은 할당할 인덱스의 값
+	Microsoft::WRL::ComPtr<ID3D12Resource> mBufferCounter;
 };

@@ -5,7 +5,7 @@
 #define DEFERRED_BUFFER_COUNT 5
 #define LIGHT_NUM 1
 
-#define SSAO
+// #define SSAO
 
 class D3DApp : public WinApp
 {
@@ -31,7 +31,7 @@ public:
 	virtual void OnDestroy() override;
 	virtual void OnResize(int screenWidth, int screenHeight) override;
 	virtual void ApplyOption(Option option);
-	virtual void CreateDescriptorHeaps(UINT textureNum,  UINT shadowMapNum);
+	virtual void CreateDescriptorHeaps(UINT textureNum,  UINT shadowMapNum, UINT particleNum);
 
 public:
 	void Set4xMsaaState(bool value);
@@ -50,6 +50,8 @@ protected:
 	void CreateRtvAndDsvDescriptorHeaps(UINT shadowMapNum);
 	void CreateCommonRootSignature(UINT textureNum, UINT shadowMapNum);
 	void CreateSsaoRootSignature();
+	void CreateParticleGraphicsRootSignature(UINT textureNum);
+	void CreateParticleComputeRootSignature();
 	void CreateShadersAndInputLayout();
 	void CreatePSOs();
 
@@ -104,18 +106,19 @@ protected:
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mBillboardLayout;
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mWidgetLayout;
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mLineLayout;
-	std::vector<D3D12_INPUT_ELEMENT_DESC> mParticleLayout;
 
 	D3D12_VIEWPORT mScreenViewport;
 	D3D12_RECT mScissorRect;
 
 	UINT objCBByteSize = 0;
 	UINT passCBByteSize = 0;
+	UINT particleCBByteSize = 0;
 
 	UINT mShadowMapHeapIndex = 0;
 	UINT mDeferredBufferHeapIndex = 0;
 	UINT mLightingPassHeapIndex = 0;
 	UINT mSsaoMapHeapIndex = 0;
+	UINT mParticleHeapIndex = 0;
 
 	UINT m4xMsaaQuality = 0;
 	UINT mRtvDescriptorSize = 0;

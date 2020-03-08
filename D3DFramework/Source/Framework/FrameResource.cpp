@@ -2,7 +2,7 @@
 #include "FrameResource.h"
 
 FrameResource::FrameResource(ID3D12Device* device, bool singleThread,
-	UINT passCount, UINT objectCount, UINT lightCount, UINT materialCount, UINT widgetCount)
+	UINT passCount, UINT objectCount, UINT lightCount, UINT materialCount, UINT widgetCount, UINT particleCount)
 {
 	if (processorCoreNum == 0 && !singleThread)
 	{
@@ -57,6 +57,8 @@ FrameResource::FrameResource(ID3D12Device* device, bool singleThread,
 	mExecutableCmdLists.push_back(mFrameCmdLists[2].Get());
 	mExecutableCmdLists.push_back(mFrameCmdLists[3].Get());
 	mExecutableCmdLists.push_back(mFrameCmdLists[4].Get());
+	mExecutableCmdLists.push_back(mFrameCmdLists[5].Get());
+	mExecutableCmdLists.push_back(mFrameCmdLists[6].Get());
 
 	mPassPool = std::make_unique<BufferMemoryPool<PassConstants>>(device, passCount, true);
 	mObjectPool = std::make_unique<BufferMemoryPool<ObjectConstants>>(device, objectCount, true);
@@ -64,6 +66,7 @@ FrameResource::FrameResource(ID3D12Device* device, bool singleThread,
 	mMaterialBufferPool = std::make_unique<BufferMemoryPool<MaterialData>>(device, materialCount, false);
 	mSsaoPool = std::make_unique<BufferMemoryPool<SsaoConstants>>(device, 1, true);
 	mWidgetPool = std::make_unique<BufferMemoryPool<ObjectConstants>>(device, widgetCount, true);
+	mParticlePool = std::make_unique<BufferMemoryPool<ParticleConstants>>(device, particleCount, true);
 }
 
 FrameResource::~FrameResource() 
@@ -88,6 +91,7 @@ FrameResource::~FrameResource()
 	mMaterialBufferPool = nullptr;
 	mSsaoPool = nullptr;
 	mWidgetPool = nullptr;
+	mParticlePool = nullptr;
 
 	mWidgetVBs.clear();
 }

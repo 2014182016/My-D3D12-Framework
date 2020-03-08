@@ -30,8 +30,6 @@ VertexOut VS(uint vid : SV_VertexID)
 
 float4 PS(VertexOut pin) : SV_Target
 {
-	float3 centerNormal = normalize(gNormalMap.SampleLevel(gsamPointClamp, pin.mTexC, 0.0f).xyz);
-	centerNormal = mul(centerNormal, (float3x3)gView);
 	float centerDepth = gDepthMap.SampleLevel(gsamDepthMap, pin.mTexC, 0.0f).r;
 	centerDepth = NdcDepthToViewDepth(centerDepth);
 
@@ -55,7 +53,7 @@ float4 PS(VertexOut pin) : SV_Target
 
 	// 필터 핵 중앙의 값은 항상 총합에 기여한다.
 	float totalWeight = blurWeights[gBlurRadius];
-	float4 color = blurWeights[gBlurRadius] * gInputMap.SampleLevel(gsamPointClamp, pin.mTexC, 0.0);
+	float4 color = blurWeights[gBlurRadius] * gInputMap.SampleLevel(gsamLinearWrap, pin.mTexC, 0.0);
 
 	for (float i = -gBlurRadius; i <= gBlurRadius; ++i)
 	{
@@ -65,22 +63,18 @@ float4 PS(VertexOut pin) : SV_Target
 
 		float2 tex = pin.mTexC + i * texOffset;
 
-		float3 neighborNormal = gNormalMap.SampleLevel(gsamPointClamp, tex, 0.0f).xyz;
-		neighborNormal = mul(neighborNormal, (float3x3)gView);
 		float  neighborDepth = gDepthMap.SampleLevel(gsamDepthMap, tex, 0.0f).r;
 		neighborDepth = NdcDepthToViewDepth(neighborDepth);
 
-		// 중앙의 값과 그 이웃의 값의 차이가 너무 크면(법선이든 깊이이든)
-		// 표본이 불연속 경계에 걸쳐 있는 것으로 간주한다. 그런 표본들은
+		// 중앙의 값과 그 이웃의 값의 차이가 너무 크면 표본이 
+		// 불연속 경계에 걸쳐 있는 것으로 간주한다. 그런 표본들은
 		// 흐리기에서 제외한다.
-
-		if (dot(neighborNormal, centerNormal) >= 0.8f &&
-			abs(neighborDepth - centerDepth) <= 0.2f)
+		if (abs(neighborDepth - centerDepth) <= 0.2f)
 		{
 			float weight = blurWeights[i + gBlurRadius];
 
 			// 이웃 픽셀들을 추가한다(그러면 현재 픽셀이 더 흐려진다).
-			color += weight * gInputMap.SampleLevel(gsamPointClamp, tex, 0.0);
+			color += weight * gInputMap.SampleLevel(gsamLinearWrap, tex, 0.0);
 
 			totalWeight += weight;
 		}

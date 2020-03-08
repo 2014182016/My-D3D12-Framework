@@ -20,7 +20,7 @@ public:
 	virtual void OnResize(int screenWidth, int screenHeight) override;
 	virtual void Tick(float deltaTime) override;
 	virtual void Render() override;
-	virtual void CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum) override;
+	virtual void CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum, UINT particleNum) override;
 
 public:
 	void InitFramework();
@@ -41,7 +41,7 @@ private:
 	void CreateObjects();
 	void CreateLights();
 	void CreateWidgets(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList);
-	void CreateParticles(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList);
+	void CreateParticles();
 	void CreateFrameResources(ID3D12Device* device);
 	void CreateThreads();
 
@@ -52,16 +52,17 @@ private:
 	void UpdateMaterialBuffer(float deltaTime);
 	void UpdateMainPassBuffer(float deltaTime);
 	void UpdateWidgetBuffer(float deltaTime);
+	void UpdateParticleBuffer(float deltaTime);
 	void UpdateSsaoBuffer(float deltaTime);
 	void UpdateObjectBufferPool();
 
+	void ParticleUpdate(ID3D12GraphicsCommandList* cmdList);
 	void WireframePass(ID3D12GraphicsCommandList* cmdList);
 	void ShadowMapPass(ID3D12GraphicsCommandList* cmdList);
 	void GBufferPass(ID3D12GraphicsCommandList* cmdList);
 	void SsaoPass(ID3D12GraphicsCommandList* cmdList);
 	void LightingPass(ID3D12GraphicsCommandList* cmdList);
 	void ForwardPass(ID3D12GraphicsCommandList* cmdList);
-	void WidgetPass(ID3D12GraphicsCommandList* cmdList);
 
 	void Init(ID3D12GraphicsCommandList* cmdList);
 	void MidFrame(ID3D12GraphicsCommandList* cmdList);

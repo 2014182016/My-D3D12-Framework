@@ -4,14 +4,6 @@
 
 #include "LightingUtil.hlsl"
 
-#define DISABLED -1
-
-#define TEX_NUM 8
-
-#define FOG_LINEAR 0
-#define FOG_EXPONENTIAL 1
-#define FOG_EXPONENTIAL2 2 
-
 struct MaterialData
 {
 	float4x4 mMatTransform;
@@ -81,7 +73,7 @@ cbuffer cbPass : register(b1)
 	float gFogDensity;
 	bool gFogEnabled;
 	uint gFogType;
-	uint gCurrentSkyCubeMapIndex;
+	float gSsaoContrast;
 	float gPadding2;
 	float gPadding3;
 };

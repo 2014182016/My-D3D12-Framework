@@ -102,6 +102,30 @@ struct SsaoConstants
 	float mSurfaceEpsilon = 0.05f;
 };
 
+struct ParticleData
+{
+	DirectX::XMFLOAT4 mColor;
+	DirectX::XMFLOAT3 mPosition;
+	float mLifeTime = 0.0f;
+	DirectX::XMFLOAT3 mDirection;
+	float mSpeed;
+	DirectX::XMFLOAT2 mSize;
+	bool mIsActive = false;
+	float mPadding1;
+};
+
+struct ParticleConstants
+{
+	ParticleData mStart;
+	ParticleData mEnd;
+	DirectX::XMFLOAT3 mEmitterLocation;
+	float mDeltaTime;
+	std::uint32_t mMaxParticleNum;
+	std::uint32_t mParticleCount;
+	std::uint32_t mEmitNum;
+	std::uint32_t mTextureIndex;
+};
+
 struct MaterialData
 {
 	// 텍스쳐 매핑에 사용
@@ -183,17 +207,6 @@ struct WidgetVertex
 	WidgetVertex(DirectX::XMFLOAT3 pos, DirectX::XMFLOAT2 tex) : mPos(pos), mTex(tex) { }
 	DirectX::XMFLOAT3 mPos;
 	DirectX::XMFLOAT2 mTex;
-};
-
-struct ParticleVertex
-{
-	ParticleVertex() = default;
-	ParticleVertex(DirectX::XMFLOAT3 pos, DirectX::XMFLOAT4 color, DirectX::XMFLOAT3 normal, DirectX::XMFLOAT2 size)
-		: mPos(pos), mColor(color), mNormal(normal), mSize(size) { }
-	DirectX::XMFLOAT3 mPos;
-	DirectX::XMFLOAT4 mColor;
-	DirectX::XMFLOAT3 mNormal;
-	DirectX::XMFLOAT2 mSize;
 };
 
 struct LineVertex

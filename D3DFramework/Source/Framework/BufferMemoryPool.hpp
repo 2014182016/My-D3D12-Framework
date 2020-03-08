@@ -18,6 +18,8 @@ public:
 	inline UINT GetBufferCount() const { return mBufferCount; }
 	inline UploadBuffer<T>* GetBuffer() const { return mBuffer.get(); }
 
+	D3D12_GPU_VIRTUAL_ADDRESS GetVirtualAddress() { if (mBuffer) return mBuffer->GetResource()->GetGPUVirtualAddress(); return 0; }
+
 private:
 	// 积己等 皋葛府 滚欺
 	std::unique_ptr<UploadBuffer<T>> mBuffer = nullptr;

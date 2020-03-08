@@ -12,6 +12,7 @@ D3DApp::D3DApp(HINSTANCE hInstance, int screenWidth, int screenHeight, std::wstr
 {
 	objCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
 	passCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(PassConstants));
+	particleCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(ParticleConstants));
 }
 
 D3DApp::~D3DApp()
@@ -739,10 +740,94 @@ void D3DApp::CreateSsaoRootSignature()
 }
 
 
-void D3DApp::CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum)
+void D3DApp::CreateParticleGraphicsRootSignature(UINT textureNum)
+{
+	// 일반적으로 셰이더 프로그램은 특정 자원들(상수 버퍼, 텍스처, 표본추출기 등)이
+	// 입력된다고 기대한다. 루트 서명은 셰이더 프로그램이 기대하는 자원들을 정의한다.
+
+	CD3DX12_DESCRIPTOR_RANGE texTable;
+	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, textureNum, 0, 1);
+
+	std::array<CD3DX12_ROOT_PARAMETER, (int)RpParticleGraphics::Count> slotRootParameter;
+
+	// 퍼포먼스 TIP: 가장 자주 사용하는 것을 앞에 놓는다.
+	slotRootParameter[(int)RpParticleGraphics::ParticleCB].InitAsConstantBufferView(0);
+	slotRootParameter[(int)RpParticleGraphics::Pass].InitAsConstantBufferView(1);
+	slotRootParameter[(int)RpParticleGraphics::Buffer].InitAsShaderResourceView(0);
+	slotRootParameter[(int)RpParticleGraphics::Texture].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL);
+
+	const CD3DX12_STATIC_SAMPLER_DESC linearWrap(
+		0, // shaderRegister
+		D3D12_FILTER_MIN_MAG_MIP_LINEAR, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP); // addressW
+
+	std::array<CD3DX12_STATIC_SAMPLER_DESC, 1> staticSamplers = { linearWrap };
+
+	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc((UINT)slotRootParameter.size(), slotRootParameter.data(),
+		(UINT)staticSamplers.size(), staticSamplers.data(),
+		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+	// Root Signature를 직렬화한 후 객체를 생성한다.
+	ComPtr<ID3DBlob> serializedRootSig = nullptr;
+	ComPtr<ID3DBlob> errorBlob = nullptr;
+	HRESULT hr = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+		serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
+
+	if (errorBlob != nullptr)
+	{
+		::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+	}
+	ThrowIfFailed(hr);
+
+	ThrowIfFailed(md3dDevice->CreateRootSignature(
+		0,
+		serializedRootSig->GetBufferPointer(),
+		serializedRootSig->GetBufferSize(),
+		IID_PPV_ARGS(&mRootSignatures["ParticleRender"])));
+}
+
+void D3DApp::CreateParticleComputeRootSignature()
+{
+	// 일반적으로 셰이더 프로그램은 특정 자원들(상수 버퍼, 텍스처, 표본추출기 등)이
+	// 입력된다고 기대한다. 루트 서명은 셰이더 프로그램이 기대하는 자원들을 정의한다.
+
+	std::array<CD3DX12_ROOT_PARAMETER, (int)RpParticleCompute::Count> slotRootParameter;
+
+	// 퍼포먼스 TIP: 가장 자주 사용하는 것을 앞에 놓는다.
+	slotRootParameter[(int)RpParticleCompute::ParticleCB].InitAsConstantBufferView(0);
+	slotRootParameter[(int)RpParticleCompute::Counter].InitAsUnorderedAccessView(0);
+	slotRootParameter[(int)RpParticleCompute::Uav].InitAsUnorderedAccessView(1);
+
+	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc((UINT)slotRootParameter.size(), slotRootParameter.data(),
+		0, nullptr,
+		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+	// Root Signature를 직렬화한 후 객체를 생성한다.
+	ComPtr<ID3DBlob> serializedRootSig = nullptr;
+	ComPtr<ID3DBlob> errorBlob = nullptr;
+	HRESULT hr = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+		serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
+
+	if (errorBlob != nullptr)
+	{
+		::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+	}
+	ThrowIfFailed(hr);
+
+	ThrowIfFailed(md3dDevice->CreateRootSignature(
+		0,
+		serializedRootSig->GetBufferPointer(),
+		serializedRootSig->GetBufferSize(),
+		IID_PPV_ARGS(&mRootSignatures["ParticleCompute"])));
+}
+
+void D3DApp::CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum, UINT particleNum)
 {
 	D3D12_DESCRIPTOR_HEAP_DESC cbvSrvUavDescriptorHeap = {};
-	cbvSrvUavDescriptorHeap.NumDescriptors = textureNum +  shadowMapNum + DEFERRED_BUFFER_COUNT + 1 + 3; // Depth Buffer, SsaoMaps
+	cbvSrvUavDescriptorHeap.NumDescriptors = textureNum +  shadowMapNum + (particleNum * 3)
+		+ DEFERRED_BUFFER_COUNT + 1 + 3; // Depth Buffer, SsaoMaps
 	cbvSrvUavDescriptorHeap.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	cbvSrvUavDescriptorHeap.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&cbvSrvUavDescriptorHeap, IID_PPV_ARGS(&mCbvSrvUavDescriptorHeap)));
@@ -825,9 +910,12 @@ void D3DApp::CreateShadersAndInputLayout()
 	mShaders["WidgetVS"] = D3DUtil::CompileShader(L"Shaders\\Widget.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["WidgetPS"] = D3DUtil::CompileShader(L"Shaders\\Widget.hlsl", nullptr, "PS", "ps_5_1");
 
-	mShaders["ParticleVS"] = D3DUtil::CompileShader(L"Shaders\\Particle.hlsl", nullptr, "VS", "vs_5_1");
-	mShaders["ParticleGS"] = D3DUtil::CompileShader(L"Shaders\\Particle.hlsl", nullptr, "GS", "gs_5_1");
-	mShaders["ParticlePS"] = D3DUtil::CompileShader(L"Shaders\\Particle.hlsl", nullptr, "PS", "ps_5_1");
+	mShaders["ParticleRenderVS"] = D3DUtil::CompileShader(L"Shaders\\ParticleRender.hlsl", nullptr, "VS", "vs_5_1");
+	mShaders["ParticleRenderGS"] = D3DUtil::CompileShader(L"Shaders\\ParticleRender.hlsl", nullptr, "GS", "gs_5_1");
+	mShaders["ParticleRenderPS"] = D3DUtil::CompileShader(L"Shaders\\ParticleRender.hlsl", nullptr, "PS", "ps_5_1");
+
+	mShaders["ParticleUpdateCS"] = D3DUtil::CompileShader(L"Shaders\\ParticleCompute.hlsl", nullptr, "CS_Update", "cs_5_1");
+	mShaders["ParticleEmitCS"] = D3DUtil::CompileShader(L"Shaders\\ParticleCompute.hlsl", nullptr, "CS_Emit", "cs_5_1");
 
 	mShaders["BillboardVS"] = D3DUtil::CompileShader(L"Shaders\\Billboard.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["BillboardGS"] = D3DUtil::CompileShader(L"Shaders\\Billboard.hlsl", nullptr, "GS", "gs_5_1");
@@ -876,14 +964,6 @@ void D3DApp::CreateShadersAndInputLayout()
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-	};
-
-	mParticleLayout =
-	{
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 28, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "SIZE", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 40, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 	};
 }
 
@@ -946,6 +1026,7 @@ void D3DApp::CreatePSOs()
 
 	// PSO for Billborad
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC billboardPsoDesc = gBufferPsoDesc;
+	billboardPsoDesc.InputLayout = { mBillboardLayout.data(), (UINT)mBillboardLayout.size() };
 	billboardPsoDesc.VS =
 	{
 		reinterpret_cast<BYTE*>(mShaders["BillboardVS"]->GetBufferPointer()),
@@ -962,34 +1043,10 @@ void D3DApp::CreatePSOs()
 		mShaders["BillboardPS"]->GetBufferSize()
 	};
 	billboardPsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
-	billboardPsoDesc.InputLayout = { mBillboardLayout.data(), (UINT)mBillboardLayout.size() };
 	billboardPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	// MSAA가 활성화되어 있다면 하드웨어는 알파 값을 이용해서 MSAA에 알파 값을 포괄하여 샘플링한다.
 	billboardPsoDesc.BlendState.AlphaToCoverageEnable = GetOptionEnabled(Option::Msaa);
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&billboardPsoDesc, IID_PPV_ARGS(&mPSOs["Billborad"])));
-
-
-	// PSO for Particle
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC particlePsoDesc = forwardPsoDesc;
-	particlePsoDesc.InputLayout = { mParticleLayout.data(), (UINT)mParticleLayout.size() };
-	particlePsoDesc.VS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["ParticleVS"]->GetBufferPointer()),
-		mShaders["ParticleVS"]->GetBufferSize()
-	};
-	particlePsoDesc.GS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["ParticleGS"]->GetBufferPointer()),
-		mShaders["ParticleGS"]->GetBufferSize()
-	};
-	particlePsoDesc.PS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["ParticlePS"]->GetBufferPointer()),
-		mShaders["ParticlePS"]->GetBufferSize()
-	};
-	particlePsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
-	particlePsoDesc.BlendState.AlphaToCoverageEnable = GetOptionEnabled(Option::Msaa);
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&particlePsoDesc, IID_PPV_ARGS(&mPSOs["Particle"])));
 
 
 	// PSO for AlphaTested
@@ -1033,6 +1090,52 @@ void D3DApp::CreatePSOs()
 	// D3D12_DEPTH_WRITE_MASK_ZERO는 깊이 기록만 비활성화할 뿐 깊이 읽기와 깊이 판정은 여전히 활성화한다.
 	transparentPsoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&transparentPsoDesc, IID_PPV_ARGS(&mPSOs["Transparent"])));
+
+
+	// PSO for ParticleRender
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC particleRenderPsoDesc = transparentPsoDesc;
+	particleRenderPsoDesc.InputLayout = { nullptr, 0 };
+	particleRenderPsoDesc.pRootSignature = mRootSignatures["ParticleRender"].Get();
+	particleRenderPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["ParticleRenderVS"]->GetBufferPointer()),
+		mShaders["ParticleRenderVS"]->GetBufferSize()
+	};
+	particleRenderPsoDesc.GS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["ParticleRenderGS"]->GetBufferPointer()),
+		mShaders["ParticleRenderGS"]->GetBufferSize()
+	};
+	particleRenderPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["ParticleRenderPS"]->GetBufferPointer()),
+		mShaders["ParticleRenderPS"]->GetBufferSize()
+	};
+	particleRenderPsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
+	particleRenderPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&particleRenderPsoDesc, IID_PPV_ARGS(&mPSOs["ParticleRender"])));
+
+
+	// PSO for ParticleUpdate
+	D3D12_COMPUTE_PIPELINE_STATE_DESC particleUpdatePsoDesc = {};
+	particleUpdatePsoDesc.pRootSignature = mRootSignatures["ParticleCompute"].Get();
+	particleUpdatePsoDesc.CS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["ParticleUpdateCS"]->GetBufferPointer()),
+		mShaders["ParticleUpdateCS"]->GetBufferSize()
+	};
+	ThrowIfFailed(md3dDevice->CreateComputePipelineState(&particleUpdatePsoDesc, IID_PPV_ARGS(&mPSOs["ParticleUpdate"])));
+
+
+	// PSO for ParticleEmit
+	D3D12_COMPUTE_PIPELINE_STATE_DESC particleEmitPsoDesc = {};
+	particleEmitPsoDesc.pRootSignature = mRootSignatures["ParticleCompute"].Get();
+	particleEmitPsoDesc.CS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["ParticleEmitCS"]->GetBufferPointer()),
+		mShaders["ParticleEmitCS"]->GetBufferSize()
+	};
+	ThrowIfFailed(md3dDevice->CreateComputePipelineState(&particleEmitPsoDesc, IID_PPV_ARGS(&mPSOs["ParticleEmit"])));
 
 
 	// PSO for Sky
@@ -1136,6 +1239,7 @@ void D3DApp::CreatePSOs()
 		mShaders["WidgetPS"]->GetBufferSize()
 	};
 	widgetPsoDesc.DepthStencilState.DepthEnable = false;
+	widgetPsoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
 	widgetPsoDesc.DepthStencilState.StencilEnable = false;
 	widgetPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&widgetPsoDesc, IID_PPV_ARGS(&mPSOs["Widget"])));

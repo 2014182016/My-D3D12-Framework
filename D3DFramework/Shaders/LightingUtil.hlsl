@@ -4,11 +4,7 @@
 // Contains API for shader lighting.
 //***************************************************************************************
 
-#define LIGHT_NUM 1
-
-#define DIRECTIONAL_LIGHT 0
-#define POINT_LIGHT 1
-#define SPOT_LIGHT 2
+#include "Globals.hlsl"
 
 struct Light
 {

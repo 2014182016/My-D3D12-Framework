@@ -89,6 +89,7 @@ private:
 		{"WireFence", L"Textures/WireFence.dds"},
 		{"Tree01S", L"Textures/Tree01S.dds"},
 		{"Clouds", L"Textures/Clouds.dds"},
+		{"Radial_Gradient", L"Textures/Radial_Gradient.dds"},
 	};
 
 	// h3d 모델의 이름과 함께 충돌 타입을 설정한다.

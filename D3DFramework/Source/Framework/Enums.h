@@ -107,4 +107,21 @@ enum class RpSsao : int
 	Count
 };
 
+enum class RpParticleGraphics : int
+{
+	ParticleCB = 0,
+	Pass,
+	Buffer,
+	Texture,
+	Count
+};
+
+enum class RpParticleCompute : int
+{
+	ParticleCB = 0,
+	Counter,
+	Uav,
+	Count
+};
+
 #endif // ENUMS_H

@@ -12,6 +12,7 @@
 #include "Interfaces.h"
 #include "Ssao.h"
 #include "StopWatch.h"
+#include "Random.h"
 
 #include "GameObject.h"
 #include "Material.h"
@@ -121,16 +122,19 @@ void D3DFramework::InitFramework()
 	CreateObjects();
 	CreateLights();
 	CreateWidgets(md3dDevice.Get(), mMainCommandList.Get());
-	//CreateParticles(md3dDevice.Get(), mMainCommandList.Get());
+	CreateParticles();
 	CreateFrameResources(md3dDevice.Get());
 	CreateThreads();
 
 	UINT textureNum = (UINT)AssetManager::GetInstance()->GetTextures().size();
 	UINT shadowMapNum = (UINT)LIGHT_NUM;
+	UINT particleNum = (UINT)mParticles.size();
 
 	CreateCommonRootSignature(textureNum, shadowMapNum);
 	CreateSsaoRootSignature();
-	CreateDescriptorHeaps(textureNum, shadowMapNum);
+	CreateParticleGraphicsRootSignature(textureNum);
+	CreateParticleComputeRootSignature();
+	CreateDescriptorHeaps(textureNum, shadowMapNum, particleNum);
 	CreatePSOs();
 
 	// 초기화 명령들을 실행한다.
@@ -145,9 +149,9 @@ void D3DFramework::InitFramework()
 		obj->BeginPlay();
 }
 
-void D3DFramework::CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum)
+void D3DFramework::CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum, UINT particleNum)
 {
-	D3DApp::CreateDescriptorHeaps(textureNum, shadowMapNum);
+	D3DApp::CreateDescriptorHeaps(textureNum, shadowMapNum, particleNum);
 
 	mSsaoMapHeapIndex = textureNum + DEFERRED_BUFFER_COUNT + 1;
 #ifdef SSAO
@@ -168,6 +172,15 @@ void D3DFramework::CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum)
 			GetCpuSrv(mShadowMapHeapIndex + i),
 			GetGpuSrv(mShadowMapHeapIndex + i),
 			GetDsv(1));
+		++i;
+	}
+
+	mParticleHeapIndex = mShadowMapHeapIndex + shadowMapNum;
+	i = 0;
+	for (const auto& particle : mParticles)
+	{
+		particle->CreateBuffers(md3dDevice.Get(), mMainCommandList.Get(),
+			GetCpuSrv(mParticleHeapIndex + i * 4), mCbvSrvUavDescriptorSize);
 		++i;
 	}
 }
@@ -220,7 +233,9 @@ void D3DFramework::Render()
 		auto cmdListMid1 = mCurrentFrameResource->mFrameCmdLists[1].Get();
 		auto cmdListMid2 = mCurrentFrameResource->mFrameCmdLists[2].Get();
 		auto cmdListMid3 = mCurrentFrameResource->mFrameCmdLists[3].Get();
-		auto cmdListPost = mCurrentFrameResource->mFrameCmdLists[4].Get();
+		auto cmdListMid4 = mCurrentFrameResource->mFrameCmdLists[4].Get();
+		auto cmdListMid5 = mCurrentFrameResource->mFrameCmdLists[5].Get();
+		auto cmdListPost = mCurrentFrameResource->mFrameCmdLists[6].Get();
 
 		Init(cmdListPre);
 
@@ -233,8 +248,8 @@ void D3DFramework::Render()
 		SsaoPass(cmdListMid3);
 #endif
 		LightingPass(cmdListMid3);
-		ForwardPass(cmdListMid3);
-		WidgetPass(cmdListMid3);
+		ForwardPass(cmdListMid4);
+		ParticleUpdate(cmdListMid5);
 
 		Finish(cmdListPost);
 	}
@@ -277,6 +292,7 @@ void D3DFramework::Tick(float deltaTime)
 	UpdateMaterialBuffer(deltaTime);
 	UpdateMainPassBuffer(deltaTime);
 	UpdateWidgetBuffer(deltaTime);
+	UpdateParticleBuffer(deltaTime);
 
 #ifdef SSAO
 	UpdateSsaoBuffer(deltaTime);
@@ -517,6 +533,35 @@ void D3DFramework::UpdateWidgetBuffer(float deltaTime)
 	}
 }
 
+void D3DFramework::UpdateParticleBuffer(float deltaTime)
+{
+	auto currParticleCB = mCurrentFrameResource->mParticlePool->GetBuffer();
+	UINT particleIndex = 0;
+
+	for (const auto& particle : mParticles)
+	{
+		particle->Tick(deltaTime);
+
+		if (particleIndex != particle->GetCBIndex())
+		{
+			particle->SetCBIndex(particleIndex);
+			particle->UpdateNumFrames();
+		}
+
+		if (particle->IsUpdate())
+		{
+			ParticleConstants particleConstants;
+			particle->SetParticleConstants(particleConstants);
+			particleConstants.mDeltaTime = deltaTime;
+			currParticleCB->CopyData(particleIndex, particleConstants);
+
+			particle->DecreaseNumFrames();
+		}
+
+		++particleIndex;
+	}
+}
+
 void D3DFramework::UpdateSsaoBuffer(float deltaTime)
 {
 	static const XMMATRIX T(
@@ -696,27 +741,32 @@ void D3DFramework::CreateWidgets(ID3D12Device* device, ID3D12GraphicsCommandList
 	mWidgets.push_back(std::move(widget));
 }
 
-void D3DFramework::CreateParticles(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList)
+void D3DFramework::CreateParticles()
 {
 	std::shared_ptr<Particle> particle;
 
-	/*
-	particle = std::make_shared<Particle>("Particle0"s, device, cmdList, 500);
+	ParticleData start;
+	start.mColor = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.5f);
+	start.mLifeTime = 2.0f;
+	start.mSize = XMFLOAT2(1.0f, 1.0f);
+	start.mSpeed = 10.0f;
+
+	ParticleData end;
+	end.mColor = XMFLOAT4(0.9f, 0.1f, 0.1f, 0.1f);
+	end.mSize = XMFLOAT2(0.25f, 0.25f);
+	end.mSpeed = 1.0f;
+
+	particle = std::make_unique<Particle>("Particle0"s, 1000);
+	particle->SetParticleDataStart(start);
+	particle->SetParticleDataEnd(end);
+	particle->SetSpawnTimeRange(0.2f);
+	particle->SetEmitNum(10);
+	particle->SetEnabledInfinite(true);
 	particle->SetPosition(0.0f, 5.0f, 0.0f);
-	particle->SetSpawnDistanceRange(XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 1.0f));
-	particle->SetVelocityRange(XMFLOAT3(-10.0f, -10.0f, -10.0f), XMFLOAT3(10.0f, 10.0f, 10.0f));
-	particle->SetColorRange(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
-	particle->SetSizeRange(XMFLOAT2(2.0f, 2.0f));
-	particle->SetSpawnTimeRange(0.1f, 0.2f);
-	particle->SetLifeTimeRange(1.5f, 3.0f);
-	particle->SetLifeTime(10.0f);
-	particle->SetBurstNum(5);
-	particle->SetEnabledGravity(true);
-	particle->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tree0"s));
+	particle->SetMaterial(AssetManager::GetInstance()->FindMaterial("Radial_Gradient"s));
 	particle->SetRenderLayer(RenderLayer::Particle);
 	mRenderableObjects[(int)RenderLayer::Particle].push_back(particle);
 	mParticles.push_back(std::move(particle));
-	*/
 }
 
 void D3DFramework::CreateFrameResources(ID3D12Device* device)
@@ -725,7 +775,7 @@ void D3DFramework::CreateFrameResources(ID3D12Device* device)
 	{
 		mFrameResources[i] = std::make_unique<FrameResource>(device, false,
 			1 + LIGHT_NUM, (UINT)mGameObjects.size() * 2, LIGHT_NUM,
-			(UINT)AssetManager::GetInstance()->GetMaterials().size(), (UINT)mWidgets.size());
+			(UINT)AssetManager::GetInstance()->GetMaterials().size(), (UINT)mWidgets.size(), (UINT)mParticles.size());
 
 		mFrameResources[i]->mWidgetVBs.reserve((UINT)mWidgets.size());
 		for (const auto& widget : mWidgets)
@@ -955,9 +1005,26 @@ void D3DFramework::ForwardPass(ID3D12GraphicsCommandList* cmdList)
 
 	cmdList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
 
+	SetCommonState(cmdList);
+
 	cmdList->SetPipelineState(mPSOs["Sky"].Get());
 	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Sky], mCurrentFrameResource->GetObjectVirtualAddress(),
 		(int)RpCommon::Object, objCBByteSize);
+
+	cmdList->SetGraphicsRootSignature(mRootSignatures["ParticleRender"].Get());
+	cmdList->SetPipelineState(mPSOs["ParticleRender"].Get());
+	cmdList->SetGraphicsRootConstantBufferView((int)RpParticleGraphics::Pass, mCurrentFrameResource->GetPassVirtualAddress());
+	cmdList->SetGraphicsRootDescriptorTable((int)RpParticleGraphics::Texture, GetGpuSrv(0));
+	for (const auto& particle : mParticles)
+	{
+		D3D12_GPU_VIRTUAL_ADDRESS cbAddress = mCurrentFrameResource->GetParticleVirtualAddress() + particle->GetCBIndex() * particleCBByteSize;
+		cmdList->SetGraphicsRootConstantBufferView((int)RpParticleGraphics::ParticleCB, cbAddress);
+
+		particle->SetBufferSrv(cmdList);
+		particle->Render(cmdList);
+	}
+
+	SetCommonState(cmdList);
 
 	cmdList->SetPipelineState(mPSOs["Transparent"].Get());
 	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Transparent], mCurrentFrameResource->GetObjectVirtualAddress(),
@@ -966,11 +1033,7 @@ void D3DFramework::ForwardPass(ID3D12GraphicsCommandList* cmdList)
 	CD3DX12_RESOURCE_BARRIER transitionsPost = CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
 		D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ);
 	cmdList->ResourceBarrier(1, &transitionsPost);
-}
 
-void D3DFramework::WidgetPass(ID3D12GraphicsCommandList* cmdList)
-{
-	cmdList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, nullptr);
 	cmdList->SetPipelineState(mPSOs["Widget"].Get());
 	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Widget], mCurrentFrameResource->GetWidgetVirtualAddress(),
 		(int)RpCommon::Object, objCBByteSize);
@@ -982,7 +1045,7 @@ void D3DFramework::WidgetPass(ID3D12GraphicsCommandList* cmdList)
 		auto iter = mWidgets.begin();
 
 		cmdList->SetPipelineState(mPSOs["DiffuseMapDebug"].Get());
-		RenderObject(cmdList, (*iter++).get(), mCurrentFrameResource->GetWidgetVirtualAddress(), 
+		RenderObject(cmdList, (*iter++).get(), mCurrentFrameResource->GetWidgetVirtualAddress(),
 			(int)RpCommon::Object, objCBByteSize, false);
 
 		cmdList->SetPipelineState(mPSOs["SpecularMapDebug"].Get());
@@ -1012,6 +1075,44 @@ void D3DFramework::WidgetPass(ID3D12GraphicsCommandList* cmdList)
 			(int)RpCommon::Object, objCBByteSize, false);
 	}
 #endif
+}
+
+void D3DFramework::ParticleUpdate(ID3D12GraphicsCommandList* cmdList)
+{
+	cmdList->RSSetViewports(1, &mScreenViewport);
+	cmdList->RSSetScissorRects(1, &mScissorRect);
+
+	ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvSrvUavDescriptorHeap.Get() };
+	cmdList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
+	cmdList->SetComputeRootSignature(mRootSignatures["ParticleCompute"].Get());
+	cmdList->SetPipelineState(mPSOs["ParticleEmit"].Get());
+	for (const auto& particle : mParticles)
+	{
+		if (particle->GetSpawnTime() < 0.0f && particle->GetCurrentParticleNum() < particle->GetMaxParticleNum())
+		{
+			D3D12_GPU_VIRTUAL_ADDRESS cbAddress = mCurrentFrameResource->GetParticleVirtualAddress() + particle->GetCBIndex() * particleCBByteSize;
+			cmdList->SetComputeRootConstantBufferView((int)RpParticleCompute::ParticleCB, cbAddress);
+
+			particle->SetBufferUav(cmdList);
+			particle->Emit(cmdList);
+		}
+	}
+
+	cmdList->SetPipelineState(mPSOs["ParticleUpdate"].Get());
+	for (const auto& particle : mParticles)
+	{
+		D3D12_GPU_VIRTUAL_ADDRESS cbAddress = mCurrentFrameResource->GetParticleVirtualAddress() + particle->GetCBIndex() * particleCBByteSize;
+		cmdList->SetComputeRootConstantBufferView((int)RpParticleCompute::ParticleCB, cbAddress);
+
+		particle->SetBufferUav(cmdList);
+		particle->Update(cmdList);
+	}
+
+	for (const auto& particle : mParticles)
+	{
+		particle->CopyData(cmdList);
+	}
 }
 
 void D3DFramework::Init(ID3D12GraphicsCommandList* cmdList)
