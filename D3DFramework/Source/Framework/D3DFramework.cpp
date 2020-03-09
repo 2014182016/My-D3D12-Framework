@@ -235,26 +235,33 @@ void D3DFramework::Render()
 	else
 	{
 		auto cmdListPre = mCurrentFrameResource->mFrameCmdLists[0].Get();
-		auto cmdListMid1 = mCurrentFrameResource->mFrameCmdLists[1].Get();
-		auto cmdListMid2 = mCurrentFrameResource->mFrameCmdLists[2].Get();
-		auto cmdListMid3 = mCurrentFrameResource->mFrameCmdLists[3].Get();
-		auto cmdListMid4 = mCurrentFrameResource->mFrameCmdLists[4].Get();
-		auto cmdListMid5 = mCurrentFrameResource->mFrameCmdLists[5].Get();
-		auto cmdListPost = mCurrentFrameResource->mFrameCmdLists[6].Get();
+		auto cmdListPost = mCurrentFrameResource->mFrameCmdLists[1].Get();
 
 		Init(cmdListPre);
 
-		ShadowMapPass(cmdListMid1);
-		GBufferPass(cmdListMid2);
+		ShadowMapPass(cmdListPre);
 
+		ThrowIfFailed(cmdListPre->Close());
+		ID3D12CommandList* commandListsPre[] = { cmdListPre };
+		mCommandQueue->ExecuteCommandLists(_countof(commandListsPre), commandListsPre);
+
+		GBufferPass(nullptr);
+
+		mCommandQueue->ExecuteCommandLists((UINT)mCurrentFrameResource->mExecutableCmdLists.size(), 
+			mCurrentFrameResource->mExecutableCmdLists.data());
+
+		MidFrame(cmdListPost);
 #ifdef SSAO
-		SsaoPass(cmdListMid3);
+		SsaoPass(cmdListPost);
 #endif
-		LightingPass(cmdListMid3);
-		ForwardPass(cmdListMid4);
-		ParticleUpdate(cmdListMid5);
-
+		LightingPass(cmdListPost);
+		ForwardPass(cmdListPost);
+		ParticleUpdate(cmdListPost);
 		Finish(cmdListPost);
+
+		ThrowIfFailed(cmdListPost->Close());
+		ID3D12CommandList* commandListsPost[] = { cmdListPost };
+		mCommandQueue->ExecuteCommandLists(_countof(commandListsPost), commandListsPost);
 	}
 
 	// 전면 버퍼와 후면 버퍼를 바꾼다.
@@ -749,7 +756,7 @@ void D3DFramework::CreateFrameResources(ID3D12Device* device)
 {
 	for (int i = 0; i < NUM_FRAME_RESOURCES; ++i)
 	{
-		mFrameResources[i] = std::make_unique<FrameResource>(device, false,
+		mFrameResources[i] = std::make_unique<FrameResource>(device, true,
 			1 + LIGHT_NUM, (UINT)mGameObjects.size() * 2, LIGHT_NUM,
 			(UINT)AssetManager::GetInstance()->GetMaterials().size(), (UINT)mWidgets.size(), (UINT)mParticles.size());
 
@@ -779,11 +786,13 @@ void D3DFramework::RenderObjects(ID3D12GraphicsCommandList* cmdList, const std::
 
 	auto iter = list.begin();
 	std::advance(iter, currentNum);
-	for (; currentNum >= maxNum ;)
+	while(true)
 	{
 		RenderObject(cmdList, (*iter).get(), startAddress, frustum);
 
 		currentNum += threadNum;
+		if (currentNum >= maxNum)
+			return;
 		std::advance(iter, threadNum);
 	}
 }
@@ -886,8 +895,6 @@ void D3DFramework::WireframePass(ID3D12GraphicsCommandList* cmdList)
 {
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
-	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
-		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
 
 	cmdList->ClearRenderTargetView(GetCurrentBackBufferView(), (float*)&mBackBufferClearColor, 0, nullptr);
 	cmdList->ClearDepthStencilView(GetDepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
@@ -899,8 +906,6 @@ void D3DFramework::WireframePass(ID3D12GraphicsCommandList* cmdList)
 
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
-	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
-		D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
 }
 
 void D3DFramework::ShadowMapPass(ID3D12GraphicsCommandList* cmdList)
@@ -929,15 +934,6 @@ void D3DFramework::GBufferPass(ID3D12GraphicsCommandList* cmdList)
 	// 각 Worker 쓰레드가 모두 렌더 명령을 마쳤다면 
 	// 대기 상태에서 풀려나게 된다.
 	WaitForMultipleObjects(FrameResource::processorCoreNum, mWorkerFinishedFrameEvents.data(), TRUE, INFINITE);
-
-	// 각 G-Buffer의 버퍼들과 깊이 버퍼를 읽기 위해 자원 상태를를 전환한다.
-	CD3DX12_RESOURCE_BARRIER transitions[DEFERRED_BUFFER_COUNT + 1];
-	transitions[0] = CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
-		D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ);
-	for (int i = 0; i < DEFERRED_BUFFER_COUNT; i++)
-		transitions[i + 1] = CD3DX12_RESOURCE_BARRIER::Transition(mDeferredBuffer[i].Get(),
-			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ);
-	cmdList->ResourceBarrier(DEFERRED_BUFFER_COUNT + 1, transitions);
 }
 
 void D3DFramework::SsaoPass(ID3D12GraphicsCommandList* cmdList)
@@ -965,13 +961,8 @@ void D3DFramework::LightingPass(ID3D12GraphicsCommandList* cmdList)
 
 void D3DFramework::ForwardPass(ID3D12GraphicsCommandList* cmdList)
 {
-	CD3DX12_RESOURCE_BARRIER transitionsPre = CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
-		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-	cmdList->ResourceBarrier(1, &transitionsPre);
-
-	cmdList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
-
 	SetCommonState(cmdList);
+	cmdList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
 
 	cmdList->SetPipelineState(mPSOs["Sky"].Get());
 	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Sky], mCurrentFrameResource->GetObjectVirtualAddress());
@@ -991,10 +982,6 @@ void D3DFramework::ForwardPass(ID3D12GraphicsCommandList* cmdList)
 
 	cmdList->SetPipelineState(mPSOs["Transparent"].Get());
 	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Transparent], mCurrentFrameResource->GetObjectVirtualAddress(),&mWorldCamFrustum);
-
-	CD3DX12_RESOURCE_BARRIER transitionsPost = CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
-		D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ);
-	cmdList->ResourceBarrier(1, &transitionsPost);
 
 	// 위젯의 0~6번째까지는 DebugMap을 그리는 위젯이다.
 	auto iter = mWidgets.begin();
@@ -1093,15 +1080,13 @@ void D3DFramework::Init(ID3D12GraphicsCommandList* cmdList)
 	}
 
 	// 각 G-Buffer의 버퍼들과 렌더 타겟, 깊이 버퍼를 사용하기 위해 자원 상태를를 전환한다.
-	CD3DX12_RESOURCE_BARRIER transitions[DEFERRED_BUFFER_COUNT + 2];
+	CD3DX12_RESOURCE_BARRIER transitions[DEFERRED_BUFFER_COUNT + 1];
 	transitions[0] = CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-	transitions[1] = CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
-		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 	for (int i = 0; i < DEFERRED_BUFFER_COUNT; i++)
-		transitions[i + 2] = CD3DX12_RESOURCE_BARRIER::Transition(mDeferredBuffer[i].Get(),
+		transitions[i + 1] = CD3DX12_RESOURCE_BARRIER::Transition(mDeferredBuffer[i].Get(),
 			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET);
-	cmdList->ResourceBarrier(DEFERRED_BUFFER_COUNT + 2, transitions);
+	cmdList->ResourceBarrier(DEFERRED_BUFFER_COUNT + 1, transitions);
 
 	for (int i = 0; i < DEFERRED_BUFFER_COUNT; i++)
 		cmdList->ClearRenderTargetView(GetDefferedBufferView(i), (float*)&mDeferredBufferClearColors[i], 0, nullptr);
@@ -1109,23 +1094,26 @@ void D3DFramework::Init(ID3D12GraphicsCommandList* cmdList)
 	cmdList->ClearDepthStencilView(GetDepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 }
 
+void D3DFramework::MidFrame(ID3D12GraphicsCommandList* cmdList)
+{
+	// 각 G-Buffer의 버퍼들과 깊이 버퍼를 읽기 위해 자원 상태를를 전환한다.
+	CD3DX12_RESOURCE_BARRIER transitions[DEFERRED_BUFFER_COUNT];
+	for (int i = 0; i < DEFERRED_BUFFER_COUNT; i++)
+		transitions[i] = CD3DX12_RESOURCE_BARRIER::Transition(mDeferredBuffer[i].Get(),
+			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ);
+	cmdList->ResourceBarrier(DEFERRED_BUFFER_COUNT, transitions);
+}
+
 void D3DFramework::Finish(ID3D12GraphicsCommandList* cmdList)
 {
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
-
-	for (UINT i = 0; i < FRAME_PHASE; ++i)
-	{
-		ThrowIfFailed(mCurrentFrameResource->mFrameCmdLists[i]->Close());
-	}
-
-	mCommandQueue->ExecuteCommandLists((UINT)mCurrentFrameResource->mExecutableCmdLists.size(),
-		mCurrentFrameResource->mExecutableCmdLists.data());
 }
 
 void D3DFramework::WorkerThread(UINT threadIndex)
 {
 	UINT threadNum = FrameResource::processorCoreNum;
+
 	while (true)
 	{
 		WaitForSingleObject(mWorkerBeginFrameEvents[threadIndex], INFINITE);

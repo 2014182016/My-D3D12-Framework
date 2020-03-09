@@ -63,6 +63,7 @@ private:
 	void ForwardPass(ID3D12GraphicsCommandList* cmdList);
 
 	void Init(ID3D12GraphicsCommandList* cmdList);
+	void MidFrame(ID3D12GraphicsCommandList* cmdList);
 	void Finish(ID3D12GraphicsCommandList* cmdList);
 	void SetCommonState(ID3D12GraphicsCommandList* cmdList);
 

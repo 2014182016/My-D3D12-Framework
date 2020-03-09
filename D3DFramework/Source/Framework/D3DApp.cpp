@@ -201,7 +201,7 @@ void D3DApp::OnResize(int screenWidth, int screenHeight)
 
 	// 깊이 버퍼로서 사용하기 위해 상태 이전을 한다.
 	mMainCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
-		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_GENERIC_READ));
+		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE));
 
 	// Resize 명령을 실행한다.
 	ThrowIfFailed(mMainCommandList->Close());

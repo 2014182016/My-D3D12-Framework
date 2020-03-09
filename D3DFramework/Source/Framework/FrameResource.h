@@ -5,14 +5,14 @@
 #include "Enumeration.h"
 #include "BufferMemoryPool.hpp"
 
-#define FRAME_PHASE 7
+#define FRAME_PHASE 2
 
 // CPU가 한 프레임의 명령 목록들을 구축하는 데 필요한 자원들을
 // 대표하는 구조체
 struct FrameResource
 {
 public:
-	FrameResource(ID3D12Device* device, bool singleThread,
+	FrameResource(ID3D12Device* device, bool isMultiThread,
 		UINT passCount, UINT objectCount, UINT lightCount, UINT materialCount, UINT widgetCount, UINT particleCount);
 	FrameResource(const FrameResource& rhs) = delete;
 	FrameResource& operator=(const FrameResource& rhs) = delete;

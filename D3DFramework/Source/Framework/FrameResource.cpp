@@ -1,16 +1,16 @@
 #include "pch.h"
 #include "FrameResource.h"
 
-FrameResource::FrameResource(ID3D12Device* device, bool singleThread,
+FrameResource::FrameResource(ID3D12Device* device, bool isMultiThread,
 	UINT passCount, UINT objectCount, UINT lightCount, UINT materialCount, UINT widgetCount, UINT particleCount)
 {
-	if (processorCoreNum == 0 && !singleThread)
+	if (processorCoreNum == 0 && isMultiThread)
 	{
 		SYSTEM_INFO info;
 		GetSystemInfo(&info);
 		processorCoreNum = info.dwNumberOfProcessors;
 	}
-	else if (singleThread)
+	else if (isMultiThread == false)
 	{
 		processorCoreNum = 1;
 	}
@@ -50,15 +50,9 @@ FrameResource::FrameResource(ID3D12Device* device, bool singleThread,
 		mFrameCmdLists[i]->Close();
 	}
 
-	mExecutableCmdLists.push_back(mFrameCmdLists[0].Get());
-	mExecutableCmdLists.push_back(mFrameCmdLists[1].Get());
 	for (UINT i = 0; i < processorCoreNum; ++i)
 		mExecutableCmdLists.push_back(mWorekrCmdLists[i].Get());
-	mExecutableCmdLists.push_back(mFrameCmdLists[2].Get());
-	mExecutableCmdLists.push_back(mFrameCmdLists[3].Get());
-	mExecutableCmdLists.push_back(mFrameCmdLists[4].Get());
-	mExecutableCmdLists.push_back(mFrameCmdLists[5].Get());
-	mExecutableCmdLists.push_back(mFrameCmdLists[6].Get());
+	mExecutableCmdLists.shrink_to_fit();
 
 	mPassPool = std::make_unique<BufferMemoryPool<PassConstants>>(device, passCount, true);
 	mObjectPool = std::make_unique<BufferMemoryPool<ObjectConstants>>(device, objectCount, true);
