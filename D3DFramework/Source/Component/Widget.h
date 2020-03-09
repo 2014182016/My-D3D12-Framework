@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Component.h"
-#include "../Framework/Interfaces.h"
+#include "Interface.h"
 
 class Widget : public Component, public Renderable
 {
@@ -10,7 +10,8 @@ public:
 	virtual ~Widget();
 
 public:
-	virtual void Render(ID3D12GraphicsCommandList* commandList);
+	virtual void Render(ID3D12GraphicsCommandList* cmdList, DirectX::BoundingFrustum* frustum = nullptr) const override;
+	virtual void SetConstantBuffer(ID3D12GraphicsCommandList* cmdList, D3D12_GPU_VIRTUAL_ADDRESS startAddress) const override;
 
 public:
 	void SetPosition(int x, int y);
@@ -25,6 +26,16 @@ public:
 	inline float GetAnchorX() const { return mAnchorX; }
 	inline float GetAnchorY() const { return mAnchorY; }
 
+	inline class Mesh* GetMesh() { return mMesh.get(); }
+	inline class Material* GetMaterial() { return mMaterial; }
+	inline void SetMaterial(class Material* material) { mMaterial = material; }
+
+	inline void SetVisible(bool value) { mIsVisible = value; }
+	inline bool GetIsVisible() const { return mIsVisible; }
+
+	inline void SetCBIndex(UINT index) { mCBIndex = index; }
+	inline UINT GetCBIndex() const { return mCBIndex; }
+
 protected:
 	int mPosX = 0;
 	int mPosY = 0;
@@ -34,5 +45,9 @@ protected:
 	float mAnchorY = 0.0f;
 
 private:
-	std::unique_ptr<class Mesh> mWidgetMesh;
+	std::unique_ptr<class Mesh> mMesh;
+	class Material* mMaterial = nullptr;
+
+	UINT mCBIndex = 0;
+	bool mIsVisible = true;
 };

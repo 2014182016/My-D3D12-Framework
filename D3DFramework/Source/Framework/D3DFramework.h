@@ -23,12 +23,10 @@ public:
 	virtual void CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum, UINT particleNum) override;
 
 public:
-	void InitFramework();
-	void RenderObject(ID3D12GraphicsCommandList* cmdList, class Renderable* obj, D3D12_GPU_VIRTUAL_ADDRESS addressStarat,
-		UINT rootParameterIndex, UINT strideCBByteSize, bool visibleCheck = true, DirectX::BoundingFrustum* frustum = nullptr) const;
-	void RenderObjects(ID3D12GraphicsCommandList* cmdList, const std::list<std::shared_ptr<class Renderable>>& list, D3D12_GPU_VIRTUAL_ADDRESS addressStarat,
-		UINT rootParameterIndex, UINT strideCBByteSize, bool visibleCheck = true, DirectX::BoundingFrustum* frustum = nullptr, 
-		UINT threadIndex = 0, UINT threadNum = 1) const;
+	void RenderObject(ID3D12GraphicsCommandList* cmdList, class Renderable* obj,
+		D3D12_GPU_VIRTUAL_ADDRESS startAddress, DirectX::BoundingFrustum* frustum = nullptr) const;
+	void RenderObjects(ID3D12GraphicsCommandList* cmdList, const std::list<std::shared_ptr<class Renderable>>& list,
+		D3D12_GPU_VIRTUAL_ADDRESS startAddress, DirectX::BoundingFrustum* frustum = nullptr, UINT threadIndex = 0, UINT threadNum = 1) const;
 	void RenderActualObjects(ID3D12GraphicsCommandList* cmdList, DirectX::BoundingFrustum* frustum = nullptr);
 	class GameObject* Picking(int screenX, int screenY, float distance = 1000.0f, bool isMeshCollision = false) const;
 	void WorkerThread(UINT threadIndex);
@@ -38,14 +36,13 @@ public:
 	inline class Camera* GetCamera() const { return mCamera.get(); }
 
 private:
+	void InitFramework();
 	void CreateObjects();
 	void CreateLights();
 	void CreateWidgets(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList);
 	void CreateParticles();
 	void CreateFrameResources(ID3D12Device* device);
 	void CreateThreads();
-
-	void AddGameObject(std::shared_ptr<class GameObject> object, RenderLayer renderLayer);
 
 	void UpdateObjectBuffer(float deltaTime);
 	void UpdateLightBuffer(float deltaTime);
@@ -55,6 +52,7 @@ private:
 	void UpdateParticleBuffer(float deltaTime);
 	void UpdateSsaoBuffer(float deltaTime);
 	void UpdateObjectBufferPool();
+	void DestroyGameObjects();
 
 	void ParticleUpdate(ID3D12GraphicsCommandList* cmdList);
 	void WireframePass(ID3D12GraphicsCommandList* cmdList);
@@ -65,11 +63,7 @@ private:
 	void ForwardPass(ID3D12GraphicsCommandList* cmdList);
 
 	void Init(ID3D12GraphicsCommandList* cmdList);
-	void MidFrame(ID3D12GraphicsCommandList* cmdList);
 	void Finish(ID3D12GraphicsCommandList* cmdList);
-
-	void DestroyGameObjects();
-
 	void SetCommonState(ID3D12GraphicsCommandList* cmdList);
 
 private:

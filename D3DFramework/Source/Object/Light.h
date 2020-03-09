@@ -2,6 +2,8 @@
 
 #include "Object.h"
 
+#define SHADOW_MAP_SIZE 1024
+
 class Light : public Object
 {
 public:

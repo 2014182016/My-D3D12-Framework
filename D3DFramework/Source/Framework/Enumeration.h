@@ -1,6 +1,6 @@
 
-#ifndef ENUMS_H
-#define ENUMS_H
+#ifndef ENUMERATION_H
+#define ENUMERATION_H
 
 enum class Option : int
 {
@@ -16,7 +16,7 @@ enum class Option : int
 	Count,
 };
 
-enum class FogType : std::uint32_t
+enum class FogType : int
 {
 	Linear,
 	Exponential,
@@ -26,15 +26,14 @@ enum class FogType : std::uint32_t
 
 enum class CollisionType : int
 {
-	AABB = 0,
+	None = 0,
+	AABB,
 	OBB,
 	Sphere,
-	Point,
-	Complex,
-	None
+	Point
 };
 
-enum class LightType : std::uint32_t
+enum class LightType : int
 {
 	DirectioanlLight = 0,
 	PointLight,
@@ -54,8 +53,6 @@ enum class RenderLayer : int
 	AlphaTested,
 	Billborad,
 	Transparent,
-	Particle,
-	Widget,
 	Sky,
 	Count,
 };
@@ -124,4 +121,4 @@ enum class RpParticleCompute : int
 	Count
 };
 
-#endif // ENUMS_H
+#endif // ENUMERATION_H

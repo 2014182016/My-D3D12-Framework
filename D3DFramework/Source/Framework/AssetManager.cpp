@@ -3,7 +3,7 @@
 #include "Material.h"
 #include "Mesh.h"
 #include "D3DUtil.h"
-#include "Structures.h"
+#include "Structure.h"
 #include "Sound.h"
 
 using namespace DirectX;
@@ -54,6 +54,13 @@ void AssetManager::LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList*
 			texMap->mFilename.c_str(), texMap->mResource, texMap->mUploadHeap));
 
 		mTextures[texName] = std::move(texMap);
+	}
+
+	if ((UINT)mTextures.size() != TEX_NUM)
+	{
+#if defined(DEBUG) || defined(_DEBUG)
+		std::cout << "Max Tex Num Difference Error" << std::endl;
+#endif
 	}
 }
 

@@ -1,10 +1,10 @@
 #pragma once
 
 #include "pch.h"
-#include "Enums.h"
+#include "Enumeration.h"
 
 #define DISABLED -1
-
+#define TEX_NUM 10
 
 class AssetManager
 {

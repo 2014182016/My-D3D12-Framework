@@ -2,7 +2,7 @@
 #include "Octree.h"
 #include "GameObject.h"
 #include "Mesh.h"
-#include "Enums.h"
+#include "Enumeration.h"
 
 using namespace DirectX;
 
@@ -12,8 +12,9 @@ Octree::Octree(const DirectX::BoundingBox& boundingBox, const std::list<std::sha
 
 	for (const auto& obj : objList)
 	{
-		if(obj->GetCollisionType() != CollisionType::None)
-			mObjectList.emplace_front(obj);
+		CollisionType collisionType = obj->GetCollisionType();
+		if(collisionType != CollisionType::None && collisionType != CollisionType::Point)
+			mWeakObjectList.emplace_front(obj);
 	}
 
 	for (int i = 0; i < 8; ++i)
@@ -31,7 +32,7 @@ Octree::Octree(const BoundingBox& boundingBox)
 void Octree::BuildTree()
 {
 	// 오브젝트가 1개 이하일 경우 BuildTree를 종료한다.
-	if (mObjectList.size() <= 1)
+	if (mWeakObjectList.size() <= 1)
 		return;
 
 	float dimension = mBoundingBox.Extents.x;
@@ -60,16 +61,18 @@ void Octree::BuildTree()
 	// 현재 가지고 있는 오브젝트 리스트로부터 없애야 할 오브젝트들을 담는 리스트
 	std::list<std::shared_ptr<GameObject>> delist;
 
-	for (const auto& obj : mObjectList)
+	for (const auto& weakObj : mWeakObjectList)
 	{
-		if (!obj->GetMesh())
+		auto obj = weakObj.lock();
+		if (obj == nullptr)
 			continue;
 
-		switch (obj->GetMesh()->GetCollisionType())
+		auto objBounding = obj->GetCollisionBounding();
+		switch (obj->GetCollisionType())
 		{
 		case CollisionType::AABB:
 		{
-			const BoundingBox& aabb = std::any_cast<BoundingBox>(obj->GetCollisionBounding());
+			const BoundingBox& aabb = std::any_cast<BoundingBox>(objBounding);
 			for (int i = 0; i < 8; ++i)
 			{
 				if (octant[i].Contains(aabb) == ContainmentType::CONTAINS)
@@ -83,7 +86,7 @@ void Octree::BuildTree()
 		}
 		case CollisionType::OBB:
 		{
-			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(obj->GetCollisionBounding());
+			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(objBounding);
 			for (int i = 0; i < 8; ++i)
 			{
 				if (octant[i].Contains(obb) == ContainmentType::CONTAINS)
@@ -97,7 +100,7 @@ void Octree::BuildTree()
 		}
 		case CollisionType::Sphere:
 		{
-			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(obj->GetCollisionBounding());
+			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(objBounding);
 			for (int i = 0; i < 8; ++i)
 			{
 				if (octant[i].Contains(sphere) == ContainmentType::CONTAINS)
@@ -115,7 +118,9 @@ void Octree::BuildTree()
 
 	// 하위 노드에 포함된 오브젝트는 이 노드에서부터 삭제한다.
 	for (auto& obj : delist)
-		mObjectList.remove(obj);
+	{
+		DeleteWeakObject(obj);
+	}
 
 	// 하위 노드에 오브젝트가 존재한다면 BuildTree를 재귀적으로 실행한다.
 	for (int i = 0; i < 8; ++i)
@@ -135,16 +140,16 @@ void Octree::BuildTree()
 
 bool Octree::Insert(std::shared_ptr<GameObject> obj)
 {
-	if (mObjectList.size() == 0)
+	if (mWeakObjectList.size() == 0)
 	{
-		mObjectList.emplace_front(obj);
+		mWeakObjectList.emplace_front(obj);
 		return true;
 	}
 
 	float dimension = mBoundingBox.Extents.x;
 	if (dimension <= MIN_SIZE)
 	{
-		mObjectList.emplace_front(obj);
+		mWeakObjectList.emplace_front(obj);
 		return true;
 	}
 
@@ -163,11 +168,12 @@ bool Octree::Insert(std::shared_ptr<GameObject> obj)
 	octant[6] = (mChildNodes[6] != nullptr) ? mChildNodes[6]->GetBoundingBox() : BoundingBox((center + XMFLOAT3(extents.x, extents.y, -extents.z)) / 2.0f, XMFLOAT3(half, half, half));
 	octant[7] = (mChildNodes[7] != nullptr) ? mChildNodes[7]->GetBoundingBox() : BoundingBox((center + XMFLOAT3(-extents.x, extents.y, -extents.z)) / 2.0f, XMFLOAT3(half, half, half));
 
-	switch (obj->GetMesh()->GetCollisionType())
+	auto objBounding = obj->GetCollisionBounding();
+	switch (obj->GetCollisionType())
 	{
 	case CollisionType::AABB:
 	{
-		const BoundingBox& aabb = std::any_cast<BoundingBox>(obj->GetCollisionBounding());
+		const BoundingBox& aabb = std::any_cast<BoundingBox>(objBounding);
 		for (int i = 0; i < 8; ++i)
 		{
 			if (octant[i].Contains(aabb) == ContainmentType::CONTAINS)
@@ -185,12 +191,12 @@ bool Octree::Insert(std::shared_ptr<GameObject> obj)
 			}
 		}
 
-		mObjectList.emplace_front(obj);
+		mWeakObjectList.emplace_front(obj);
 		return true;
 	}
 	case CollisionType::OBB:
 	{
-		const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(obj->GetCollisionBounding());
+		const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(objBounding);
 		for (int i = 0; i < 8; ++i)
 		{
 			if (octant[i].Contains(obb) == ContainmentType::CONTAINS)
@@ -206,12 +212,12 @@ bool Octree::Insert(std::shared_ptr<GameObject> obj)
 			}
 		}
 
-		mObjectList.emplace_front(obj);
+		mWeakObjectList.emplace_front(obj);
 		return true;
 	}
 	case CollisionType::Sphere:
 	{
-		const BoundingSphere& sphere = std::any_cast<BoundingSphere>(obj->GetCollisionBounding());
+		const BoundingSphere& sphere = std::any_cast<BoundingSphere>(objBounding);
 		for (int i = 0; i < 8; ++i)
 		{
 			if (octant[i].Contains(sphere) == ContainmentType::CONTAINS)
@@ -227,7 +233,7 @@ bool Octree::Insert(std::shared_ptr<GameObject> obj)
 			}
 		}
 
-		mObjectList.emplace_front(obj);
+		mWeakObjectList.emplace_front(obj);
 		return true;
 	}
 	}
@@ -238,13 +244,18 @@ bool Octree::Insert(std::shared_ptr<GameObject> obj)
 void Octree::Update(float deltaTime)
 {
 	if (mTreeBuilt == false || mTreeReady == false)
+	{
+#if defined(DEBUG) || defined(_DEBUG)
+		std::cout << "Octree isn't built or ready" << std::endl;
+#endif
 		return;
+	}
 
 	// 이 노드가 오브젝트를 가지고 있지 않다면 카운트 다운을 시작하고,
 	// 카운트 다운이 0이 될 시에 이 노드를 삭제한다.
 	// 죽기 전에 노드를 다시 사용하게 됐다면 수명을 두 배로 늘린다.
 	// 이로써 불필요한 메모리 할당 및 해제를 피할 수 있다.
-	if (mObjectList.size() == 0)
+	if (mWeakObjectList.size() == 0)
 	{
 		if (!mHasChildren)
 		{
@@ -265,12 +276,22 @@ void Octree::Update(float deltaTime)
 	}
 
 	std::list<std::shared_ptr<GameObject>> movedObjects;
-	for (const auto& obj : mObjectList)
+	for (auto iter = mWeakObjectList.begin(); iter != mWeakObjectList.end();)
 	{
-		// 이 함수는 Tick이 불리고 난 이후에 WorldUpdate가 Set되므로
-		// Update함수는 Object의 Tick함수 이전에 불려져야 한다.
-		if (obj->GetIsWorldUpdate())
-			movedObjects.emplace_front(obj);
+		auto obj = iter->lock();
+		if (obj == nullptr)
+		{
+			iter = mWeakObjectList.erase(iter);
+			++iter;
+		}
+		else
+		{
+			// 이 함수는 Tick이 불리고 난 이후에 WorldUpdate가 설정되므로
+			// Update함수는 Object의 Tick함수 이전에 불려져야 한다.
+			if (obj->GetIsWorldUpdate())
+				movedObjects.emplace_front(obj);
+			++iter;
+		}
 	}
 
 	mHasChildren = false;
@@ -313,13 +334,14 @@ void Octree::Update(float deltaTime)
 	for (auto& obj : movedObjects)
 	{
 		Octree* currentNode = this;
+		auto objBounding = obj->GetCollisionBounding();
 
 		// 오브젝트의 바운딩 박스를 완전히 포함할 부모 노드를 계속해서 찾아간다.
-		switch (obj->GetMesh()->GetCollisionType())
+		switch (obj->GetCollisionType())
 		{
 		case CollisionType::AABB:
 		{
-			const BoundingBox& aabb = std::any_cast<BoundingBox>(obj->GetCollisionBounding());
+			const BoundingBox& aabb = std::any_cast<BoundingBox>(objBounding);
 			while (currentNode->GetBoundingBox().Contains(aabb) != ContainmentType::CONTAINS)
 			{
 				if (currentNode->GetParent() != nullptr)
@@ -331,7 +353,7 @@ void Octree::Update(float deltaTime)
 		}
 		case CollisionType::OBB:
 		{
-			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(obj->GetCollisionBounding());
+			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(objBounding);
 			while (currentNode->GetBoundingBox().Contains(obb) != ContainmentType::CONTAINS)
 			{
 				if (currentNode->GetParent() != nullptr)
@@ -343,7 +365,7 @@ void Octree::Update(float deltaTime)
 		}
 		case CollisionType::Sphere:
 		{
-			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(obj->GetCollisionBounding());
+			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(objBounding);
 			while (currentNode->GetBoundingBox().Contains(sphere) != ContainmentType::CONTAINS)
 			{
 				if (currentNode->GetParent() != nullptr)
@@ -361,41 +383,41 @@ void Octree::Update(float deltaTime)
 		// 현재 노드에서 움직인 오브젝트를 삭제하고,
 		// 알맞은 노드에 다시 삽입한다.
 		currentNode->Insert(obj);
-		mObjectList.remove(obj);
+		DeleteWeakObject(obj);
 	}
 
 	// 부모노드에 있는 오브젝트들과 1:1검사를 한 뒤
 	// 현재 노드에 있는 오브젝트끼리 충돌검사를 한다.
-	std::list<std::shared_ptr<GameObject>> currentObjList, parentObjList;
-	currentObjList = mObjectList;
+	std::list<std::weak_ptr<GameObject>> currentObjList, parentObjList;
+	currentObjList = mWeakObjectList;
 	GetParentObjectList(parentObjList);
 
 	while (!parentObjList.empty())
 	{
-		std::shared_ptr<GameObject> obj = parentObjList.front();
+		auto obj = parentObjList.front().lock();
 		parentObjList.pop_front();
 
-		for (auto& other : currentObjList)
+		for (auto& weakOther : currentObjList)
 		{
-			bool isCollision = obj->IsCollision(other);
-			if (isCollision)
+			auto other = weakOther.lock();
+			if (obj->IsCollision(other.get()))
 			{
-				obj->Collide(other);
+				obj->Collide(other.get());
 			}
 		}
 	}
 
 	while (!currentObjList.empty())
 	{
-		std::shared_ptr<GameObject> obj = currentObjList.front();
+		auto obj = currentObjList.front().lock();
 		currentObjList.pop_front();
 
-		for (auto& other : currentObjList)
+		for (auto& weakOther : currentObjList)
 		{
-			bool isCollision = obj->IsCollision(other);
-			if (isCollision)
+			auto other = weakOther.lock();
+			if (obj->IsCollision(other.get()))
 			{
-				obj->Collide(other);
+				obj->Collide(other.get());
 			}
 		}
 	}
@@ -439,45 +461,18 @@ void Octree::GetBoundingWorlds(std::vector<XMFLOAT4X4>& worlds) const
 	}
 }
 
-void Octree::GetIntersectObjects(const DirectX::BoundingBox& bounding, std::list<std::shared_ptr<GameObject>>& objects)
-{
-	ContainmentType containmentType = mBoundingBox.Contains(bounding);
-
-	switch (containmentType)
-	{
-	case DirectX::DISJOINT:
-		break;
-	case DirectX::INTERSECTS:
-		objects.insert(objects.end(), mObjectList.begin(), mObjectList.end());
-
-		for (int i = 0; i < 8; ++i)
-		{
-			if (mChildNodes[i] != nullptr)
-			{
-				mChildNodes[i]->GetIntersectObjects(bounding, objects);
-			}
-		}
-		break;
-	case DirectX::CONTAINS:
-		GetChildObjectList(objects);
-		break;
-	default:
-		break;
-	}
-}
-
-void Octree::GetParentObjectList(std::list<std::shared_ptr<GameObject>>& objList) const
+void Octree::GetParentObjectList(std::list<std::weak_ptr<GameObject>>& objList) const
 {
 	Octree* parentNode = mParent;
 	while (parentNode != nullptr)
 	{
-		const std::list<std::shared_ptr<GameObject>>& parentObjList = parentNode->GetObjectList();
+		const std::list<std::weak_ptr<GameObject>>& parentObjList = parentNode->GetObjectList();
 		objList.insert(objList.end(), parentObjList.begin(), parentObjList.end());
 		parentNode = parentNode->GetParent();
 	}
 }
 
-void Octree::GetChildObjectList(std::list<std::shared_ptr<class GameObject>>& objList) const
+void Octree::GetChildObjectList(std::list<std::weak_ptr<class GameObject>>& objList) const
 {
 	if (mChildNodes == nullptr)
 		return;
@@ -486,26 +481,16 @@ void Octree::GetChildObjectList(std::list<std::shared_ptr<class GameObject>>& ob
 	{
 		if (mChildNodes[i] != nullptr)
 		{
-			std::list<std::shared_ptr<class GameObject>> chileObjList = mChildNodes[i]->GetObjectList();
+			const std::list<std::weak_ptr<class GameObject>> chileObjList = mChildNodes[i]->GetObjectList();
 			objList.insert(objList.end(), chileObjList.begin(), chileObjList.end());
 			mChildNodes[i]->GetChildObjectList(objList);
 		}
 	}
 }
 
-void Octree::DestroyObjects()
+void Octree::DeleteWeakObject(std::shared_ptr<class GameObject> obj)
 {
-	mObjectList.remove_if([](std::shared_ptr<GameObject>& obj)->bool
-	{ return obj->GetIsDestroyesd(); });
-
-	if (mChildNodes == nullptr)
-		return;
-
-	for (int i = 0; i < 8; ++i)
-	{
-		if (mChildNodes[i] != nullptr)
-		{
-			mChildNodes[i]->DestroyObjects();
-		}
-	}
+	mWeakObjectList.remove_if([&obj](std::weak_ptr<GameObject>& weakObj)->bool
+	{ auto listedObj = weakObj.lock();
+	if (obj == listedObj) return true; return false; });
 }

@@ -23,9 +23,7 @@ public:
 		CD3DX12_GPU_DESCRIPTOR_HANDLE hNormalGpuSrv,
 		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
 		CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
-		UINT cbvSrvUavDescriptorSize,
-		UINT rtvDescriptorSize);
+		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv);
 
 	void RebuildDescriptors(ID3D12Device* device);
 	void OnResize(ID3D12Device* device, UINT newWidth, UINT newHeight);

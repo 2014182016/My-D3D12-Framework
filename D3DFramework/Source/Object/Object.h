@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Component.h"
-#include "Enums.h"
+#include "Enumeration.h"
 
 class Object : public Component
 {

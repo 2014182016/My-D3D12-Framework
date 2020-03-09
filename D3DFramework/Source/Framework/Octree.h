@@ -16,8 +16,6 @@ public:
 	// Update함수는 Object의 Tick함수 이전에 불려져야 한다.
 	void Update(float deltaTime); 
 
-	void DestroyObjects();
-
 public:
 	inline Octree* GetParent() const { return mParent; }
 	inline void SetParent(Octree* parent) { mParent = parent; }
@@ -25,19 +23,18 @@ public:
 	inline void SetCurrentLife(int value) { mCurrLife = value; }
 	inline int GetCurrentLife() const { return mCurrLife; }
 
-	inline std::list<std::shared_ptr<class GameObject>> GetObjectList() const { return mObjectList; }
-	inline UINT GetObjectCount() const { return (UINT)mObjectList.size(); }
+	inline std::list<std::weak_ptr<class GameObject>> GetObjectList() const { return mWeakObjectList; }
+	inline UINT GetObjectCount() const { return (UINT)mWeakObjectList.size(); }
 
 	inline DirectX::BoundingBox GetBoundingBox() const { return mBoundingBox; }
 	void GetBoundingWorlds(std::vector<DirectX::XMFLOAT4X4>& worlds) const;
 
-	void GetIntersectObjects(const DirectX::BoundingBox& bounding, std::list<std::shared_ptr<class GameObject>>& objects);
-
 private:
 	Octree* CreateNode(const DirectX::BoundingBox& boundingBox, std::list<std::shared_ptr<class GameObject>> objList);
 	Octree* CreateNode(const DirectX::BoundingBox& boundingBox, std::shared_ptr<class GameObject> obj);
-	void GetParentObjectList(std::list<std::shared_ptr<class GameObject>>& objList) const;
-	void GetChildObjectList(std::list<std::shared_ptr<class GameObject>>& objList) const;
+	void GetParentObjectList(std::list<std::weak_ptr<class GameObject>>& objList) const;
+	void GetChildObjectList(std::list<std::weak_ptr<class GameObject>>& objList) const;
+	void DeleteWeakObject(std::shared_ptr<class GameObject> obj);
 
 public:
 	static inline bool mTreeReady = false;
@@ -51,7 +48,7 @@ private:
 	DirectX::BoundingBox mBoundingBox;
 
 	// 이 노드가 가지고 있는 오브젝트 리스트
-	std::list<std::shared_ptr<class GameObject>> mObjectList;
+	std::list<std::weak_ptr<class GameObject>> mWeakObjectList;
 
 	Octree* mChildNodes[8];
 	Octree* mParent = nullptr;

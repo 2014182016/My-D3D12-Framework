@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "SpotLight.h"
-#include "Structures.h"
+#include "Structure.h"
 #include "SimpleShadowMap.h"
 
 using namespace DirectX;

@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "DirectionalLight.h"
-#include "Structures.h"
+#include "Structure.h"
 #include "SimpleShadowMap.h"
 
 using namespace DirectX;
@@ -16,7 +16,6 @@ DirectionalLight::~DirectionalLight() { }
 
 void DirectionalLight::SetLightData(LightData& lightData)
 {
-
 	__super::SetLightData(lightData);
 
 	// 그림자 맵에 사용하기 위한 행렬을 계산한다.
@@ -25,7 +24,7 @@ void DirectionalLight::SetLightData(LightData& lightData)
 	XMVECTOR targetPos = lightPos + lightDir * mFalloffEnd;
 	XMVECTOR lightUp = XMLoadFloat3(&GetUp());
 	XMMATRIX lightView = XMMatrixLookAtLH(lightPos, targetPos, lightUp);
-	XMMATRIX lightProj = XMMatrixOrthographicLH(mShadowMapSize.x, mShadowMapSize.y, 0.5f, mFalloffEnd);
+	XMMATRIX lightProj = XMMatrixOrthographicLH(mShadowMapSize.x, mShadowMapSize.y, mFalloffStart, mFalloffEnd);
 
 	XMMATRIX shadowTransform = lightView * lightProj * toTextureTransform;
 	XMStoreFloat4x4(&lightData.mShadowTransform, XMMatrixTranspose(shadowTransform));

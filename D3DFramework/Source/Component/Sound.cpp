@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "Sound.h"
 #include "D3DUtil.h"
-#include "Structures.h"
+#include "Structure.h"
 
 Sound::Sound(std::string&& name) : Component(std::move(name)){ }
 

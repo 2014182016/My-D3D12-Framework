@@ -5,7 +5,7 @@
 #pragma once
 
 #include "pch.h"
-#include "Interfaces.h"
+#include "Interface.h"
 
 class SimpleShadowMap : public ShadowMap
 {
@@ -24,7 +24,7 @@ public:
 	virtual void BuildDescriptors(ID3D12Device* device) override;
 	virtual void BuildResource(ID3D12Device* device) override;
 	virtual void OnResize(ID3D12Device* device, UINT width, UINT height) override;
-	virtual void RenderSceneToShadowMap(ID3D12GraphicsCommandList* cmdList, DirectX::BoundingFrustum* camFrustum = nullptr) override;
+	virtual void RenderSceneToShadowMap(ID3D12GraphicsCommandList* cmdList, DirectX::BoundingFrustum* frustum = nullptr) override;
 
 private:
 	D3D12_VIEWPORT mViewport;

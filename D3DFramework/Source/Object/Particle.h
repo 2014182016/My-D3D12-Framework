@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Object.h"
-#include "../Framework/Structures.h"
-#include "../Framework/Interfaces.h"
+#include "Structure.h"
+#include "Interface.h"
 
 //#define BUFFER_COPY
 #define NUM_EMIT_THREAD 8.0f
@@ -16,16 +16,18 @@ public:
 
 public:
 	virtual void Tick(float deltaTime) override;
-	virtual void Render(ID3D12GraphicsCommandList* commandList) override;
+	virtual void Render(ID3D12GraphicsCommandList* cmdList, DirectX::BoundingFrustum* frustum = nullptr) const override;
+	virtual void SetConstantBuffer(ID3D12GraphicsCommandList* cmdList, D3D12_GPU_VIRTUAL_ADDRESS startAddress) const override;
 
 public:
-	void CreateBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList,
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, UINT cbvSrvUavDescriptorSize);
+	void CreateBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv);
 	void Update(ID3D12GraphicsCommandList* cmdList);
 	void Emit(ID3D12GraphicsCommandList* cmdList);
 	void SetBufferSrv(ID3D12GraphicsCommandList* cmdList);
 	void SetBufferUav(ID3D12GraphicsCommandList* cmdList);
 	void CopyData(ID3D12GraphicsCommandList* cmdList);
+
+	void SetParticleConstants(ParticleConstants& constants);
 
 public:
 	inline void SetParticleDataStart(ParticleData& data) { mStart = data; }
@@ -51,7 +53,14 @@ public:
 	inline int GetMaxParticleNum() const { return mMaxParticleNum; }
 	inline int GetCurrentParticleNum() const { return mCurrentParticleNum; }
 
-	void SetParticleConstants(ParticleConstants& constants);
+	inline class Material* GetMaterial() { return mMaterial; }
+	inline void SetMaterial(class Material* material) { mMaterial = material; }
+
+	inline void SetVisible(bool value) { mIsVisible = value; }
+	inline bool GetIsVisible() const { return mIsVisible; }
+
+	inline void SetCBIndex(UINT index) { mCBIndex = index; }
+	inline UINT GetCBIndex() const { return mCBIndex; }
 
 protected:
 	int mMaxParticleNum = 0;
@@ -69,6 +78,10 @@ private:
 	bool mIsActive = true;
 	bool mEnabledGravity = false;
 	bool mIsInfinite = false;
+
+	class Material* mMaterial = nullptr;
+	UINT mCBIndex = 0;
+	bool mIsVisible = true;
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> mBuffer;
 #ifdef BUFFER_COPY

@@ -1,6 +1,6 @@
 #define DISABLED -1
 
-#define TEX_NUM 9
+#define TEX_NUM 10
 
 #define FOG_LINEAR 0
 #define FOG_EXPONENTIAL 1

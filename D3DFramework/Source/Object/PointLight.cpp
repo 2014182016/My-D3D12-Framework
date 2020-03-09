@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "PointLight.h"
-#include "Structures.h"
+#include "Structure.h"
 
 using namespace DirectX;
 

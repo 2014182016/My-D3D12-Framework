@@ -1,8 +1,8 @@
 #pragma once
 
 #include "pch.h"
-#include "Structures.h"
-#include "Enums.h"
+#include "Structure.h"
+#include "Enumeration.h"
 #include "BufferMemoryPool.hpp"
 
 #define FRAME_PHASE 7

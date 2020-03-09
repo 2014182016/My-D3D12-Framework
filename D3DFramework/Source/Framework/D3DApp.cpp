@@ -1,19 +1,15 @@
 #include "pch.h"
 #include "D3DApp.h"
 #include "D3DUtil.h"
-#include "Structures.h"
+#include "Structure.h"
 #include "AssetManager.h"
 #include "Ssao.h"
+#include "Global.h"
 
 using Microsoft::WRL::ComPtr;
 
 D3DApp::D3DApp(HINSTANCE hInstance, int screenWidth, int screenHeight, std::wstring applicationName)
-	: WinApp(hInstance, screenWidth, screenHeight, applicationName)
-{
-	objCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
-	passCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(PassConstants));
-	particleCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(ParticleConstants));
-}
+	: WinApp(hInstance, screenWidth, screenHeight, applicationName) { }
 
 D3DApp::~D3DApp()
 {
@@ -115,12 +111,6 @@ void D3DApp::OnResize(int screenWidth, int screenHeight)
 	if (!md3dDevice || !mSwapChain || !mMainCommandAlloc)
 		return;
 
-	/*
-	assert(md3dDevice);
-	assert(mSwapChain);
-	assert(mDirectCmdListAlloc);
-	*/
-
 	// 리소스를 변경하기 전에 명령들을 비운다.
 	FlushCommandQueue();
 
@@ -147,7 +137,7 @@ void D3DApp::OnResize(int screenWidth, int screenHeight)
 	{
 		ThrowIfFailed(mSwapChain->GetBuffer(i, IID_PPV_ARGS(&mSwapChainBuffer[i])));
 		md3dDevice->CreateRenderTargetView(mSwapChainBuffer[i].Get(), nullptr, rtvHeapHandle);
-		rtvHeapHandle.Offset(1, mRtvDescriptorSize);
+		rtvHeapHandle.Offset(1, DescriptorSize::rtvDescriptorSize);
 	}
 
 	D3D12_RESOURCE_DESC defferedBufferDesc;
@@ -180,7 +170,7 @@ void D3DApp::OnResize(int screenWidth, int screenHeight)
 			&optClear,
 			IID_PPV_ARGS(mDeferredBuffer[i].GetAddressOf())));
 		md3dDevice->CreateRenderTargetView(mDeferredBuffer[i].Get(), &defferedBufferRtvDesc, rtvHeapHandle);
-		rtvHeapHandle.Offset(1, mRtvDescriptorSize);
+		rtvHeapHandle.Offset(1, DescriptorSize::rtvDescriptorSize);
 	}
 
 	D3D12_RESOURCE_DESC depthStencilDesc = defferedBufferDesc;
@@ -286,9 +276,9 @@ void D3DApp::CreateDevice()
 		IID_PPV_ARGS(&mFence)));
 
 	// 서술자의 크기는 CPU 마다 다를 수 있으므로 미리 알아내둔다.
-	mRtvDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	mDsvDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
-	mCbvSrvUavDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	DescriptorSize::rtvDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	DescriptorSize::dsvDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+	DescriptorSize::cbvSrvUavDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	// 후면 버퍼를 위한 4X MSAA 지원 여부를 점검한다.
 	D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS msQualityLevels;
@@ -424,7 +414,7 @@ D3D12_CPU_DESCRIPTOR_HANDLE D3DApp::GetCurrentBackBufferView() const
 	return CD3DX12_CPU_DESCRIPTOR_HANDLE(
 		mRtvHeap->GetCPUDescriptorHandleForHeapStart(),
 		mCurrentBackBuffer,
-		mRtvDescriptorSize);
+		DescriptorSize::rtvDescriptorSize);
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE D3DApp::GetDefferedBufferView(UINT index) const
@@ -432,7 +422,7 @@ D3D12_CPU_DESCRIPTOR_HANDLE D3DApp::GetDefferedBufferView(UINT index) const
 	return CD3DX12_CPU_DESCRIPTOR_HANDLE(
 		mRtvHeap->GetCPUDescriptorHandleForHeapStart(),
 		SWAP_CHAIN_BUFFER_COUNT + index,
-		mRtvDescriptorSize);
+		DescriptorSize::rtvDescriptorSize);
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE D3DApp::GetDepthStencilView() const
@@ -443,28 +433,28 @@ D3D12_CPU_DESCRIPTOR_HANDLE D3DApp::GetDepthStencilView() const
 CD3DX12_CPU_DESCRIPTOR_HANDLE D3DApp::GetCpuSrv(int index) const
 {
 	auto srv = CD3DX12_CPU_DESCRIPTOR_HANDLE(mCbvSrvUavDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-	srv.Offset(index, mCbvSrvUavDescriptorSize);
+	srv.Offset(index, DescriptorSize::cbvSrvUavDescriptorSize);
 	return srv;
 }
 
 CD3DX12_GPU_DESCRIPTOR_HANDLE D3DApp::GetGpuSrv(int index) const
 {
 	auto srv = CD3DX12_GPU_DESCRIPTOR_HANDLE(mCbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-	srv.Offset(index, mCbvSrvUavDescriptorSize);
+	srv.Offset(index, DescriptorSize::cbvSrvUavDescriptorSize);
 	return srv;
 }
 
 CD3DX12_CPU_DESCRIPTOR_HANDLE D3DApp::GetDsv(int index) const
 {
 	auto dsv = CD3DX12_CPU_DESCRIPTOR_HANDLE(mDsvHeap->GetCPUDescriptorHandleForHeapStart());
-	dsv.Offset(index, mDsvDescriptorSize);
+	dsv.Offset(index, DescriptorSize::dsvDescriptorSize);
 	return dsv;
 }
 
 CD3DX12_CPU_DESCRIPTOR_HANDLE D3DApp::GetRtv(int index) const
 {
 	auto rtv = CD3DX12_CPU_DESCRIPTOR_HANDLE(mRtvHeap->GetCPUDescriptorHandleForHeapStart());
-	rtv.Offset(index, mRtvDescriptorSize);
+	rtv.Offset(index, DescriptorSize::rtvDescriptorSize);
 	return rtv;
 }
 
@@ -841,6 +831,7 @@ void D3DApp::CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum, UINT part
 	srvDesc.Texture2D.MostDetailedMip = 0;
 	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
 
+	DescriptorIndex::textureHeapIndex = 0;
 	// 각 텍스처마다 힙에 Shader Resource View를 생성한다.
 	for (UINT i = 0; i < textureNum; ++i)
 	{
@@ -852,10 +843,10 @@ void D3DApp::CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum, UINT part
 		md3dDevice->CreateShaderResourceView(resource, &srvDesc, hDescriptor);
 
 		// next descriptor
-		hDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
+		hDescriptor.Offset(1, DescriptorSize::cbvSrvUavDescriptorSize);
 	}
 
-	mDeferredBufferHeapIndex = textureNum;
+	DescriptorIndex::deferredBufferHeapIndex = textureNum;
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	for (UINT i = 0; i < DEFERRED_BUFFER_COUNT; ++i)
 	{
@@ -866,14 +857,14 @@ void D3DApp::CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum, UINT part
 		md3dDevice->CreateShaderResourceView(mDeferredBuffer[i].Get(), &srvDesc, hDescriptor);
 
 		// next descriptor
-		hDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
+		hDescriptor.Offset(1, DescriptorSize::cbvSrvUavDescriptorSize);
 	}
 
 	
 	srvDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
 	// G-Buffer에 사용되는 깊이 버퍼에 대한 SRV를 생성한다.
 	md3dDevice->CreateShaderResourceView(mDepthStencilBuffer.Get(), &srvDesc, hDescriptor);
-	hDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
+	hDescriptor.Offset(1, DescriptorSize::cbvSrvUavDescriptorSize);
 }
 
 void D3DApp::CreateShadersAndInputLayout()

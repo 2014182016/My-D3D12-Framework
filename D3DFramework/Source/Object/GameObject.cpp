@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "GameObject.h"
 #include "Mesh.h"
+#include "Global.h"
 
 using namespace DirectX;
 
@@ -8,38 +9,44 @@ GameObject::GameObject(std::string&& name) : Object(std::move(name)) { }
 
 GameObject::~GameObject() { }
 
+void GameObject::BeginPlay()
+{
+	WorldUpdate();
+}
+
 void GameObject::WorldUpdate()
 {
 	__super::WorldUpdate();
 
 	if (mMesh)
 	{
-		if (mMesh->GetCollisionBounding().has_value())
+		auto meshBounding = mMesh->GetCollisionBounding();
+		if (meshBounding.has_value())
 		{
 			switch (mMesh->GetCollisionType())
 			{
 			case CollisionType::AABB:
 			{
-				const BoundingBox& aabb = std::any_cast<BoundingBox>(mMesh->GetCollisionBounding());
-				BoundingBox out;
-				aabb.Transform(out, XMLoadFloat4x4(&mWorld));
-				mCollisionBounding = std::move(out);
+				const BoundingBox& aabb = std::any_cast<BoundingBox>(meshBounding);
+				BoundingBox outAABB;
+				aabb.Transform(outAABB, XMLoadFloat4x4(&mWorld));
+				mCollisionBounding = std::move(outAABB);
 				break;
 			}
 			case CollisionType::OBB:
 			{
-				const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(mMesh->GetCollisionBounding());
-				BoundingOrientedBox out;
-				obb.Transform(out, XMLoadFloat4x4(&mWorld));
-				mCollisionBounding = std::move(out);
+				const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(meshBounding);
+				BoundingOrientedBox outOBB;
+				obb.Transform(outOBB, XMLoadFloat4x4(&mWorld));
+				mCollisionBounding = std::move(outOBB);
 				break;
 			}
 			case CollisionType::Sphere:
 			{
-				const BoundingSphere& sphere = std::any_cast<BoundingSphere>(mMesh->GetCollisionBounding());
-				BoundingSphere out;
-				sphere.Transform(out, XMLoadFloat4x4(&mWorld));
-				mCollisionBounding = std::move(out);
+				const BoundingSphere& sphere = std::any_cast<BoundingSphere>(meshBounding);
+				BoundingSphere outSphere;
+				sphere.Transform(outSphere, XMLoadFloat4x4(&mWorld));
+				mCollisionBounding = std::move(outSphere);
 				break;
 			}
 			}
@@ -47,59 +54,9 @@ void GameObject::WorldUpdate()
 	}
 }
 
-void GameObject::Tick(float deltaTime)
+void GameObject::Collide(GameObject* other)
 {
-	__super::Tick(deltaTime);
 
-	if (mIsPhysics)
-	{
-		if (mMass < FLT_EPSILON)
-		{
-#if defined(DEBUG) || defined(_DEBUG)
-			std::cout << ToString() << " : Mass 0" << std::endl;
-#endif
-			return;
-		}
-
-		// 중력 적용
-		mVelocity.y += GA * deltaTime;
-
-		// 가속도 적용
-		mVelocity = mVelocity + mAcceleration * deltaTime;
-		
-		// 위치 적용
-		Move(mVelocity * deltaTime);
-
-		if (mPosition.y < DEATH_Z)
-			Destroy();
-	}
-}
-
-void GameObject::Collide(std::shared_ptr<GameObject> other)
-{
-	/*
-	XMVECTOR myVel = XMLoadFloat3(&mVelocity);
-	XMVECTOR otherVel = XMLoadFloat3(&other->GetVelocity());
-
-	// 상대속도를 계산
-	XMVECTOR relativeVel = otherVel - myVel;
-
-	float velAlongNormal = XMVector3Dot(relativeVel, collisonNormal);
-	if (velAlongNormal > 0)
-		return;
-
-	// 직관적인 결과를 위해 최저 반발을 이용한다.
-	float e = std::min<float>(mCof, other->GetCof());
-
-	// Impulse Scalar를 계산한다.
-	float j = -(1 + e) * velAlongNormal;
-	j /= mInvMass + other->GetInvMass();
-
-	// 충격량만큼 힘을 준다.
-	XMVECTOR impulse = j * collisonNormal;
-	AddImpulse(-impulse);
-	other->AddImpulse(impulse);
-	*/
 }
 
 std::optional<XMMATRIX> GameObject::GetBoundingWorld() const
@@ -107,78 +64,74 @@ std::optional<XMMATRIX> GameObject::GetBoundingWorld() const
 	if (!mCollisionBounding.has_value())
 		return {};
 
-	if (mMesh)
+	switch (GetMeshCollisionType())
 	{
-		switch (mMesh->GetCollisionType())
-		{
-		case CollisionType::AABB:
-		{
-			const BoundingBox& aabb = std::any_cast<BoundingBox>(mCollisionBounding);
-			XMMATRIX translation = XMMatrixTranslation(aabb.Center.x, aabb.Center.y, aabb.Center.z);
-			XMMATRIX scailing = XMMatrixScaling(aabb.Extents.x, aabb.Extents.y, aabb.Extents.z);
-			XMMATRIX world = XMMatrixMultiply(scailing, translation);
-			return world;
-		}
-		case CollisionType::OBB:
-		{
-			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(mCollisionBounding);
-			XMMATRIX translation = XMMatrixTranslation(obb.Center.x, obb.Center.y, obb.Center.z);
-			XMMATRIX rotation = XMMatrixRotationQuaternion(XMLoadFloat4(&obb.Orientation));
-			XMMATRIX scailing = XMMatrixScaling(obb.Extents.x, obb.Extents.y, obb.Extents.z);
-			XMMATRIX world = XMMatrixMultiply(scailing, XMMatrixMultiply(rotation, translation));
-			return world;
-		}
-		case CollisionType::Sphere:
-		{
-			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(mCollisionBounding);
-			XMMATRIX translation = XMMatrixTranslation(sphere.Center.x, sphere.Center.y, sphere.Center.z);
-			XMMATRIX scailing = XMMatrixScaling(sphere.Radius, sphere.Radius, sphere.Radius);
-			XMMATRIX world = XMMatrixMultiply(scailing, translation);
-			return world;
-		}
-		}
+	case CollisionType::AABB:
+	{
+		const BoundingBox& aabb = std::any_cast<BoundingBox>(mCollisionBounding);
+		XMMATRIX translation = XMMatrixTranslation(aabb.Center.x, aabb.Center.y, aabb.Center.z);
+		XMMATRIX scailing = XMMatrixScaling(aabb.Extents.x, aabb.Extents.y, aabb.Extents.z);
+		XMMATRIX world = XMMatrixMultiply(scailing, translation);
+		return world;
+	}
+	case CollisionType::OBB:
+	{
+		const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(mCollisionBounding);
+		XMMATRIX translation = XMMatrixTranslation(obb.Center.x, obb.Center.y, obb.Center.z);
+		XMMATRIX rotation = XMMatrixRotationQuaternion(XMLoadFloat4(&obb.Orientation));
+		XMMATRIX scailing = XMMatrixScaling(obb.Extents.x, obb.Extents.y, obb.Extents.z);
+		XMMATRIX world = XMMatrixMultiply(scailing, XMMatrixMultiply(rotation, translation));
+		return world;
+	}
+	case CollisionType::Sphere:
+	{
+		const BoundingSphere& sphere = std::any_cast<BoundingSphere>(mCollisionBounding);
+		XMMATRIX translation = XMMatrixTranslation(sphere.Center.x, sphere.Center.y, sphere.Center.z);
+		XMMATRIX scailing = XMMatrixScaling(sphere.Radius, sphere.Radius, sphere.Radius);
+		XMMATRIX world = XMMatrixMultiply(scailing, translation);
+		return world;
+	}
 	}
 
 	return {};
 }
 
-bool GameObject::IsInFrustum(DirectX::BoundingFrustum* camFrustum) const
+bool GameObject::IsInFrustum(DirectX::BoundingFrustum* frustum) const
 {
-	if (mMesh)
+	if (frustum == nullptr)
+		return true;
+
+	switch (GetMeshCollisionType())
 	{
-		switch (mMesh->GetCollisionType())
-		{
-		case CollisionType::AABB:
-		{
-			const BoundingBox& aabb = std::any_cast<BoundingBox>(mCollisionBounding);
-			if ((*camFrustum).Contains(aabb) != DirectX::DISJOINT)
-				return true;
-			break;
-		}
-		case CollisionType::OBB:
-		{
-			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(mCollisionBounding);
-			if ((*camFrustum).Contains(obb) != DirectX::DISJOINT)
-				return true;
-			break;
-		}
-		case CollisionType::Sphere:
-		{
-			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(mCollisionBounding);
-			if ((*camFrustum).Contains(sphere) != DirectX::DISJOINT)
-				return true;
-			break;
-		}
-		case CollisionType::Point:
-		{
-			XMFLOAT3 pos = GetPosition();
-			XMVECTOR vecPos = XMLoadFloat3(&pos);
-			if((*camFrustum).Contains(vecPos) != DirectX::DISJOINT)
-				return true;
-		}
-		default:
+	case CollisionType::AABB:
+	{
+		const BoundingBox& aabb = std::any_cast<BoundingBox>(mCollisionBounding);
+		if ((*frustum).Contains(aabb) != DirectX::DISJOINT)
 			return true;
-		}
+		break;
+	}
+	case CollisionType::OBB:
+	{
+		const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(mCollisionBounding);
+		if ((*frustum).Contains(obb) != DirectX::DISJOINT)
+			return true;
+		break;
+	}
+	case CollisionType::Sphere:
+	{
+		const BoundingSphere& sphere = std::any_cast<BoundingSphere>(mCollisionBounding);
+		if ((*frustum).Contains(sphere) != DirectX::DISJOINT)
+			return true;
+		break;
+	}
+	case CollisionType::Point:
+	{
+		XMFLOAT3 pos = GetPosition();
+		XMVECTOR vecPos = XMLoadFloat3(&pos);
+		if ((*frustum).Contains(vecPos) != DirectX::DISJOINT)
+			return true;
+		break;
+	}
 	}
 
 	return false;
@@ -197,36 +150,44 @@ void GameObject::SetCollisionEnabled(bool value)
 	}
 }
 
-
-bool GameObject::IsCollision(const std::shared_ptr<GameObject> other) const
+CollisionType GameObject::GetMeshCollisionType() const
 {
-	if (mCollisionType == CollisionType::None || other->GetCollisionType() == CollisionType::None)
+	if (mMesh)
+		return mMesh->GetCollisionType();
+	return CollisionType::None;
+}
+
+bool GameObject::IsCollision(GameObject* other) const
+{
+	CollisionType otherType = other->GetCollisionType();
+	if (mCollisionType == CollisionType::None || otherType == CollisionType::None)
 		return false;
 
-	switch (mCollisionType) 
+	auto otherBounding = other->GetCollisionBounding();
+	switch (mCollisionType)
 	{
 	case CollisionType::AABB:
 	{
 		const BoundingBox& aabb = std::any_cast<BoundingBox>(mCollisionBounding);
-		switch (other->GetCollisionType())
+		switch (otherType)
 		{
 		case CollisionType::AABB:
 		{
-			const BoundingBox& otherAabb = std::any_cast<BoundingBox>(other->GetCollisionBounding());
+			const BoundingBox& otherAabb = std::any_cast<BoundingBox>(otherBounding);
 			if (aabb.Contains(otherAabb) != ContainmentType::DISJOINT)
 				return true;
 			break;
 		}
 		case CollisionType::OBB:
 		{
-			const BoundingOrientedBox& otherObb = std::any_cast<BoundingOrientedBox>(other->GetCollisionBounding());
+			const BoundingOrientedBox& otherObb = std::any_cast<BoundingOrientedBox>(otherBounding);
 			if (aabb.Contains(otherObb) != ContainmentType::DISJOINT)
 				return true;
 			break;
 		}
 		case CollisionType::Sphere:
 		{
-			const BoundingSphere& otherSphere = std::any_cast<BoundingSphere>(other->GetCollisionBounding());
+			const BoundingSphere& otherSphere = std::any_cast<BoundingSphere>(otherBounding);
 			if (aabb.Contains(otherSphere) != ContainmentType::DISJOINT)
 				return true;
 			break;
@@ -237,25 +198,25 @@ bool GameObject::IsCollision(const std::shared_ptr<GameObject> other) const
 	case CollisionType::OBB:
 	{
 		const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(mCollisionBounding);
-		switch (other->GetCollisionType())
+		switch (otherType)
 		{
 		case CollisionType::AABB:
 		{
-			const BoundingBox& otherAabb = std::any_cast<BoundingBox>(other->GetCollisionBounding());
+			const BoundingBox& otherAabb = std::any_cast<BoundingBox>(otherBounding);
 			if (obb.Contains(otherAabb) != ContainmentType::DISJOINT)
 				return true;
 			break;
 		}
 		case CollisionType::OBB:
 		{
-			const BoundingOrientedBox& otherObb = std::any_cast<BoundingOrientedBox>(other->GetCollisionBounding());
+			const BoundingOrientedBox& otherObb = std::any_cast<BoundingOrientedBox>(otherBounding);
 			if (obb.Contains(otherObb) != ContainmentType::DISJOINT)
 				return true;
 			break;
 		}
 		case CollisionType::Sphere:
 		{
-			const BoundingSphere& otherSphere = std::any_cast<BoundingSphere>(other->GetCollisionBounding());
+			const BoundingSphere& otherSphere = std::any_cast<BoundingSphere>(otherBounding);
 			if (obb.Contains(otherSphere) != ContainmentType::DISJOINT)
 				return true;
 			break;
@@ -266,25 +227,25 @@ bool GameObject::IsCollision(const std::shared_ptr<GameObject> other) const
 	case CollisionType::Sphere:
 	{
 		const BoundingSphere& sphere = std::any_cast<BoundingSphere>(mCollisionBounding);
-		switch (other->GetCollisionType())
+		switch (otherType)
 		{
 		case CollisionType::AABB:
 		{
-			const BoundingBox& otherAabb = std::any_cast<BoundingBox>(other->GetCollisionBounding());
+			const BoundingBox& otherAabb = std::any_cast<BoundingBox>(otherBounding);
 			if (sphere.Contains(otherAabb) != ContainmentType::DISJOINT)
 				return true;
 			break;
 		}
 		case CollisionType::OBB:
 		{
-			const BoundingOrientedBox& otherObb = std::any_cast<BoundingOrientedBox>(other->GetCollisionBounding());
+			const BoundingOrientedBox& otherObb = std::any_cast<BoundingOrientedBox>(otherBounding);
 			if (sphere.Contains(otherObb) != ContainmentType::DISJOINT)
 				return true;
 			break;
 		}
 		case CollisionType::Sphere:
 		{
-			const BoundingSphere& otherSphere = std::any_cast<BoundingSphere>(other->GetCollisionBounding());
+			const BoundingSphere& otherSphere = std::any_cast<BoundingSphere>(otherBounding);
 			if (sphere.Contains(otherSphere) != ContainmentType::DISJOINT)
 				return true;
 			break;
@@ -297,29 +258,19 @@ bool GameObject::IsCollision(const std::shared_ptr<GameObject> other) const
 	return false;
 }
 
-void GameObject::AddImpulse(DirectX::XMVECTOR impulse)
+void GameObject::Render(ID3D12GraphicsCommandList* commandList, BoundingFrustum* frustum) const
 {
-	XMFLOAT3 xmf3Impulse;
-	XMStoreFloat3(&xmf3Impulse, impulse);
-	AddImpulse(xmf3Impulse);
-}
-
-void GameObject::AddImpulse(DirectX::XMFLOAT3 impulse)
-{
-	AddImpulse(impulse.x, impulse.y, impulse.z);
-}
-
-void GameObject::AddImpulse(float impulseX, float impulseY, float impulseZ)
-{
-	if (mMass < FLT_EPSILON || !mIsPhysics)
+	if (!mIsVisible || !mMesh)
 		return;
 
-	mAcceleration.x = impulseX * mInvMass;
-	mAcceleration.y = impulseY * mInvMass;
-	mAcceleration.z = impulseZ * mInvMass;
+	if (!IsInFrustum(frustum))
+		return;
+
+	mMesh->Render(commandList);
 }
 
-void GameObject::Render(ID3D12GraphicsCommandList* commandList)
+void GameObject::SetConstantBuffer(ID3D12GraphicsCommandList* cmdList, D3D12_GPU_VIRTUAL_ADDRESS startAddress) const
 {
-	mMesh->Render(commandList);
+	D3D12_GPU_VIRTUAL_ADDRESS cbAddress = startAddress + mCBIndex * ConstantsSize::objectCBByteSize;
+	cmdList->SetGraphicsRootConstantBufferView((UINT)RpCommon::Object, cbAddress);
 }

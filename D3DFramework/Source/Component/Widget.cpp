@@ -1,14 +1,15 @@
 #include "pch.h"
 #include "Widget.h"
 #include "Mesh.h"
-#include "Structures.h"
+#include "Structure.h"
+#include "Global.h"
 
 using namespace std::literals;
 using namespace DirectX;
 
-Widget::Widget(std::string&& name, ID3D12Device* device, ID3D12GraphicsCommandList* commandList) : Component(std::move(name)) 
+Widget::Widget(std::string&& name, ID3D12Device* device, ID3D12GraphicsCommandList* commandList) : Component(std::move(name))
 {
-	mWidgetMesh = std::make_unique<Mesh>(GetName() + "Mesh"s + std::to_string(GetUID()));
+	mMesh = std::make_unique<Mesh>(GetName() + "Mesh"s + std::to_string(GetUID()));
 
 	std::vector<std::uint16_t> indices;
 	indices.emplace_back(0);
@@ -19,8 +20,7 @@ Widget::Widget(std::string&& name, ID3D12Device* device, ID3D12GraphicsCommandLi
 	indices.emplace_back(3);
 	indices.emplace_back(1);
 
-	mWidgetMesh->BuildIndices(device, commandList, indices.data(), (UINT)indices.size(), (UINT)sizeof(std::uint16_t));
-	mMesh = mWidgetMesh.get();
+	mMesh->BuildIndices(device, commandList, indices.data(), (UINT)indices.size(), (UINT)sizeof(std::uint16_t));
 }
 
 Widget::~Widget() { }
@@ -43,7 +43,16 @@ void Widget::SetAnchor(float x, float y)
 	mAnchorY = y;
 }
 
-void Widget::Render(ID3D12GraphicsCommandList* commandList)
+void Widget::Render(ID3D12GraphicsCommandList* commandList, DirectX::BoundingFrustum* frustum) const
 {
-	mMesh->Render(commandList);
+	if (mIsVisible)
+	{
+		mMesh->Render(commandList);
+	}
+}
+
+void Widget::SetConstantBuffer(ID3D12GraphicsCommandList* cmdList, D3D12_GPU_VIRTUAL_ADDRESS startAddress) const
+{
+	D3D12_GPU_VIRTUAL_ADDRESS cbAddress = startAddress + mCBIndex * ConstantsSize::objectCBByteSize;
+	cmdList->SetGraphicsRootConstantBufferView((UINT)RpCommon::Object, cbAddress);
 }

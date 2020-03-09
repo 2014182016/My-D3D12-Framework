@@ -10,15 +10,6 @@
 class D3DApp : public WinApp
 {
 public:
-	struct RootParameterInfo
-	{
-		RootParameterInfo(UINT shaderRegister, UINT registerSpace)
-			: mShaderRegister(shaderRegister), mRegisterSpace(registerSpace) { }
-		UINT mShaderRegister;
-		UINT mRegisterSpace;
-	};
-
-public:
 	D3DApp(HINSTANCE hInstance, int screenWidth, int screenHeight, std::wstring applicationName);
 	D3DApp(const D3DApp& rhs) = delete;
 	D3DApp& operator=(const D3DApp& rhs) = delete;
@@ -109,27 +100,13 @@ protected:
 
 	D3D12_VIEWPORT mScreenViewport;
 	D3D12_RECT mScissorRect;
-
-	UINT objCBByteSize = 0;
-	UINT passCBByteSize = 0;
-	UINT particleCBByteSize = 0;
-
-	UINT mShadowMapHeapIndex = 0;
-	UINT mDeferredBufferHeapIndex = 0;
-	UINT mLightingPassHeapIndex = 0;
-	UINT mSsaoMapHeapIndex = 0;
-	UINT mParticleHeapIndex = 0;
-
 	UINT m4xMsaaQuality = 0;
-	UINT mRtvDescriptorSize = 0;
-	UINT mDsvDescriptorSize = 0;
-	UINT mCbvSrvUavDescriptorSize = 0;
 
 	DirectX::XMFLOAT4 mBackBufferClearColor = (DirectX::XMFLOAT4)DirectX::Colors::LightSteelBlue;
 	const std::array<DirectX::XMFLOAT4, DEFERRED_BUFFER_COUNT> mDeferredBufferClearColors =
 	{
 		DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f), // Diffuse
-		DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f), // Specular Roughness
+		DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f), // Specular Roughness
 		DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f), // Position
 		DirectX::XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f), // Normal
 		DirectX::XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f), // Normal(Normal Map x)

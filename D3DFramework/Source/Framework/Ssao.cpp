@@ -5,8 +5,9 @@
 #include "pch.h"
 #include "Ssao.h"
 #include "D3DUtil.h"
-#include "Enums.h"
+#include "Enumeration.h"
 #include "Random.h"
+#include "Global.h"
 #include <DirectXPackedVector.h>
 
 using namespace DirectX;
@@ -53,23 +54,21 @@ void Ssao::BuildDescriptors(ID3D12Device* device,
 	CD3DX12_GPU_DESCRIPTOR_HANDLE hNormalGpuSrv,
 	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
 	CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
-	UINT cbvSrvUavDescriptorSize,
-	UINT rtvDescriptorSize)
+	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv)
 {
 	// Normal Map과 Depth Map은 2개가 연속해서 만들어져있다.
 	mhNormalMapGpuSrv = hNormalGpuSrv; 
 
 	mhAmbientMap0CpuSrv = hCpuSrv;
-	mhAmbientMap1CpuSrv = hCpuSrv.Offset(1, cbvSrvUavDescriptorSize);
-	mhRandomVectorMapCpuSrv = hCpuSrv.Offset(1, cbvSrvUavDescriptorSize);
+	mhAmbientMap1CpuSrv = hCpuSrv.Offset(1, DescriptorSize::cbvSrvUavDescriptorSize);
+	mhRandomVectorMapCpuSrv = hCpuSrv.Offset(1, DescriptorSize::cbvSrvUavDescriptorSize);
 
 	mhAmbientMap0GpuSrv = hGpuSrv;
-	mhAmbientMap1GpuSrv = hGpuSrv.Offset(1, cbvSrvUavDescriptorSize);
-	mhRandomVectorMapGpuSrv = hGpuSrv.Offset(1, cbvSrvUavDescriptorSize);
+	mhAmbientMap1GpuSrv = hGpuSrv.Offset(1, DescriptorSize::cbvSrvUavDescriptorSize);
+	mhRandomVectorMapGpuSrv = hGpuSrv.Offset(1, DescriptorSize::cbvSrvUavDescriptorSize);
 
 	mhAmbientMap0CpuRtv = hCpuRtv;
-	mhAmbientMap1CpuRtv = hCpuRtv.Offset(1, rtvDescriptorSize);
+	mhAmbientMap1CpuRtv = hCpuRtv.Offset(1, DescriptorSize::rtvDescriptorSize);
 
 	RebuildDescriptors(device);
 }

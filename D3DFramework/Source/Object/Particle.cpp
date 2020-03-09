@@ -1,9 +1,10 @@
 #include "pch.h"
 #include "Particle.h"
-#include "Structures.h"
+#include "Structure.h"
 #include "Random.h"
 #include "D3DUtil.h"
 #include "Material.h"
+#include "Global.h"
 
 using namespace std::literals;
 using namespace DirectX;
@@ -32,12 +33,11 @@ Particle::~Particle()
 #endif
 }
 
-void Particle::CreateBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList,
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, UINT cbvSrvUavDescriptorSize)
+void Particle::CreateBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv)
 {
 	CD3DX12_CPU_DESCRIPTOR_HANDLE bufferCpuSrv = hCpuSrv;
-	CD3DX12_CPU_DESCRIPTOR_HANDLE bufferCpuUav = hCpuSrv.Offset(1, cbvSrvUavDescriptorSize);
-	CD3DX12_CPU_DESCRIPTOR_HANDLE counterCpuUav = hCpuSrv.Offset(1, cbvSrvUavDescriptorSize);
+	CD3DX12_CPU_DESCRIPTOR_HANDLE bufferCpuUav = hCpuSrv.Offset(1, DescriptorSize::cbvSrvUavDescriptorSize);
+	CD3DX12_CPU_DESCRIPTOR_HANDLE counterCpuUav = hCpuSrv.Offset(1, DescriptorSize::cbvSrvUavDescriptorSize);
 
 	const UINT particleByteSize = mMaxParticleNum * sizeof(ParticleData);
 	const UINT counterByteSize = 2 * sizeof(std::uint32_t); 
@@ -160,21 +160,27 @@ void Particle::Tick(float deltaTime)
 #endif
 }
 
-void Particle::Render(ID3D12GraphicsCommandList* commandList)
+void Particle::Render(ID3D12GraphicsCommandList* cmdList, DirectX::BoundingFrustum* frustum) const
 {
 	if (!GetIsVisible() || mCurrentParticleNum <= 0)
 		return;
 
-	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mBuffer.Get(),
+	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mBuffer.Get(),
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
 
-	commandList->IASetVertexBuffers(0, 0, nullptr);
-	commandList->IASetIndexBuffer(nullptr);
-	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_POINTLIST);
-	commandList->DrawInstanced(mMaxParticleNum, 1, 0, 0);
+	cmdList->IASetVertexBuffers(0, 0, nullptr);
+	cmdList->IASetIndexBuffer(nullptr);
+	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_POINTLIST);
+	cmdList->DrawInstanced(mMaxParticleNum, 1, 0, 0);
 
-	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mBuffer.Get(),
+	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mBuffer.Get(),
 		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+}
+
+void Particle::SetConstantBuffer(ID3D12GraphicsCommandList* cmdList, D3D12_GPU_VIRTUAL_ADDRESS startAddress) const
+{
+	D3D12_GPU_VIRTUAL_ADDRESS cbAddress = startAddress + mCBIndex * ConstantsSize::particleCBByteSize;
+	cmdList->SetGraphicsRootConstantBufferView((UINT)RpParticleCompute::ParticleCB, cbAddress);
 }
 
 void Particle::SetBufferSrv(ID3D12GraphicsCommandList* cmdList)

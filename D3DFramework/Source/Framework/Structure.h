@@ -1,9 +1,9 @@
 
-#ifndef STRUCTURES_H
-#define STRUCTURES_H
+#ifndef STRUCTURE_H
+#define STRUCTURE_H
 
 #include "pch.h"
-#include "Enums.h"
+#include "Enumeration.h"
 
 struct WaveHeaderType
 {
@@ -217,4 +217,4 @@ struct LineVertex
 	DirectX::XMFLOAT4 mColor;
 };
 
-#endif // STRUCTURES_H
+#endif // STRUCTURE_H

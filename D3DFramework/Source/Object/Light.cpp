@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "Light.h"
-#include "Structures.h"
-#include "Interfaces.h"
+#include "Structure.h"
+#include "Interface.h"
 
 using namespace DirectX;
 

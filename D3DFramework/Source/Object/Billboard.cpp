@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "Billboard.h"
 #include "Mesh.h"
-#include "Structures.h"
+#include "Structure.h"
 
 using namespace DirectX;
 using namespace std::literals;

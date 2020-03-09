@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "Mesh.h"
 #include "D3DUtil.h"
-#include "Enums.h"
+#include "Enumeration.h"
 
 using namespace DirectX;
 
