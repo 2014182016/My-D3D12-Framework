@@ -813,6 +813,67 @@ void D3DApp::CreateParticleComputeRootSignature()
 		IID_PPV_ARGS(&mRootSignatures["ParticleCompute"])));
 }
 
+
+void D3DApp::CreateTerrainRootSignature(UINT textureNum)
+{
+	// 일반적으로 셰이더 프로그램은 특정 자원들(상수 버퍼, 텍스처, 표본추출기 등)이
+	// 입력된다고 기대한다. 루트 서명은 셰이더 프로그램이 기대하는 자원들을 정의한다.
+
+	CD3DX12_DESCRIPTOR_RANGE texTable;
+	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, textureNum, 0, 0);
+
+	std::array<CD3DX12_ROOT_PARAMETER, (int)RpTerrain::Count> slotRootParameter;
+
+	// 퍼포먼스 TIP: 가장 자주 사용하는 것을 앞에 놓는다.
+	slotRootParameter[(int)RpTerrain::TerrainCB].InitAsConstantBufferView(0);
+	slotRootParameter[(int)RpTerrain::Pass].InitAsConstantBufferView(1);
+	slotRootParameter[(int)RpTerrain::Texture].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_ALL);
+	slotRootParameter[(int)RpTerrain::Light].InitAsShaderResourceView(0, 1);
+	slotRootParameter[(int)RpTerrain::Material].InitAsShaderResourceView(1, 1);
+
+	// 선형 필터링, 순환 좌표 지정 모드
+	const CD3DX12_STATIC_SAMPLER_DESC linearWrap(
+		0, // shaderRegister
+		D3D12_FILTER_MIN_MAG_MIP_LINEAR, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP); // addressW
+
+	// 비등방 필터링, 순환 좌표 지정 모드
+	const CD3DX12_STATIC_SAMPLER_DESC anisotropicWrap(
+		1, // shaderRegister
+		D3D12_FILTER_ANISOTROPIC, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressW
+		0.0f,                             // mipLODBias
+		8);                               // maxAnisotropy
+
+	std::array<CD3DX12_STATIC_SAMPLER_DESC, 2> staticSamplers = { linearWrap, anisotropicWrap, };
+
+	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc((UINT)slotRootParameter.size(), slotRootParameter.data(),
+		(UINT)staticSamplers.size(), staticSamplers.data(),
+		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+	// Root Signature를 직렬화한 후 객체를 생성한다.
+	ComPtr<ID3DBlob> serializedRootSig = nullptr;
+	ComPtr<ID3DBlob> errorBlob = nullptr;
+	HRESULT hr = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+		serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
+
+	if (errorBlob != nullptr)
+	{
+		::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+	}
+	ThrowIfFailed(hr);
+
+	ThrowIfFailed(md3dDevice->CreateRootSignature(
+		0,
+		serializedRootSig->GetBufferPointer(),
+		serializedRootSig->GetBufferSize(),
+		IID_PPV_ARGS(&mRootSignatures["Terrain"])));
+}
+
 void D3DApp::CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum, UINT particleNum)
 {
 	D3D12_DESCRIPTOR_HEAP_DESC cbvSrvUavDescriptorHeap = {};
@@ -929,6 +990,11 @@ void D3DApp::CreateShadersAndInputLayout()
 	mShaders["SsaoBlurVS"] = D3DUtil::CompileShader(L"Shaders\\SsaoBlur.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["SsaoBlurPS"] = D3DUtil::CompileShader(L"Shaders\\SsaoBlur.hlsl", nullptr, "PS", "ps_5_1");
 
+	mShaders["TerrainVS"] = D3DUtil::CompileShader(L"Shaders\\Terrain.hlsl", nullptr, "VS", "vs_5_1");
+	mShaders["TerrainHS"] = D3DUtil::CompileShader(L"Shaders\\Terrain.hlsl", nullptr, "HS", "hs_5_1");
+	mShaders["TerrainDS"] = D3DUtil::CompileShader(L"Shaders\\Terrain.hlsl", nullptr, "DS", "ds_5_1");
+	mShaders["TerrainPS"] = D3DUtil::CompileShader(L"Shaders\\Terrain.hlsl", nullptr, "PS", "ps_5_1");
+
 	mDefaultLayout =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -955,6 +1021,12 @@ void D3DApp::CreateShadersAndInputLayout()
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	};
+
+	mTerrainLayout = 
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 	};
 }
 
@@ -1321,6 +1393,41 @@ void D3DApp::CreatePSOs()
 	lightingPassPsoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&lightingPassPsoDesc, IID_PPV_ARGS(&mPSOs["LightingPass"])));
 
+
+	// PSO for TerrainPass
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC terrainPsoDesc = forwardPsoDesc;
+	terrainPsoDesc.InputLayout = { mTerrainLayout.data(), (UINT)mTerrainLayout.size() };
+	terrainPsoDesc.pRootSignature = mRootSignatures["Terrain"].Get();
+	terrainPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["TerrainVS"]->GetBufferPointer()),
+		mShaders["TerrainVS"]->GetBufferSize()
+	};
+	terrainPsoDesc.HS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["TerrainHS"]->GetBufferPointer()),
+		mShaders["TerrainHS"]->GetBufferSize()
+	};
+	terrainPsoDesc.DS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["TerrainDS"]->GetBufferPointer()),
+		mShaders["TerrainDS"]->GetBufferSize()
+	};
+	terrainPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["TerrainPS"]->GetBufferPointer()),
+		mShaders["TerrainPS"]->GetBufferSize()
+	};
+	terrainPsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
+	terrainPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_FRONT;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&terrainPsoDesc, IID_PPV_ARGS(&mPSOs["Terrain"])));
+
+
+	// PSO for TerrainWireframePass
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC terrainWireframePsoDesc = terrainPsoDesc;
+	terrainWireframePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
+	terrainWireframePsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&terrainWireframePsoDesc, IID_PPV_ARGS(&mPSOs["TerrainWireframe"])));
 }
 
 void D3DApp::SetGamma(float gamma)

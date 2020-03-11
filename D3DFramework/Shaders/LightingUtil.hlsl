@@ -4,7 +4,7 @@
 // Contains API for shader lighting.
 //***************************************************************************************
 
-#include "Globals.hlsl"
+#include "Global.hlsl"
 
 struct Light
 {
@@ -157,6 +157,26 @@ float4 ComputeLighting(StructuredBuffer<Light> lights, Material mat, float3 pos,
 			break;
 		case SPOT_LIGHT:
 			result += ComputeSpotLight(lights[i], mat, pos, normal, toEye);
+			break;
+		}
+	}
+
+	return float4(result, 0.0f);
+}
+
+float4 ComputeOnlyDirectionalLight(StructuredBuffer<Light> lights, Material mat, float3 normal, float3 toEye)
+{
+	float3 result = 0.0f;
+
+	for (uint i = 0; i < LIGHT_NUM; ++i)
+	{
+		if (lights[i].mEnabled == 0)
+			continue;
+
+		switch (lights[i].mType)
+		{
+		case DIRECTIONAL_LIGHT:
+			result += ComputeDirectionalLight(lights[i], mat, normal, toEye);
 			break;
 		}
 	}

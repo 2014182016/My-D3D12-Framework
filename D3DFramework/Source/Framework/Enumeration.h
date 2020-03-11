@@ -54,6 +54,7 @@ enum class RenderLayer : int
 	Billborad,
 	Transparent,
 	Sky,
+	Terrain,
 	Count,
 };
 
@@ -118,6 +119,16 @@ enum class RpParticleCompute : int
 	ParticleCB = 0,
 	Counter,
 	Uav,
+	Count
+};
+
+enum class RpTerrain : int
+{
+	TerrainCB = 0,
+	Pass,
+	Texture,
+	Light,
+	Material,
 	Count
 };
 

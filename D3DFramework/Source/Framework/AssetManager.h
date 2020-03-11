@@ -4,7 +4,7 @@
 #include "Enumeration.h"
 
 #define DISABLED -1
-#define TEX_NUM 10
+#define TEX_NUM 12
 
 class AssetManager
 {
@@ -90,6 +90,8 @@ private:
 		{"Tree01S", L"Textures/Tree01S.dds"},
 		{"Clouds", L"Textures/Clouds.dds"},
 		{"Radial_Gradient", L"Textures/Radial_Gradient.dds"},
+		{"HeightMap", L"Textures/HeightMap.dds"},
+		{"Grass", L"Textures/Grass.dds"},
 	};
 
 	// h3d 모델의 이름과 함께 충돌 타입을 설정한다.

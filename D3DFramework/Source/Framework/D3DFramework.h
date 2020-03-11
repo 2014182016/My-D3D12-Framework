@@ -41,6 +41,7 @@ private:
 	void CreateLights();
 	void CreateWidgets(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList);
 	void CreateParticles();
+	void CreateTerrain();
 	void CreateFrameResources(ID3D12Device* device);
 	void CreateThreads();
 
@@ -51,8 +52,8 @@ private:
 	void UpdateWidgetBuffer(float deltaTime);
 	void UpdateParticleBuffer(float deltaTime);
 	void UpdateSsaoBuffer(float deltaTime);
+	void UpdateTerrainBuffer(float deltaTime);
 	void UpdateObjectBufferPool();
-	void DestroyGameObjects();
 
 	void ParticleUpdate(ID3D12GraphicsCommandList* cmdList);
 	void WireframePass(ID3D12GraphicsCommandList* cmdList);
@@ -83,12 +84,13 @@ private:
 	std::list<std::shared_ptr<class Light>> mLights;
 	std::list<std::shared_ptr<class Widget>> mWidgets;
 	std::list<std::shared_ptr<class Particle>> mParticles;
+	std::shared_ptr<class Terrain> mTerrain;
 
 	std::unique_ptr<struct PassConstants> mMainPassCB;
 	std::array<std::unique_ptr<struct PassConstants>, LIGHT_NUM> mShadowPassCB;
 	std::unique_ptr<class Camera> mCamera;
 	std::unique_ptr<class Octree> mOctreeRoot;
 	std::unique_ptr<class Ssao> mSsao;
-
+	
 	DirectX::BoundingFrustum mWorldCamFrustum;
 };

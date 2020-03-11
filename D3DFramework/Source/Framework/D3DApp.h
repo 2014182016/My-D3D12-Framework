@@ -5,7 +5,8 @@
 #define DEFERRED_BUFFER_COUNT 5
 #define LIGHT_NUM 1
 
-// #define SSAO
+//#define SSAO
+//#define MULTITHREAD_RENDERING
 
 class D3DApp : public WinApp
 {
@@ -43,6 +44,7 @@ protected:
 	void CreateSsaoRootSignature();
 	void CreateParticleGraphicsRootSignature(UINT textureNum);
 	void CreateParticleComputeRootSignature();
+	void CreateTerrainRootSignature(UINT textureNum);
 	void CreateShadersAndInputLayout();
 	void CreatePSOs();
 
@@ -97,6 +99,7 @@ protected:
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mBillboardLayout;
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mWidgetLayout;
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mLineLayout;
+	std::vector<D3D12_INPUT_ELEMENT_DESC> mTerrainLayout;
 
 	D3D12_VIEWPORT mScreenViewport;
 	D3D12_RECT mScissorRect;

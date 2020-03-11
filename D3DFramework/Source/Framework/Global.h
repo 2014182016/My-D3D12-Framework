@@ -10,6 +10,7 @@ public:
 	static inline UINT objectCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
 	static inline UINT passCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(PassConstants));
 	static inline UINT particleCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(ParticleConstants));
+	static inline UINT terrainCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(TerrainConstants));
 };
 
 class DescriptorSize

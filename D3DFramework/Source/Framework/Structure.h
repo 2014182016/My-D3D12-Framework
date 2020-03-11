@@ -126,6 +126,19 @@ struct ParticleConstants
 	std::uint32_t mTextureIndex;
 };
 
+struct TerrainConstants
+{
+	DirectX::XMFLOAT4X4 mTerrainWorld;
+	float mMaxLOD;
+	float mMinLOD;
+	float mMinDistance;
+	float mMaxDistance;
+	float mHeightScale;
+	float mTexScale;
+	std::uint32_t mMaterialIndex;
+	std::uint32_t mHegihtMapIndex;
+};
+
 struct MaterialData
 {
 	// 텍스쳐 매핑에 사용
@@ -215,6 +228,14 @@ struct LineVertex
 	LineVertex(DirectX::XMFLOAT3 pos, DirectX::XMFLOAT4 color) : mPosition(pos), mColor(color) { }
 	DirectX::XMFLOAT3 mPosition;
 	DirectX::XMFLOAT4 mColor;
+};
+
+struct TerrainVertex
+{
+	TerrainVertex() = default;
+	TerrainVertex(DirectX::XMFLOAT3 pos, DirectX::XMFLOAT2 tex) : mPos(pos), mTex(tex) { }
+	DirectX::XMFLOAT3 mPos;
+	DirectX::XMFLOAT2 mTex;
 };
 
 #endif // STRUCTURE_H

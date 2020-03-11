@@ -1,4 +1,4 @@
-#include "Globals.hlsl"
+#include "Global.hlsl"
 #include "ParticleRS.hlsl"
 
 const static float2 texC[4] =

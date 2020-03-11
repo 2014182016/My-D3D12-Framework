@@ -4,18 +4,6 @@
 
 #include "LightingUtil.hlsl"
 
-struct MaterialData
-{
-	float4x4 mMatTransform;
-	float4   mDiffuseAlbedo;
-	float3   mSpecular;
-	float    mRoughness;
-	uint     mDiffuseMapIndex;
-	uint     mNormalMapIndex;
-	uint     mMatPad1;
-	uint     mMatPad2;
-};
-
 Texture2D gTextureMaps[TEX_NUM] : register(t0, space0);
 Texture2D gShadowMaps[LIGHT_NUM]: register(t0, space1);
 

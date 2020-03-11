@@ -4,37 +4,47 @@
 FrameResource::FrameResource(ID3D12Device* device, bool isMultiThread,
 	UINT passCount, UINT objectCount, UINT lightCount, UINT materialCount, UINT widgetCount, UINT particleCount)
 {
-	if (processorCoreNum == 0 && isMultiThread)
+	if (!isInitailize)
 	{
 		SYSTEM_INFO info;
 		GetSystemInfo(&info);
-		processorCoreNum = info.dwNumberOfProcessors;
+		processorCoreNum = isMultiThread ? info.dwNumberOfProcessors : 1;
+
+		framePhase = isMultiThread ? 2 : 1;
+
+		isInitailize = true;
 	}
-	else if (isMultiThread == false)
+
+	if (isMultiThread)
 	{
-		processorCoreNum = 1;
+		mWorkerCmdAllocs.reserve(processorCoreNum); mWorkerCmdAllocs.resize(processorCoreNum);
+		mWorekrCmdLists.reserve(processorCoreNum); mWorekrCmdLists.resize(processorCoreNum);
+
+		for (UINT i = 0; i < processorCoreNum; ++i)
+		{
+			ThrowIfFailed(device->CreateCommandAllocator(
+				D3D12_COMMAND_LIST_TYPE_DIRECT,
+				IID_PPV_ARGS(mWorkerCmdAllocs[i].GetAddressOf())));
+
+			ThrowIfFailed(device->CreateCommandList(
+				0,
+				D3D12_COMMAND_LIST_TYPE_DIRECT,
+				mWorkerCmdAllocs[i].Get(),
+				nullptr,
+				IID_PPV_ARGS(mWorekrCmdLists[i].GetAddressOf())));
+
+			mWorekrCmdLists[i]->Close();
+		}
+
+		for (UINT i = 0; i < processorCoreNum; ++i)
+			mExecutableCmdLists.push_back(mWorekrCmdLists[i].Get());
+		mExecutableCmdLists.shrink_to_fit();
 	}
 
-	mWorkerCmdAllocs.reserve(processorCoreNum); mWorkerCmdAllocs.resize(processorCoreNum);
-	mWorekrCmdLists.reserve(processorCoreNum); mWorekrCmdLists.resize(processorCoreNum);
+	mFrameCmdAllocs.reserve(framePhase); mFrameCmdAllocs.resize(framePhase);
+	mFrameCmdLists.reserve(framePhase); mFrameCmdLists.resize(framePhase);
 
-	for (UINT i = 0; i < processorCoreNum; ++i)
-	{
-		ThrowIfFailed(device->CreateCommandAllocator(
-			D3D12_COMMAND_LIST_TYPE_DIRECT,
-			IID_PPV_ARGS(mWorkerCmdAllocs[i].GetAddressOf())));
-
-		ThrowIfFailed(device->CreateCommandList(
-			0,
-			D3D12_COMMAND_LIST_TYPE_DIRECT,
-			mWorkerCmdAllocs[i].Get(),
-			nullptr,
-			IID_PPV_ARGS(mWorekrCmdLists[i].GetAddressOf())));
-
-		mWorekrCmdLists[i]->Close();
-	}
-
-	for (int i = 0; i < FRAME_PHASE; ++i)
+	for (UINT i = 0; i < framePhase; ++i)
 	{
 		ThrowIfFailed(device->CreateCommandAllocator(
 			D3D12_COMMAND_LIST_TYPE_DIRECT,
@@ -50,10 +60,6 @@ FrameResource::FrameResource(ID3D12Device* device, bool isMultiThread,
 		mFrameCmdLists[i]->Close();
 	}
 
-	for (UINT i = 0; i < processorCoreNum; ++i)
-		mExecutableCmdLists.push_back(mWorekrCmdLists[i].Get());
-	mExecutableCmdLists.shrink_to_fit();
-
 	mPassPool = std::make_unique<BufferMemoryPool<PassConstants>>(device, passCount, true);
 	mObjectPool = std::make_unique<BufferMemoryPool<ObjectConstants>>(device, objectCount, true);
 	mLightBufferPool = std::make_unique<BufferMemoryPool<LightData>>(device, lightCount, false);
@@ -61,22 +67,15 @@ FrameResource::FrameResource(ID3D12Device* device, bool isMultiThread,
 	mSsaoPool = std::make_unique<BufferMemoryPool<SsaoConstants>>(device, 1, true);
 	mWidgetPool = std::make_unique<BufferMemoryPool<ObjectConstants>>(device, widgetCount, true);
 	mParticlePool = std::make_unique<BufferMemoryPool<ParticleConstants>>(device, particleCount, true);
+	mTerrainPool = std::make_unique<BufferMemoryPool<TerrainConstants>>(device, 1, true);
 }
 
 FrameResource::~FrameResource() 
 {
-	for (UINT i = 0; i < processorCoreNum; ++i)
-	{
-		mWorekrCmdLists[i] = nullptr;
-		mWorkerCmdAllocs[i] = nullptr;
-	}
-
-	for (UINT i = 0; i < FRAME_PHASE; ++i)
-	{
-		mFrameCmdLists[i] = nullptr;
-		mFrameCmdAllocs[i] = nullptr;
-	}
-
+	mWorekrCmdLists.clear();
+	mWorkerCmdAllocs.clear();
+	mFrameCmdLists.clear();
+	mFrameCmdAllocs.clear();
 	mExecutableCmdLists.clear();
 
 	mPassPool = nullptr;
@@ -86,6 +85,7 @@ FrameResource::~FrameResource()
 	mSsaoPool = nullptr;
 	mWidgetPool = nullptr;
 	mParticlePool = nullptr;
+	mTerrainPool = nullptr;
 
 	mWidgetVBs.clear();
 }

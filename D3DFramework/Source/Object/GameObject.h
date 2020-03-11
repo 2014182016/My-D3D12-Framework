@@ -32,9 +32,6 @@ public:
 	inline void SetCBIndex(UINT index) { mCBIndex = index; }
 	inline UINT GetCBIndex() const { return mCBIndex; }
 
-	inline RenderLayer GetRenderLayer() const { return mRenderLayer; }
-	inline void SetRenderLayer(RenderLayer layer) { mRenderLayer = layer; }
-
 	inline CollisionType GetCollisionType() const { return mCollisionType; }
 	void SetCollisionEnabled(bool value);
 	CollisionType GetMeshCollisionType() const;
@@ -50,7 +47,6 @@ protected:
 	class Material* mMaterial = nullptr;
 
 private:
-	RenderLayer mRenderLayer = RenderLayer::Opaque;
 	UINT mCBIndex = 0;
 	bool mIsVisible = true;
 };

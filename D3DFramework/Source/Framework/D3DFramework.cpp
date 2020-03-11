@@ -25,6 +25,9 @@
 #include "Particle.h"
 #include "Billboard.h"
 #include "SkySphere.h"
+#include "Terrain.h"
+
+#include <pix3.h>
 
 using namespace DirectX;
 using namespace std::literals;
@@ -120,6 +123,7 @@ void D3DFramework::InitFramework()
 	CreateLights();
 	CreateWidgets(md3dDevice.Get(), mMainCommandList.Get());
 	CreateParticles();
+	CreateTerrain();
 	CreateFrameResources(md3dDevice.Get());
 	CreateThreads();
 
@@ -131,6 +135,7 @@ void D3DFramework::InitFramework()
 	CreateSsaoRootSignature();
 	CreateParticleGraphicsRootSignature(textureNum);
 	CreateParticleComputeRootSignature();
+	CreateTerrainRootSignature(textureNum);
 	CreateDescriptorHeaps(textureNum, shadowMapNum, particleNum);
 	CreatePSOs();
 
@@ -234,6 +239,7 @@ void D3DFramework::Render()
 	}
 	else
 	{
+#ifdef MULTITHREAD_RENDERING
 		auto cmdListPre = mCurrentFrameResource->mFrameCmdLists[0].Get();
 		auto cmdListPost = mCurrentFrameResource->mFrameCmdLists[1].Get();
 
@@ -262,6 +268,27 @@ void D3DFramework::Render()
 		ThrowIfFailed(cmdListPost->Close());
 		ID3D12CommandList* commandListsPost[] = { cmdListPost };
 		mCommandQueue->ExecuteCommandLists(_countof(commandListsPost), commandListsPost);
+#else
+		auto cmdList = mCurrentFrameResource->mFrameCmdLists[0].Get();
+
+		Init(cmdList);
+
+		ShadowMapPass(cmdList);
+		GBufferPass(nullptr);
+
+		MidFrame(cmdList);
+#ifdef SSAO
+		SsaoPass(cmdList);
+#endif
+		LightingPass(cmdList);
+		ForwardPass(cmdList);
+		ParticleUpdate(cmdList);
+		Finish(cmdList);
+
+		ThrowIfFailed(cmdList->Close());
+		ID3D12CommandList* commandLists[] = { cmdList };
+		mCommandQueue->ExecuteCommandLists(_countof(commandLists), commandLists);
+#endif
 	}
 
 	// 전면 버퍼와 후면 버퍼를 바꾼다.
@@ -294,7 +321,6 @@ void D3DFramework::Tick(float deltaTime)
 
 	mWorldCamFrustum = mCamera->GetWorldCameraBounding();
 
-	DestroyGameObjects();
 	mOctreeRoot->Update(deltaTime);
 	UpdateObjectBuffer(deltaTime);
 	UpdateLightBuffer(deltaTime);
@@ -302,17 +328,11 @@ void D3DFramework::Tick(float deltaTime)
 	UpdateMainPassBuffer(deltaTime);
 	UpdateWidgetBuffer(deltaTime);
 	UpdateParticleBuffer(deltaTime);
+	UpdateTerrainBuffer(deltaTime);
 
 #ifdef SSAO
 	UpdateSsaoBuffer(deltaTime);
 #endif
-}
-
-
-void D3DFramework::DestroyGameObjects()
-{
-	mGameObjects.remove_if([](const std::shared_ptr<Object>& obj)->bool
-	{ return obj->GetIsDestroyesd(); });
 }
 
 
@@ -574,6 +594,28 @@ void D3DFramework::UpdateSsaoBuffer(float deltaTime)
 	currSsaoCB->CopyData(0, ssaoCB);
 }
 
+void D3DFramework::UpdateTerrainBuffer(float deltaTime)
+{
+	auto currTerrainCB = mCurrentFrameResource->mTerrainPool->GetBuffer();
+
+	if (mTerrain->IsUpdate())
+	{
+		TerrainConstants terrainConstants;
+		XMStoreFloat4x4(&terrainConstants.mTerrainWorld, XMMatrixTranspose(mTerrain->GetWorld()));
+		terrainConstants.mMinLOD = 32.0f;
+		terrainConstants.mMaxLOD = 64.0f;
+		terrainConstants.mMinDistance = 100.0f;
+		terrainConstants.mMaxDistance = 500.0f;
+		terrainConstants.mHeightScale = 50.0f;
+		terrainConstants.mTexScale = 10.0f;
+		terrainConstants.mMaterialIndex = mTerrain->GetMaterial()->GetMaterialIndex();
+		terrainConstants.mHegihtMapIndex = AssetManager::GetInstance()->FindTexture("HeightMap"s)->mTextureIndex;
+		currTerrainCB->CopyData(0, terrainConstants);
+
+		mTerrain->DecreaseNumFrames();
+	}
+}
+
 void D3DFramework::UpdateObjectBufferPool()
 {
 	UINT allObjectCount = (UINT)mGameObjects.size() + (UINT)mWidgets.size();
@@ -595,8 +637,7 @@ void D3DFramework::CreateObjects()
 	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Sky"s));
 	object->SetMesh(AssetManager::GetInstance()->FindMesh("SkySphere"s));
 	object->SetCollisionEnabled(false);
-	object->SetRenderLayer(RenderLayer::Sky);
-	mRenderableObjects[(int)object->GetRenderLayer()].push_back(object);
+	mRenderableObjects[(int)RenderLayer::Sky].push_back(object);
 	mGameObjects.push_back(object);
 
 	object = std::make_shared<GameObject>("Floor0"s);
@@ -604,8 +645,7 @@ void D3DFramework::CreateObjects()
 	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tile0"s));
 	object->SetMesh(AssetManager::GetInstance()->FindMesh("Cube_AABB"s));
 	object->SetCollisionEnabled(true);
-	object->SetRenderLayer(RenderLayer::Opaque);
-	mRenderableObjects[(int)object->GetRenderLayer()].push_back(object);
+	mRenderableObjects[(int)RenderLayer::Opaque].push_back(object);
 	mGameObjects.push_back(object);
 
 	for (int i = 0; i < 5; ++i)
@@ -615,8 +655,7 @@ void D3DFramework::CreateObjects()
 		object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Brick0"s));
 		object->SetMesh(AssetManager::GetInstance()->FindMesh("Cylinder"s));
 		object->SetCollisionEnabled(true);
-		object->SetRenderLayer(RenderLayer::Opaque);
-		mRenderableObjects[(int)object->GetRenderLayer()].push_back(object);
+		mRenderableObjects[(int)RenderLayer::Opaque].push_back(object);
 		mGameObjects.push_back(object);
 
 		object = std::make_shared<GameObject>("ColumnRight"s + std::to_string(i));
@@ -624,8 +663,7 @@ void D3DFramework::CreateObjects()
 		object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Brick0"s));
 		object->SetMesh(AssetManager::GetInstance()->FindMesh("Cylinder"s));
 		object->SetCollisionEnabled(true);
-		object->SetRenderLayer(RenderLayer::Opaque);
-		mRenderableObjects[(int)object->GetRenderLayer()].push_back(object);
+		mRenderableObjects[(int)RenderLayer::Opaque].push_back(object);
 		mGameObjects.push_back(object);
 
 		object = std::make_shared<GameObject>("SphereLeft"s + std::to_string(i));
@@ -633,8 +671,7 @@ void D3DFramework::CreateObjects()
 		object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Mirror0"s));
 		object->SetMesh(AssetManager::GetInstance()->FindMesh("Sphere"s));
 		object->SetCollisionEnabled(true);
-		object->SetRenderLayer(RenderLayer::Transparent);
-		mRenderableObjects[(int)object->GetRenderLayer()].push_back(object);
+		mRenderableObjects[(int)RenderLayer::Transparent].push_back(object);
 		mGameObjects.push_back(object);
 
 		object = std::make_shared<GameObject>("SphereRight"s + std::to_string(i));
@@ -642,12 +679,20 @@ void D3DFramework::CreateObjects()
 		object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Mirror0"s));
 		object->SetMesh(AssetManager::GetInstance()->FindMesh("Sphere"s));
 		object->SetCollisionEnabled(true);
-		object->SetRenderLayer(RenderLayer::Transparent);
-		mRenderableObjects[(int)object->GetRenderLayer()].push_back(object);
+		mRenderableObjects[(int)RenderLayer::Transparent].push_back(object);
 		mGameObjects.push_back(object);
 	}
+}
 
-	UpdateObjectBufferPool();
+void D3DFramework::CreateTerrain()
+{
+	mTerrain = std::make_shared<Terrain>("Terrian"s);
+	mTerrain->SetPosition(0.0f, -50.0f, 0.0f);
+	mTerrain->SetScale(10.0f, 10.0f, 10.0f);
+	mTerrain->BuildMesh(md3dDevice.Get(), mMainCommandList.Get(), 100.0f, 100.0f, 3, 3);
+	mTerrain->SetMaterial(AssetManager::GetInstance()->FindMaterial("HeightMap"s));
+	mTerrain->WorldUpdate();
+	mRenderableObjects[(int)RenderLayer::Terrain].push_back(mTerrain);
 }
 
 void D3DFramework::CreateLights()
@@ -756,7 +801,13 @@ void D3DFramework::CreateFrameResources(ID3D12Device* device)
 {
 	for (int i = 0; i < NUM_FRAME_RESOURCES; ++i)
 	{
-		mFrameResources[i] = std::make_unique<FrameResource>(device, true,
+		bool isMultithreadRendering;
+#ifdef MULTITHREAD_RENDERING
+		isMultithreadRendering = true;
+#else
+		isMultithreadRendering = false;
+#endif
+		mFrameResources[i] = std::make_unique<FrameResource>(device, isMultithreadRendering,
 			1 + LIGHT_NUM, (UINT)mGameObjects.size() * 2, LIGHT_NUM,
 			(UINT)AssetManager::GetInstance()->GetMaterials().size(), (UINT)mWidgets.size(), (UINT)mParticles.size());
 
@@ -901,8 +952,24 @@ void D3DFramework::WireframePass(ID3D12GraphicsCommandList* cmdList)
 	cmdList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
 
 	SetCommonState(cmdList);
+
+	PIXBeginEvent(cmdList, 0, "Wirefrmae Rendering");
+
 	cmdList->SetPipelineState(mPSOs["Wireframe"].Get());
 	RenderActualObjects(cmdList, &mWorldCamFrustum);
+
+	PIXEndEvent(cmdList);
+	PIXBeginEvent(cmdList, 0, "TerrainWirefrmae Rendering");
+
+	cmdList->SetGraphicsRootSignature(mRootSignatures["Terrain"].Get());
+	cmdList->SetPipelineState(mPSOs["TerrainWireframe"].Get());
+	cmdList->SetGraphicsRootConstantBufferView((int)RpTerrain::Pass, mCurrentFrameResource->GetPassVirtualAddress());
+	cmdList->SetGraphicsRootDescriptorTable((int)RpTerrain::Texture, GetGpuSrv(DescriptorIndex::textureHeapIndex));
+	cmdList->SetGraphicsRootShaderResourceView((int)RpTerrain::Light, mCurrentFrameResource->GetLightVirtualAddress());
+	cmdList->SetGraphicsRootShaderResourceView((int)RpTerrain::Material, mCurrentFrameResource->GetMaterialVirtualAddress());
+	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Terrain], mCurrentFrameResource->GetTerrainVirtualAddress());
+
+	PIXEndEvent(cmdList);
 
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
@@ -911,6 +978,9 @@ void D3DFramework::WireframePass(ID3D12GraphicsCommandList* cmdList)
 void D3DFramework::ShadowMapPass(ID3D12GraphicsCommandList* cmdList)
 {
 	SetCommonState(cmdList);
+
+	PIXBeginEvent(cmdList, 0, L"ShadowMap Rendering");
+
 	cmdList->SetPipelineState(mPSOs["ShadowMap"].Get());
 	UINT i = 0;
 	for (const auto& light : mLights)
@@ -921,6 +991,8 @@ void D3DFramework::ShadowMapPass(ID3D12GraphicsCommandList* cmdList)
 
 		light->RenderSceneToShadowMap(cmdList);
 	}
+
+	PIXEndEvent(cmdList);
 }
 
 void D3DFramework::GBufferPass(ID3D12GraphicsCommandList* cmdList)
@@ -941,14 +1013,20 @@ void D3DFramework::SsaoPass(ID3D12GraphicsCommandList* cmdList)
 	ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvSrvUavDescriptorHeap.Get() };
 	cmdList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
+	PIXBeginEvent(cmdList, 0, L"SSAO Rendering");
+
 	cmdList->SetGraphicsRootSignature(mRootSignatures["Ssao"].Get());
 	mSsao->ComputeSsao(cmdList, mPSOs["Ssao"].Get(), mCurrentFrameResource->GetSsaoVirtualAddress(), mCurrentFrameResource->GetPassVirtualAddress());
 	mSsao->BlurAmbientMap(cmdList, mPSOs["SsaoBlur"].Get(), 3);
+
+	PIXEndEvent(cmdList);
 }
 
 void D3DFramework::LightingPass(ID3D12GraphicsCommandList* cmdList)
 {
 	SetCommonState(cmdList);
+
+	PIXBeginEvent(cmdList, 0, L"LightingPass Rendering");
 
 	cmdList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, nullptr);
 	cmdList->SetPipelineState(mPSOs["LightingPass"].Get());
@@ -957,31 +1035,57 @@ void D3DFramework::LightingPass(ID3D12GraphicsCommandList* cmdList)
 	cmdList->IASetIndexBuffer(nullptr);
 	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	cmdList->DrawInstanced(6, 1, 0, 0);
+
+	PIXEndEvent(cmdList);
 }
 
 void D3DFramework::ForwardPass(ID3D12GraphicsCommandList* cmdList)
 {
-	SetCommonState(cmdList);
 	cmdList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
 
+	PIXBeginEvent(cmdList, 0, L"Terrain Rendering");
+
+	cmdList->SetGraphicsRootSignature(mRootSignatures["Terrain"].Get());
+	cmdList->SetPipelineState(mPSOs["Terrain"].Get());
+	cmdList->SetGraphicsRootConstantBufferView((int)RpTerrain::Pass, mCurrentFrameResource->GetPassVirtualAddress());
+	cmdList->SetGraphicsRootDescriptorTable((int)RpTerrain::Texture, GetGpuSrv(DescriptorIndex::textureHeapIndex));
+	cmdList->SetGraphicsRootShaderResourceView((int)RpTerrain::Light, mCurrentFrameResource->GetLightVirtualAddress());
+	cmdList->SetGraphicsRootShaderResourceView((int)RpTerrain::Material, mCurrentFrameResource->GetMaterialVirtualAddress());
+	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Terrain], mCurrentFrameResource->GetTerrainVirtualAddress());
+
+	PIXEndEvent(cmdList);
+	PIXBeginEvent(cmdList, 0, L"Sky Rendering");
+
+	SetCommonState(cmdList);
 	cmdList->SetPipelineState(mPSOs["Sky"].Get());
 	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Sky], mCurrentFrameResource->GetObjectVirtualAddress());
+
+	PIXEndEvent(cmdList);
+
+	PIXBeginEvent(cmdList, 0, L"Particle Rendering");
 
 	cmdList->SetGraphicsRootSignature(mRootSignatures["ParticleRender"].Get());
 	cmdList->SetPipelineState(mPSOs["ParticleRender"].Get());
 	cmdList->SetGraphicsRootConstantBufferView((int)RpParticleGraphics::Pass, mCurrentFrameResource->GetPassVirtualAddress());
-	cmdList->SetGraphicsRootDescriptorTable((int)RpParticleGraphics::Texture, GetGpuSrv(0));
+	cmdList->SetGraphicsRootDescriptorTable((int)RpParticleGraphics::Texture, GetGpuSrv(DescriptorIndex::textureHeapIndex));
 	for (const auto& particle : mParticles)
 	{
-		particle->SetConstantBuffer(cmdList, mCurrentFrameResource->GetParticleVirtualAddress());
 		particle->SetBufferSrv(cmdList);
-		particle->Render(cmdList);
+		RenderObject(cmdList, particle.get(), mCurrentFrameResource->GetParticleVirtualAddress());
 	}
+
+	PIXEndEvent(cmdList);
 
 	SetCommonState(cmdList);
 
+	PIXBeginEvent(cmdList, 0, L"Transparent Rendering");
+
 	cmdList->SetPipelineState(mPSOs["Transparent"].Get());
 	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Transparent], mCurrentFrameResource->GetObjectVirtualAddress(),&mWorldCamFrustum);
+
+	PIXEndEvent(cmdList);
+
+	PIXBeginEvent(cmdList, 0, L"Widget Rendering");
 
 	// 위젯의 0~6번째까지는 DebugMap을 그리는 위젯이다.
 	auto iter = mWidgets.begin();
@@ -1021,6 +1125,8 @@ void D3DFramework::ForwardPass(ID3D12GraphicsCommandList* cmdList)
 		RenderObject(cmdList, (*iter++).get(), mCurrentFrameResource->GetWidgetVirtualAddress());
 	}
 #endif
+
+	PIXEndEvent(cmdList);
 }
 
 void D3DFramework::ParticleUpdate(ID3D12GraphicsCommandList* cmdList)
@@ -1030,6 +1136,8 @@ void D3DFramework::ParticleUpdate(ID3D12GraphicsCommandList* cmdList)
 
 	ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvSrvUavDescriptorHeap.Get() };
 	cmdList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
+	PIXBeginEvent(cmdList, 0, L"Particle Update");
 
 	cmdList->SetComputeRootSignature(mRootSignatures["ParticleCompute"].Get());
 	cmdList->SetPipelineState(mPSOs["ParticleEmit"].Get());
@@ -1061,18 +1169,22 @@ void D3DFramework::ParticleUpdate(ID3D12GraphicsCommandList* cmdList)
 	{
 		particle->CopyData(cmdList);
 	}
+
+	PIXEndEvent(cmdList);
 }
 
 void D3DFramework::Init(ID3D12GraphicsCommandList* cmdList)
 {
+#ifdef MULTITHREAD_RENDERING
 	for (UINT i = 0; i < FrameResource::processorCoreNum; ++i)
 	{
 		auto cmdList = mCurrentFrameResource->mWorekrCmdLists[i].Get();
 		auto cmdAlloc = mCurrentFrameResource->mWorkerCmdAllocs[i].Get();
 		Reset(cmdList, cmdAlloc);
 	}
+#endif
 
-	for (UINT i = 0; i < FRAME_PHASE; ++i)
+	for (UINT i = 0; i < FrameResource::framePhase; ++i)
 	{
 		auto cmdList = mCurrentFrameResource->mFrameCmdLists[i].Get();
 		auto cmdAlloc = mCurrentFrameResource->mFrameCmdAllocs[i].Get();
@@ -1118,10 +1230,17 @@ void D3DFramework::WorkerThread(UINT threadIndex)
 	{
 		WaitForSingleObject(mWorkerBeginFrameEvents[threadIndex], INFINITE);
 
-		auto cmdList = mCurrentFrameResource->mWorekrCmdLists[threadIndex].Get();
+		ID3D12GraphicsCommandList* cmdList = nullptr;
+#ifdef MULTITHREAD_RENDERING
+		cmdList = mCurrentFrameResource->mWorekrCmdLists[threadIndex].Get();
+#else
+		cmdList = mCurrentFrameResource->mFrameCmdLists[0].Get();
+#endif
 
 		SetCommonState(cmdList);
 		cmdList->OMSetRenderTargets(DEFERRED_BUFFER_COUNT, &GetDefferedBufferView(0), true, &GetDepthStencilView());
+
+		PIXBeginEvent(cmdList, 0, L"MultiThread Rendering");
 
 		cmdList->SetPipelineState(mPSOs["Opaque"].Get());
 		RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Opaque], mCurrentFrameResource->GetObjectVirtualAddress(),
@@ -1135,7 +1254,11 @@ void D3DFramework::WorkerThread(UINT threadIndex)
 		RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Billborad], mCurrentFrameResource->GetObjectVirtualAddress(),
 			&mWorldCamFrustum, threadIndex, threadNum);
 
+		PIXEndEvent(cmdList);
+
+#ifdef MULTITHREAD_RENDERING
 		ThrowIfFailed(cmdList->Close());
+#endif
 
 		SetEvent(mWorkerFinishedFrameEvents[threadIndex]);
 	}
