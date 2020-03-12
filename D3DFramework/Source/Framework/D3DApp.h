@@ -40,11 +40,7 @@ protected:
 	void CreateSwapChain();
 	void CreateSoundBuffer();
 	void CreateRtvAndDsvDescriptorHeaps(UINT shadowMapNum);
-	void CreateCommonRootSignature(UINT textureNum, UINT shadowMapNum);
-	void CreateSsaoRootSignature();
-	void CreateParticleGraphicsRootSignature(UINT textureNum);
-	void CreateParticleComputeRootSignature();
-	void CreateTerrainRootSignature(UINT textureNum);
+	void CreateRootSignatures(UINT textureNum, UINT shadowMapNum);
 	void CreateShadersAndInputLayout();
 	void CreatePSOs();
 

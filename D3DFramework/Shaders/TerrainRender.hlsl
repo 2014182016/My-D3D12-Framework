@@ -1,8 +1,10 @@
 #include "LightingUtil.hlsl"
 
 Texture2D gTextureMaps[TEX_NUM] : register(t0, space0);
-StructuredBuffer<Light> gLights : register(t0, space1);
-StructuredBuffer<MaterialData> gMaterialData : register(t1, space1);
+Texture2D gLODLookupMap : register(t0, space1);
+Texture2D gNormalMap : register(t1, space1);
+StructuredBuffer<Light> gLights : register(t2, space1);
+StructuredBuffer<MaterialData> gMaterialData : register(t3, space1);
 
 SamplerState gsamLinearClamp      : register(s0);
 SamplerState gsamAnisotropicWrap  : register(s1);
@@ -10,6 +12,8 @@ SamplerState gsamAnisotropicWrap  : register(s1);
 cbuffer cbTerrain : register(b0)
 {
 	float4x4 gTerrainWorld;
+	float2 gPixelDimension;
+	float2 gGeometryDimension;
 	float gMaxLOD;
 	float gMinLOD;
 	float gMinDistance;
@@ -17,7 +21,7 @@ cbuffer cbTerrain : register(b0)
 	float gHeightScale;
 	float gTexScale;
 	uint gMaterialIndex;
-	uint gHeightMapIndex;
+	float gTPadding0;
 }
 
 cbuffer cbPass : register(b1)
@@ -77,10 +81,10 @@ struct PatchTess
 
 struct DomainOut
 {
-	float4 mPosH  : SV_POSITION;
-	float3 mPosW  : POSITION;
-	float2 mTexC  : TEXCOORD;
-	float3 mNormal: NORMAL;
+	float4 mPosH   : SV_POSITION;
+	float3 mPosW   : POSITION;
+	float2 mTexC   : TEXCOORD;
+	float  mHeight : HEIGHT;
 };
 
 float4 GetFogBlend(float4 litColor, float distToEye)
@@ -140,41 +144,52 @@ float ComputePatchLOD(float3 midPoint)
 
 float GetHeightMapSample(float2 uv)
 {
-	return gHeightScale * gTextureMaps[gHeightMapIndex].SampleLevel(gsamLinearClamp, uv, 0.0f).r;
+	uint heightMapIndex = gMaterialData[gMaterialIndex].mHeightMapIndex;
+	return gTextureMaps[heightMapIndex].SampleLevel(gsamLinearClamp, uv, 0.0f).r;
 }
 
-float3 Sobel(float2 uv)
+float4 ReadLookup(uint2 idx)
 {
-	float2 pxSz = float2(1.0f / 512.0f, 1.0f / 512.0f);
+	return gLODLookupMap.Load(uint3(idx, 0));
+}
 
-	// 필요한 오프셋들을 계산한다.
-	float2 o00 = uv + float2(-pxSz.x, -pxSz.y);
-	float2 o10 = uv + float2(0.0f, -pxSz.y);
-	float2 o20 = uv + float2(pxSz.x, -pxSz.y);
-	float2 o01 = uv + float2(-pxSz.x, 0.0f);
-	float2 o02 = uv + float2(-pxSz.x, pxSz.y);
-	float2 o12 = uv + float2(0.0f, pxSz.y);
-	float2 o21 = uv + float2(pxSz.x, 0.0f);
-	float2 o22 = uv + float2(pxSz.x, pxSz.y);
+uint2 ComputeLookupIndex(uint primitiveID, int xOffset, int zOffset)
+{
+	// 32x32 그리드의 경우, 1024개의 패치가 있다.
+	// 따라서 패치는 0~1023이고, 이를 XY좌표로 디코딩해야 한다.
+	uint2 p;
 
-	// 소벨 필터를 적용하려면 현재 필셀 주위의 여덟 픽셀이 필요한다.
-	float h00 = GetHeightMapSample(o00);
-	float h10 = GetHeightMapSample(o10);
-	float h20 = GetHeightMapSample(o20);
-	float h01 = GetHeightMapSample(o01);
-	float h02 = GetHeightMapSample(o02);
-	float h12 = GetHeightMapSample(o12);
-	float h21 = GetHeightMapSample(o21);
-	float h22 = GetHeightMapSample(o22);
+	p.x = primitiveID % (uint)gGeometryDimension.x;
+	p.y = primitiveID / (uint)gGeometryDimension.y;
 
-	// 소벨 필터들을 평가한다.
-	float gx = h00 - h20 + 2.0f * h01 - 2.0f * h21 + h02 - h22;
-	float gy = h00 + 2.0f * h10 + h20 - h02 - 2.0f * h12 - h22;
+	// 패치에 대한 XY좌표를 렌더링한 후 파라미터에 따라 오프셋해야 한다.
+	p.x = clamp(p.x + xOffset, 0, ((uint)gGeometryDimension.x) - 1);
+	p.y = clamp(p.y + zOffset, 0, ((uint)gGeometryDimension.y) - 1);
 
-	// 빠진 z 성분을 생성한다.
-	float gz = 0.01f * sqrt(max(0.0f, 1.0f - gx * gx - gy * gy));
+	return p;
+}
 
-	return normalize(float3(2.0f * gx, gz, 2.0f * gy));
+float ComputePatchLODUsingLookup(float3 midPoint, float4 lookup)
+{
+	// 비례된 거리를 계산한다.
+	float d = ComputeScaledDistance(gEyePosW, midPoint);
+
+	// lookup:
+	//	x,y,z = 패치 노멀
+	//	w = 패치 표면에서의 표준 편차
+
+	// 0.75 이상의 표준 편차를 얻는 것은 매우 드물다.
+	// 따라서 여기에 작은 퍼지 팩터를 적용하여 선택한
+	// 데이터 셋을 수정하거나 제거할 수 있다.
+	float sd = lookup.w / 0.75;
+
+	// 최종 LOD는 뷰어로부터 거리에 비례된 패치 당 표준 편차이다. 
+	// 이 계산은 LOD를 그 이상으로 증가시키진 않지만 필요하지
+	// 않는 패치에 대해선 추가 삼각형이 생기지 않도록 하는데에
+	// 효과적일 것이다.
+	float lod = clamp(sd * d, 0.0f, 1.0f);
+
+	return lerp(gMinLOD, gMaxLOD, lod);
 }
 
 VertexOut VS(VertexIn vin)
@@ -209,6 +224,24 @@ PatchTess HsPerPatch(InputPatch<VertexOut, 12> patch, uint patchID : SV_Primitiv
 {
 	PatchTess pt = (PatchTess)0.0f;
 
+	float4 tileLookup[] =
+	{
+		// 주 사각형
+		ReadLookup(ComputeLookupIndex(patchID, 0, 0)),
+
+		// +X 방향 이웃
+		ReadLookup(ComputeLookupIndex(patchID, 0, 1)),
+
+		// +Z 방향 이웃
+		ReadLookup(ComputeLookupIndex(patchID, 1, 0)),
+
+		// -X 방향 이웃
+		ReadLookup(ComputeLookupIndex(patchID, 0, -1)),
+
+		// -Z 방향 이웃
+		ReadLookup(ComputeLookupIndex(patchID, -1, 0))
+	};
+
 	// 현재 타일과 이웃 타일들의 중점을 구한다.
 	float3 midPoints[] =
 	{
@@ -228,8 +261,9 @@ PatchTess HsPerPatch(InputPatch<VertexOut, 12> patch, uint patchID : SV_Primitiv
 		ComputePatchMidPoint(patch[0].mPosW, patch[2].mPosW, patch[10].mPosW, patch[11].mPosW)
 	};
 
-	// 각 타일의 적절한 LOD를 결정한다.
-	float dist[] =
+	/*
+	// 각 타일의 카메라와의 거리를 이용해 적절한 LOD를 결정한다.
+	float detail[] =
 	{
 		// 현재 타일 사각형
 		ComputePatchLOD(midPoints[0]),
@@ -246,17 +280,37 @@ PatchTess HsPerPatch(InputPatch<VertexOut, 12> patch, uint patchID : SV_Primitiv
 		// -Z 방향 이웃
 		ComputePatchLOD(midPoints[4])
 	};
+	*/
+
+	// 각 타일의 표준 편차를 이용하여 적절한 LOD를 결정한다.
+	float detail[] =
+	{
+		// 현재 타일 사각형
+		ComputePatchLODUsingLookup(midPoints[0], tileLookup[0]),
+
+		// +X 방향 이웃
+		ComputePatchLODUsingLookup(midPoints[1], tileLookup[1]),
+
+		// +Z 방향 이웃
+		ComputePatchLODUsingLookup(midPoints[2], tileLookup[2]),
+
+		// -X 방향 이웃
+		ComputePatchLODUsingLookup(midPoints[3], tileLookup[3]),
+
+		// -Z 방향 이웃
+		ComputePatchLODUsingLookup(midPoints[4], tileLookup[4])
+	};
 
 	// 현재 타일 내부 조각의 LOD는 항상 타일 자체의 LOD와 같다.
-	pt.mInsideTess[0] = pt.mInsideTess[1] = dist[0];
+	pt.mInsideTess[0] = pt.mInsideTess[1] = detail[0];
 
 	// 이웃 타일의 LOD가 더 낮다면 그 LOD를 가장자리 조각의 LOD로 설정한다.
 	// 이웃 타일의 LOD가 더 높다면 가장자리 조각에 그대로 사용한다.
 	// (그 이웃 타일이 현재 타일에 맞게 자신의 가장자리 LOD를 낮춘다.)
-	pt.mEdgeTess[0] = min(dist[0], dist[4]);
-	pt.mEdgeTess[1] = min(dist[0], dist[3]);
-	pt.mEdgeTess[2] = min(dist[0], dist[2]);
-	pt.mEdgeTess[3] = min(dist[0], dist[1]);
+	pt.mEdgeTess[0] = min(detail[0], detail[4]);
+	pt.mEdgeTess[1] = min(detail[0], detail[3]);
+	pt.mEdgeTess[2] = min(detail[0], detail[2]);
+	pt.mEdgeTess[3] = min(detail[0], detail[1]);
 
 	return pt;
 }
@@ -287,7 +341,8 @@ DomainOut DS(PatchTess patchTess,
 		quad[2].mTexC * (1.0f - uv.x) * uv.y +
 		quad[3].mTexC * uv.x * uv.y;
 
-	finalVertexCoord.y += GetHeightMapSample(texCoord);
+	dout.mHeight = GetHeightMapSample(texCoord);
+	finalVertexCoord.y += dout.mHeight * gHeightScale;
 
 	// 세계 공간에서의 좌표를 전달한다.
 	dout.mPosW = finalVertexCoord;
@@ -295,8 +350,6 @@ DomainOut DS(PatchTess patchTess,
 	dout.mPosH = mul(float4(finalVertexCoord, 1.0f), gViewProj);
 	// 출력 정점 특성들은 이후 삼각형을 따라 보간된다.
 	dout.mTexC = mul(float4(texCoord, 0.0f, 1.0f), gMaterialData[gMaterialIndex].mMatTransform).xy;
-	// 소벨 연산자를 사용하여 노멀을 계산한다.
-	dout.mNormal = Sobel(texCoord);
 
 	return dout;
 }
@@ -314,6 +367,16 @@ float4 PS(DomainOut pin) : SV_Target
 		diffuse *= gTextureMaps[diffuseMapIndex].Sample(gsamAnisotropicWrap, pin.mTexC * gTexScale);
 	}
 
+	// 미리 계산된 노멀맵에서 해당 픽셀 위치의 노멀을 가져온다.
+	float3 normal = normalize(gNormalMap.SampleLevel(gsamLinearClamp, pin.mTexC, 0.0f).xyz);
+
+	// Terrain의 절반이상부터는 꼭대기에 눈이 쌓인듯한 효과를 준다.
+	if (pin.mHeight > 0.5f)
+	{
+		float snowAmount = (pin.mHeight - 0.5f) * 2.0f;
+		diffuse = lerp(diffuse, 1.0f, snowAmount);
+	}
+
 	// 조명되는 픽셀에서 눈으로의 벡터
 	float3 toEyeW = gEyePosW - pin.mPosW;
 	float distToEye = length(toEyeW);
@@ -322,15 +385,12 @@ float4 PS(DomainOut pin) : SV_Target
 	// Diffuse를 전반적으로 밝혀주는 Ambient항
 	float4 ambient = gAmbientLight * diffuse;
 
-	// 노멀을 정규화한다.
-	pin.mNormal = normalize(pin.mNormal);
-
 	// roughness와 normal를 이용하여 shininess를 계산한다.
 	const float shininess = 1.0f - roughness;
 	Material mat = { diffuse, specular, shininess };
 
 	// Terrain에선 gLight의 DirectionalLight만을 라이팅한다.
-	float4 directLight = ComputeOnlyDirectionalLight(gLights, mat, pin.mNormal, toEyeW);
+	float4 directLight = ComputeOnlyDirectionalLight(gLights, mat, normal, toEyeW);
 	float4 litColor = ambient + directLight;
 
 	if (gFogEnabled)

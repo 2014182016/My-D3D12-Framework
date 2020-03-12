@@ -129,6 +129,8 @@ struct ParticleConstants
 struct TerrainConstants
 {
 	DirectX::XMFLOAT4X4 mTerrainWorld;
+	DirectX::XMFLOAT2 mPixelDimesion;
+	DirectX::XMFLOAT2 mGeometryDimension;
 	float mMaxLOD;
 	float mMinLOD;
 	float mMinDistance;
@@ -136,7 +138,7 @@ struct TerrainConstants
 	float mHeightScale;
 	float mTexScale;
 	std::uint32_t mMaterialIndex;
-	std::uint32_t mHegihtMapIndex;
+	float mPadding0;
 };
 
 struct MaterialData
@@ -153,7 +155,7 @@ struct MaterialData
 	float mRoughness = 0.25f;
 	std::uint32_t mDiffuseMapIndex = -1;
 	std::uint32_t mNormalMapIndex = -1;
-	std::uint32_t mMaterialPad1;
+	std::uint32_t mHeightMapIndex = -1;
 	std::uint32_t mMaterialPad2;
 };
 

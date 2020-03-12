@@ -32,10 +32,12 @@ public:
 	inline float GetOpacity() const { return mDiffuseAlbedo.w; }
 	inline void SetOpacity(float opacity) { mDiffuseAlbedo.w = opacity; }
 
-	inline int GetDiffuseIndex() const { return mDiffuseSrvHeapIndex; }
-	inline void SetDiffuseIndex(int index) { mDiffuseSrvHeapIndex = index; }
-	inline int GetNormalIndex() const { return mNormalSrvHeapIndex; }
-	inline void SetNormalIndex(int index) { mNormalSrvHeapIndex = index; }
+	inline int GetDiffuseMapIndex() const { return mDiffuseMapIndex; }
+	inline void SetDiffuseMapIndex(int index) { mDiffuseMapIndex = index; }
+	inline int GetNormalMapIndex() const { return mNormalMapIndex; }
+	inline void SetNormalMapIndex(int index) { mNormalMapIndex = index; }
+	inline int GetHeightMapIndex() const { return mHeightMapIndex; }
+	inline void SetHeightMapIndex(int index) { mHeightMapIndex = index; }
 
 	inline UINT GetMaterialIndex() const { return mMaterialIndex; }
 
@@ -47,10 +49,12 @@ protected:
 	float mRoughness = 0.25f;
 
 private:
-	// 디퓨즈 텍스처를 위한 SRV 힙에서의 인덱스
-	int mDiffuseSrvHeapIndex = -1;
-	// 노말 텍스처를 위한 SRV 힙에서의 인덱스
-	int mNormalSrvHeapIndex = -1;
+	// 디퓨즈맵 텍스처를 위한 SRV 힙에서의 인덱스
+	int mDiffuseMapIndex = -1;
+	// 노말맵 텍스처를 위한 SRV 힙에서의 인덱스
+	int mNormalMapIndex = -1;
+	// 하이트맵 텍스처를 위한 SRV 힙에서의 인덱스
+	int mHeightMapIndex = -1;
 
 	// 머터리얼을 생성할 때마다 삽입할 상수 버퍼에서의 인덱스
 	static inline UINT currentMaterialIndex = 0;

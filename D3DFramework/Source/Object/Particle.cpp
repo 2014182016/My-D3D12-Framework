@@ -33,7 +33,7 @@ Particle::~Particle()
 #endif
 }
 
-void Particle::CreateBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv)
+void Particle::CreateBuffers(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv)
 {
 	CD3DX12_CPU_DESCRIPTOR_HANDLE bufferCpuSrv = hCpuSrv;
 	CD3DX12_CPU_DESCRIPTOR_HANDLE bufferCpuUav = hCpuSrv.Offset(1, DescriptorSize::cbvSrvUavDescriptorSize);
@@ -214,7 +214,7 @@ void Particle::SetParticleConstants(ParticleConstants& constants)
 	constants.mMaxParticleNum = (std::uint32_t)mMaxParticleNum;
 	constants.mParticleCount = (std::uint32_t)mCurrentParticleNum;
 	constants.mEmitNum = (std::uint32_t)mEmitNum;
-	constants.mTextureIndex = GetMaterial()->GetDiffuseIndex();
+	constants.mTextureIndex = GetMaterial()->GetDiffuseMapIndex();
 }
 
 void Particle::CopyData(ID3D12GraphicsCommandList* cmdList)

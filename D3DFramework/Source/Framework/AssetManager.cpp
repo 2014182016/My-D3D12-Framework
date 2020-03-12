@@ -465,24 +465,24 @@ void AssetManager::BuildMaterial()
 	std::unique_ptr<Material> mat;
 
 	mat = std::make_unique<Material>("Default"s);
-	mat->SetDiffuseIndex(DISABLED);
-	mat->SetNormalIndex(DISABLED);
+	mat->SetDiffuseMapIndex(DISABLED);
+	mat->SetNormalMapIndex(DISABLED);
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.1f, 0.1f, 0.1f);
 	mat->SetRoughtness(0.25f);
 	mMaterials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Brick0"s);
-	mat->SetDiffuseIndex(FindTexture("Bricks2"s)->mTextureIndex);
-	mat->SetNormalIndex(FindTexture("Bricks2_nmap"s)->mTextureIndex);
+	mat->SetDiffuseMapIndex(FindTexture("Bricks2"s)->mTextureIndex);
+	mat->SetNormalMapIndex(FindTexture("Bricks2_nmap"s)->mTextureIndex);
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.1f, 0.1f, 0.1f);
 	mat->SetRoughtness(0.25f);
 	mMaterials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Tile0"s);
-	mat->SetDiffuseIndex(FindTexture("Tile"s)->mTextureIndex);
-	mat->SetNormalIndex(FindTexture("Tile_nmap"s)->mTextureIndex);
+	mat->SetDiffuseMapIndex(FindTexture("Tile"s)->mTextureIndex);
+	mat->SetNormalMapIndex(FindTexture("Tile_nmap"s)->mTextureIndex);
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.2f, 0.2f, 0.2f);
 	mat->SetRoughtness(0.1f);
@@ -490,8 +490,8 @@ void AssetManager::BuildMaterial()
 	mMaterials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Mirror0"s);
-	mat->SetDiffuseIndex(FindTexture("Ice"s)->mTextureIndex);
-	mat->SetNormalIndex(FindTexture("Default_nmap"s)->mTextureIndex);
+	mat->SetDiffuseMapIndex(FindTexture("Ice"s)->mTextureIndex);
+	mat->SetNormalMapIndex(FindTexture("Default_nmap"s)->mTextureIndex);
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.98f, 0.97f, 0.95f);
 	mat->SetRoughtness(0.1f);
@@ -499,24 +499,24 @@ void AssetManager::BuildMaterial()
 	mMaterials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Wirefence"s);
-	mat->SetDiffuseIndex(FindTexture("WireFence"s)->mTextureIndex);
-	mat->SetNormalIndex(DISABLED);
+	mat->SetDiffuseMapIndex(FindTexture("WireFence"s)->mTextureIndex);
+	mat->SetNormalMapIndex(DISABLED);
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.1f, 0.1f, 0.1f);
 	mat->SetRoughtness(0.25f);
 	mMaterials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Tree0"s);
-	mat->SetDiffuseIndex(FindTexture("Tree01S"s)->mTextureIndex);
-	mat->SetNormalIndex(DISABLED);
+	mat->SetDiffuseMapIndex(FindTexture("Tree01S"s)->mTextureIndex);
+	mat->SetNormalMapIndex(DISABLED);
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.01f, 0.01f, 0.01f);
 	mat->SetRoughtness(0.125f);
 	mMaterials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Sky"s);
-	mat->SetDiffuseIndex(FindTexture("Clouds"s)->mTextureIndex);
-	mat->SetNormalIndex(DISABLED);
+	mat->SetDiffuseMapIndex(FindTexture("Clouds"s)->mTextureIndex);
+	mat->SetNormalMapIndex(DISABLED);
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.1f, 0.1f, 0.1f);
 	mat->SetRoughtness(1.0f);
@@ -524,16 +524,17 @@ void AssetManager::BuildMaterial()
 	mMaterials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Radial_Gradient"s);
-	mat->SetDiffuseIndex(FindTexture("Radial_Gradient"s)->mTextureIndex);
-	mat->SetNormalIndex(DISABLED);
+	mat->SetDiffuseMapIndex(FindTexture("Radial_Gradient"s)->mTextureIndex);
+	mat->SetNormalMapIndex(DISABLED);
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.1f, 0.1f, 0.1f);
 	mat->SetRoughtness(1.0f);
 	mMaterials[mat->GetName()] = std::move(mat);
 
-	mat = std::make_unique<Material>("HeightMap"s);
-	mat->SetDiffuseIndex(FindTexture("Grass"s)->mTextureIndex);
-	mat->SetNormalIndex(DISABLED);
+	mat = std::make_unique<Material>("Terrain"s);
+	mat->SetDiffuseMapIndex(FindTexture("Grass"s)->mTextureIndex);
+	mat->SetNormalMapIndex(DISABLED);
+	mat->SetHeightMapIndex(FindTexture("HeightMap"s)->mTextureIndex);
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.1f, 0.1f, 0.1f);
 	mat->SetRoughtness(0.9f);

@@ -29,4 +29,5 @@ public:
 	static inline UINT deferredBufferHeapIndex = 0;
 	static inline UINT ssaoMapHeapIndex = 0;
 	static inline UINT particleHeapIndex = 0;
+	static inline UINT terrainHeapIndex = 0;
 };

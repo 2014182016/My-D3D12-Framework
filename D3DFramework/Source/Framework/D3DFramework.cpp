@@ -131,13 +131,27 @@ void D3DFramework::InitFramework()
 	UINT shadowMapNum = (UINT)LIGHT_NUM;
 	UINT particleNum = (UINT)mParticles.size();
 
-	CreateCommonRootSignature(textureNum, shadowMapNum);
-	CreateSsaoRootSignature();
-	CreateParticleGraphicsRootSignature(textureNum);
-	CreateParticleComputeRootSignature();
-	CreateTerrainRootSignature(textureNum);
+	CreateRootSignatures(textureNum, shadowMapNum);
 	CreateDescriptorHeaps(textureNum, shadowMapNum, particleNum);
 	CreatePSOs();
+
+	// Terrain에서 사용할 표준 편차 LODMap과 노멀 맵을 미리 계산한다.
+	// 이들은 다시 계산할 필요가 없다.
+	{
+		ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvSrvUavDescriptorHeap.Get() };
+		mMainCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
+		// 하이트맵에 대한 표준편차를 계산한다.
+		mMainCommandList->SetComputeRootSignature(mRootSignatures["TerrainCompute"].Get());
+		mMainCommandList->SetComputeRootDescriptorTable((int)RpTerrainCompute::HeightMap, GetGpuSrv(mTerrain->GetMaterial()->GetHeightMapIndex()));
+		mTerrain->SetUavDescriptors(mMainCommandList.Get());
+
+		mMainCommandList->SetPipelineState(mPSOs["TerrainStdDev"].Get());
+		mTerrain->LODCompute(mMainCommandList.Get());
+
+		mMainCommandList->SetPipelineState(mPSOs["TerrainNormal"].Get());
+		mTerrain->NormalCompute(mMainCommandList.Get());
+	}
 
 	// 초기화 명령들을 실행한다.
 	ThrowIfFailed(mMainCommandList->Close());
@@ -184,10 +198,14 @@ void D3DFramework::CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum, UIN
 	i = 0;
 	for (const auto& particle : mParticles)
 	{
-		particle->CreateBuffers(md3dDevice.Get(), mMainCommandList.Get(),
-			GetCpuSrv(DescriptorIndex::particleHeapIndex + i * 3));
+		particle->CreateBuffers(md3dDevice.Get(), GetCpuSrv(DescriptorIndex::particleHeapIndex + i * 3));
 		++i;
 	}
+
+	DescriptorIndex::terrainHeapIndex = DescriptorIndex::particleHeapIndex + particleNum * 3;
+	mTerrain->BuildDescriptors(md3dDevice.Get(),
+		GetCpuSrv(DescriptorIndex::terrainHeapIndex),
+		GetGpuSrv(DescriptorIndex::terrainHeapIndex));
 }
 
 void D3DFramework::SetCommonState(ID3D12GraphicsCommandList* cmdList)
@@ -427,8 +445,9 @@ void D3DFramework::UpdateMaterialBuffer(float deltaTime)
 			matData.mDiffuseAlbedo = mat->GetDiffuse();
 			matData.mSpecular = mat->GetSpecular();
 			matData.mRoughness = mat->GetRoughness();
-			matData.mDiffuseMapIndex = mat->GetDiffuseIndex();
-			matData.mNormalMapIndex = mat->GetNormalIndex();
+			matData.mDiffuseMapIndex = mat->GetDiffuseMapIndex();
+			matData.mNormalMapIndex = mat->GetNormalMapIndex();
+			matData.mHeightMapIndex = mat->GetHeightMapIndex();
 			DirectX::XMStoreFloat4x4(&matData.mMatTransform, XMMatrixTranspose(mat->GetMaterialTransform()));
 
 			currMaterialBuffer->CopyData(mat->GetMaterialIndex(), matData);
@@ -503,7 +522,7 @@ void D3DFramework::UpdateWidgetBuffer(float deltaTime)
 		if (widget->IsUpdate())
 		{
 			ObjectConstants objConstants;
-			objConstants.mMaterialIndex = widget->GetMaterial()->GetDiffuseIndex();
+			objConstants.mMaterialIndex = widget->GetMaterial()->GetDiffuseMapIndex();
 			currWidgetCB->CopyData(widgetIndex, objConstants);
 
 			float posX = (float)widget->GetPosX();
@@ -602,14 +621,15 @@ void D3DFramework::UpdateTerrainBuffer(float deltaTime)
 	{
 		TerrainConstants terrainConstants;
 		XMStoreFloat4x4(&terrainConstants.mTerrainWorld, XMMatrixTranspose(mTerrain->GetWorld()));
-		terrainConstants.mMinLOD = 32.0f;
+		terrainConstants.mPixelDimesion = mTerrain->GetPixelDimesion();
+		terrainConstants.mGeometryDimension = mTerrain->GetGeometryDimesion();
+		terrainConstants.mMinLOD = 16.0f;
 		terrainConstants.mMaxLOD = 64.0f;
-		terrainConstants.mMinDistance = 100.0f;
-		terrainConstants.mMaxDistance = 500.0f;
+		terrainConstants.mMinDistance = 300.0f;
+		terrainConstants.mMaxDistance = 1000.0f;
 		terrainConstants.mHeightScale = 50.0f;
 		terrainConstants.mTexScale = 10.0f;
 		terrainConstants.mMaterialIndex = mTerrain->GetMaterial()->GetMaterialIndex();
-		terrainConstants.mHegihtMapIndex = AssetManager::GetInstance()->FindTexture("HeightMap"s)->mTextureIndex;
 		currTerrainCB->CopyData(0, terrainConstants);
 
 		mTerrain->DecreaseNumFrames();
@@ -689,8 +709,8 @@ void D3DFramework::CreateTerrain()
 	mTerrain = std::make_shared<Terrain>("Terrian"s);
 	mTerrain->SetPosition(0.0f, -50.0f, 0.0f);
 	mTerrain->SetScale(10.0f, 10.0f, 10.0f);
-	mTerrain->BuildMesh(md3dDevice.Get(), mMainCommandList.Get(), 100.0f, 100.0f, 3, 3);
-	mTerrain->SetMaterial(AssetManager::GetInstance()->FindMaterial("HeightMap"s));
+	mTerrain->BuildMesh(md3dDevice.Get(), mMainCommandList.Get(), 100.0f, 100.0f, 8, 8);
+	mTerrain->SetMaterial(AssetManager::GetInstance()->FindMaterial("Terrain"s));
 	mTerrain->WorldUpdate();
 	mRenderableObjects[(int)RenderLayer::Terrain].push_back(mTerrain);
 }
@@ -959,17 +979,8 @@ void D3DFramework::WireframePass(ID3D12GraphicsCommandList* cmdList)
 	RenderActualObjects(cmdList, &mWorldCamFrustum);
 
 	PIXEndEvent(cmdList);
-	PIXBeginEvent(cmdList, 0, "TerrainWirefrmae Rendering");
 
-	cmdList->SetGraphicsRootSignature(mRootSignatures["Terrain"].Get());
-	cmdList->SetPipelineState(mPSOs["TerrainWireframe"].Get());
-	cmdList->SetGraphicsRootConstantBufferView((int)RpTerrain::Pass, mCurrentFrameResource->GetPassVirtualAddress());
-	cmdList->SetGraphicsRootDescriptorTable((int)RpTerrain::Texture, GetGpuSrv(DescriptorIndex::textureHeapIndex));
-	cmdList->SetGraphicsRootShaderResourceView((int)RpTerrain::Light, mCurrentFrameResource->GetLightVirtualAddress());
-	cmdList->SetGraphicsRootShaderResourceView((int)RpTerrain::Material, mCurrentFrameResource->GetMaterialVirtualAddress());
-	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Terrain], mCurrentFrameResource->GetTerrainVirtualAddress());
-
-	PIXEndEvent(cmdList);
+	TerrainPass(cmdList, true);
 
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
@@ -1043,17 +1054,8 @@ void D3DFramework::ForwardPass(ID3D12GraphicsCommandList* cmdList)
 {
 	cmdList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
 
-	PIXBeginEvent(cmdList, 0, L"Terrain Rendering");
+	TerrainPass(cmdList, false);
 
-	cmdList->SetGraphicsRootSignature(mRootSignatures["Terrain"].Get());
-	cmdList->SetPipelineState(mPSOs["Terrain"].Get());
-	cmdList->SetGraphicsRootConstantBufferView((int)RpTerrain::Pass, mCurrentFrameResource->GetPassVirtualAddress());
-	cmdList->SetGraphicsRootDescriptorTable((int)RpTerrain::Texture, GetGpuSrv(DescriptorIndex::textureHeapIndex));
-	cmdList->SetGraphicsRootShaderResourceView((int)RpTerrain::Light, mCurrentFrameResource->GetLightVirtualAddress());
-	cmdList->SetGraphicsRootShaderResourceView((int)RpTerrain::Material, mCurrentFrameResource->GetMaterialVirtualAddress());
-	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Terrain], mCurrentFrameResource->GetTerrainVirtualAddress());
-
-	PIXEndEvent(cmdList);
 	PIXBeginEvent(cmdList, 0, L"Sky Rendering");
 
 	SetCommonState(cmdList);
@@ -1131,9 +1133,6 @@ void D3DFramework::ForwardPass(ID3D12GraphicsCommandList* cmdList)
 
 void D3DFramework::ParticleUpdate(ID3D12GraphicsCommandList* cmdList)
 {
-	cmdList->RSSetViewports(1, &mScreenViewport);
-	cmdList->RSSetScissorRects(1, &mScissorRect);
-
 	ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvSrvUavDescriptorHeap.Get() };
 	cmdList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
@@ -1169,6 +1168,29 @@ void D3DFramework::ParticleUpdate(ID3D12GraphicsCommandList* cmdList)
 	{
 		particle->CopyData(cmdList);
 	}
+
+	PIXEndEvent(cmdList);
+}
+
+void D3DFramework::TerrainPass(ID3D12GraphicsCommandList* cmdList, bool isWireframe)
+{
+	cmdList->SetGraphicsRootSignature(mRootSignatures["TerrainRender"].Get());
+	if (isWireframe)
+	{
+		PIXBeginEvent(cmdList, 0, "TerrainWirefrmae Rendering");
+		cmdList->SetPipelineState(mPSOs["TerrainWireframe"].Get());
+	}
+	else
+	{
+		PIXBeginEvent(cmdList, 0, "Terrain Rendering");
+		cmdList->SetPipelineState(mPSOs["TerrainRender"].Get());
+	}
+	cmdList->SetGraphicsRootConstantBufferView((int)RpTerrainGraphics::Pass, mCurrentFrameResource->GetPassVirtualAddress());
+	cmdList->SetGraphicsRootDescriptorTable((int)RpTerrainGraphics::Texture, GetGpuSrv(DescriptorIndex::textureHeapIndex));
+	cmdList->SetGraphicsRootShaderResourceView((int)RpTerrainGraphics::Light, mCurrentFrameResource->GetLightVirtualAddress());
+	cmdList->SetGraphicsRootShaderResourceView((int)RpTerrainGraphics::Material, mCurrentFrameResource->GetMaterialVirtualAddress());
+	mTerrain->SetSrvDescriptors(cmdList);
+	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Terrain], mCurrentFrameResource->GetTerrainVirtualAddress());
 
 	PIXEndEvent(cmdList);
 }

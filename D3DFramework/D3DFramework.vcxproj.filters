@@ -87,10 +87,13 @@
     <FxCompile Include="Shaders\ParticleCompute.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="Shaders\Terrain.hlsl">
+    <FxCompile Include="Shaders\Global.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="Shaders\Global.hlsl">
+    <FxCompile Include="Shaders\TerrainCompute.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\TerrainRender.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>

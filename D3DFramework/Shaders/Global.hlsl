@@ -20,6 +20,6 @@ struct MaterialData
 	float    mRoughness;
 	uint     mDiffuseMapIndex;
 	uint     mNormalMapIndex;
-	uint     mMatPad1;
-	uint     mMatPad2;
+	uint     mHeightMapIndex;
+	uint     mMatPad0;
 };

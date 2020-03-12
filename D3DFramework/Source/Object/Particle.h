@@ -20,7 +20,7 @@ public:
 	virtual void SetConstantBuffer(ID3D12GraphicsCommandList* cmdList, D3D12_GPU_VIRTUAL_ADDRESS startAddress) const override;
 
 public:
-	void CreateBuffers(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv);
+	void CreateBuffers(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv);
 	void Update(ID3D12GraphicsCommandList* cmdList);
 	void Emit(ID3D12GraphicsCommandList* cmdList);
 	void SetBufferSrv(ID3D12GraphicsCommandList* cmdList);

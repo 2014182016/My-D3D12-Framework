@@ -62,6 +62,7 @@ private:
 	void SsaoPass(ID3D12GraphicsCommandList* cmdList);
 	void LightingPass(ID3D12GraphicsCommandList* cmdList);
 	void ForwardPass(ID3D12GraphicsCommandList* cmdList);
+	void TerrainPass(ID3D12GraphicsCommandList* cmdList, bool isWireframe);
 
 	void Init(ID3D12GraphicsCommandList* cmdList);
 	void MidFrame(ID3D12GraphicsCommandList* cmdList);

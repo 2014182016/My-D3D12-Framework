@@ -122,13 +122,21 @@ enum class RpParticleCompute : int
 	Count
 };
 
-enum class RpTerrain : int
+enum class RpTerrainGraphics : int
 {
 	TerrainCB = 0,
 	Pass,
 	Texture,
+	Srv,
 	Light,
 	Material,
+	Count
+};
+
+enum class RpTerrainCompute : int
+{
+	HeightMap = 0,
+	Uav,
 	Count
 };
 
