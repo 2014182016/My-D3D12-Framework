@@ -44,11 +44,11 @@ float4 PS(VertexOut pin) : SV_Target
 	float2 texOffset;
 	if (gHorizontalBlur)
 	{
-		texOffset = float2(gInvRenderTargetSize.x, 0.0f);
+		texOffset = float2(gSsaoRenderTargetInvSize.x, 0.0f);
 	}
 	else
 	{
-		texOffset = float2(0.0f, gInvRenderTargetSize.y);
+		texOffset = float2(0.0f, gSsaoRenderTargetInvSize.y);
 	}
 
 	// 필터 핵 중앙의 값은 항상 총합에 기여한다.

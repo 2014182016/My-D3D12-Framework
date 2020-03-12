@@ -481,21 +481,20 @@ void D3DFramework::UpdateMainPassBuffer(float deltaTime)
 	XMStoreFloat4x4(&mMainPassCB->mInvViewProj, XMMatrixTranspose(invViewProj));
 	XMStoreFloat4x4(&mMainPassCB->mProjTex, XMMatrixTranspose(proj * T));
 	XMStoreFloat4x4(&mMainPassCB->mViewProjTex, XMMatrixTranspose(viewProj * T));
-	mMainPassCB->mEyePosW = mCamera->GetPosition3f();
+	mMainPassCB->mAmbientLight = { 0.4f, 0.4f, 0.6f, 1.0f };
 	mMainPassCB->mRenderTargetSize = XMFLOAT2((float)mScreenWidth, (float)mScreenHeight);
 	mMainPassCB->mInvRenderTargetSize = XMFLOAT2(1.0f / mScreenWidth, 1.0f / mScreenHeight);
+	mMainPassCB->mEyePosW = mCamera->GetPosition3f();
 	mMainPassCB->mNearZ = mCamera->GetNearZ();
 	mMainPassCB->mFarZ = mCamera->GetFarZ();
 	mMainPassCB->mTotalTime = mGameTimer->GetTotalTime();
 	mMainPassCB->mDeltaTime = mGameTimer->GetDeltaTime();
-	mMainPassCB->mAmbientLight = { 0.4f, 0.4f, 0.6f, 1.0f };
+	mMainPassCB->mFogEnabled = GetOptionEnabled(Option::Fog);
 	mMainPassCB->mFogColor = { 0.7f, 0.7f, 0.7f, 1.0f };
 	mMainPassCB->mFogStart = 0.0f;
 	mMainPassCB->mFogRange = 100.0f;
 	mMainPassCB->mFogDensity = 0.1f;
-	mMainPassCB->mFogEnabled = GetOptionEnabled(Option::Fog);
 	mMainPassCB->mFogType = (std::uint32_t)FogType::Exponential;
-	mMainPassCB->mSsaoContrast = 3.0f;
 
 	auto passCB = mCurrentFrameResource->mPassPool->GetBuffer();
 	passCB->CopyData(0, *mMainPassCB);
@@ -590,27 +589,36 @@ void D3DFramework::UpdateParticleBuffer(float deltaTime)
 
 void D3DFramework::UpdateSsaoBuffer(float deltaTime)
 {
+	static UINT isSsaoUpdate = NUM_FRAME_RESOURCES;
 	static const XMMATRIX T(
 		0.5f, 0.0f, 0.0f, 0.0f,
 		0.0f, -0.5f, 0.0f, 0.0f,
 		0.0f, 0.0f, 1.0f, 0.0f,
 		0.5f, 0.5f, 0.0f, 1.0f);
 
-	SsaoConstants ssaoCB;
+	if (isSsaoUpdate > 0)
+	{
+		SsaoConstants ssaoCB;
 
-	mSsao->GetOffsetVectors(ssaoCB.mOffsetVectors);
-	auto blurWeights = mSsao->CalcGaussWeights(2.5f);
-	ssaoCB.mBlurWeights[0] = XMFLOAT4(&blurWeights[0]);
-	ssaoCB.mBlurWeights[1] = XMFLOAT4(&blurWeights[4]);
-	ssaoCB.mBlurWeights[2] = XMFLOAT4(&blurWeights[8]);
+		mSsao->GetOffsetVectors(ssaoCB.mOffsetVectors);
+		auto blurWeights = mSsao->CalcGaussWeights(2.5f);
+		ssaoCB.mBlurWeights[0] = XMFLOAT4(&blurWeights[0]);
+		ssaoCB.mBlurWeights[1] = XMFLOAT4(&blurWeights[4]);
+		ssaoCB.mBlurWeights[2] = XMFLOAT4(&blurWeights[8]);
 
-	ssaoCB.mOcclusionRadius = 0.5f;
-	ssaoCB.mOcclusionFadeStart = 0.2f;
-	ssaoCB.mOcclusionFadeEnd = 1.0f;
-	ssaoCB.mSurfaceEpsilon = 0.05f;
+		ssaoCB.mOcclusionRadius = 0.5f;
+		ssaoCB.mOcclusionFadeStart = 0.2f;
+		ssaoCB.mOcclusionFadeEnd = 1.0f;
+		ssaoCB.mSurfaceEpsilon = 0.05f;
 
-	auto currSsaoCB = mCurrentFrameResource->mSsaoPool->GetBuffer();
-	currSsaoCB->CopyData(0, ssaoCB);
+		ssaoCB.mRenderTargetInvSize = DirectX::XMFLOAT2(1.0f / mSsao->GetMapWidth(), 1.0f / mSsao->GetMapHeight());
+		ssaoCB.mSsaoContrast = 4.0f;
+
+		auto currSsaoCB = mCurrentFrameResource->mSsaoPool->GetBuffer();
+		currSsaoCB->CopyData(0, ssaoCB);
+
+		--isSsaoUpdate;
+	}
 }
 
 void D3DFramework::UpdateTerrainBuffer(float deltaTime)

@@ -46,24 +46,20 @@ cbuffer cbPass : register(b1)
 	float4x4 gProjTex;
 	float4x4 gViewProjTex;
 	float4x4 gIdentity;
-    float3 gEyePosW;
-	float gPadding1;
+	float4 gAmbientLight;
     float2 gRenderTargetSize;
     float2 gInvRenderTargetSize;
+	float3 gEyePosW;
     float gNearZ; 
     float gFarZ;
     float gTotalTime;
     float gDeltaTime;
-    float4 gAmbientLight;
+	bool gFogEnabled;
 	float4 gFogColor;
 	float gFogStart;
 	float gFogRange;
 	float gFogDensity;
-	bool gFogEnabled;
 	uint gFogType;
-	float gSsaoContrast;
-	float gPadding2;
-	float gPadding3;
 };
 
 // 법선 맵 표본을 World Space로 변환한다.

@@ -67,28 +67,22 @@ struct PassConstants
 	DirectX::XMFLOAT4X4 mProjTex = DirectX::Identity4x4f();
 	DirectX::XMFLOAT4X4 mViewProjTex = DirectX::Identity4x4f();
 	DirectX::XMFLOAT4X4 mIdentity = DirectX::Identity4x4f();
-	DirectX::XMFLOAT3 mEyePosW = { 0.0f, 0.0f, 0.0f };
-	float mPadding0;
+	DirectX::XMFLOAT4 mAmbientLight = { 0.0f, 0.0f, 0.0f, 1.0f };
 	DirectX::XMFLOAT2 mRenderTargetSize = { 0.0f, 0.0f };
 	DirectX::XMFLOAT2 mInvRenderTargetSize = { 0.0f, 0.0f };
+	DirectX::XMFLOAT3 mEyePosW = { 0.0f, 0.0f, 0.0f };
 	float mNearZ = 0.0f;
 	float mFarZ = 0.0f;
 	float mTotalTime = 0.0f;
 	float mDeltaTime = 0.0f;
 
-	// 맵 전역에 적용되는 전반적인 Light
-	DirectX::XMFLOAT4 mAmbientLight = { 0.0f, 0.0f, 0.0f, 1.0f };
-
 	// 안개 속성
+	std::uint32_t mFogEnabled = false;
 	DirectX::XMFLOAT4 mFogColor = { 0.7f, 0.7f, 0.7f, 1.0f };
 	float mFogStart = 5.0f; // Linear Fog
 	float mFogRange = 150.0f; // Linear Fog
 	float mFogDensity = 0.0f; // Exponential Fog
-	std::uint32_t mFogEnabled = false;
 	std::uint32_t mFogType = (std::uint32_t)FogType::Exponential;
-	float mSsaoContrast;
-	float mPadding2;
-	float mPadding3;
 };
 
 struct SsaoConstants
@@ -100,6 +94,10 @@ struct SsaoConstants
 	float mOcclusionFadeStart = 0.2f;
 	float mOcclusionFadeEnd = 2.0f;
 	float mSurfaceEpsilon = 0.05f;
+
+	DirectX::XMFLOAT2 mRenderTargetInvSize;
+	float mSsaoContrast;
+	float mPadding0;
 };
 
 struct ParticleData

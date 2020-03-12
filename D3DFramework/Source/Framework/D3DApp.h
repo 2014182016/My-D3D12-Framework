@@ -6,7 +6,7 @@
 #define LIGHT_NUM 1
 
 //#define SSAO
-//#define MULTITHREAD_RENDERING
+#define MULTITHREAD_RENDERING
 
 class D3DApp : public WinApp
 {

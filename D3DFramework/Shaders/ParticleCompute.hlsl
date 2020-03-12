@@ -71,13 +71,13 @@ void CS_Update(uint3 dispatchThreadID : SV_DispatchThreadID)
 			}
 			else
 			{
-				gParticles[myID].mLifeTime -= gDeltaTime;
+				gParticles[myID].mLifeTime -= gpDeltaTime;
 
 				float period = saturate(gParticles[myID].mLifeTime / gStart.mLifeTime);
 				gParticles[myID].mColor = lerp(gEnd.mColor, gStart.mColor, period);
 				gParticles[myID].mSpeed = lerp(gEnd.mSpeed, gStart.mSpeed, period);
 				gParticles[myID].mSize = lerp(gEnd.mSize, gStart.mSize, period);
-				gParticles[myID].mPosition += gParticles[myID].mDirection * gParticles[myID].mSpeed * gDeltaTime;
+				gParticles[myID].mPosition += gParticles[myID].mDirection * gParticles[myID].mSpeed * gpDeltaTime;
 			}
 		}
 	}

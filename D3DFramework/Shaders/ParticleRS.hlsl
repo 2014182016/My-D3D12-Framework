@@ -27,7 +27,7 @@ cbuffer cbParticleConstants : register(b0)
 	ParticleData gStart;
 	ParticleData gEnd;
 	float3 gEmitterLocation;
-	float gDeltaTime;
+	float gpDeltaTime;
 	uint gMaxParticleNum;
 	uint gParticleCount;
 	uint gEmitNum;
