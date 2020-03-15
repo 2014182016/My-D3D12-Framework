@@ -4,7 +4,7 @@
 #include "Structure.h"
 #include "Interface.h"
 
-//#define BUFFER_COPY
+// #define BUFFER_COPY
 #define NUM_EMIT_THREAD 8.0f
 #define NUM_UPDATE_THREAD 512.0f
 

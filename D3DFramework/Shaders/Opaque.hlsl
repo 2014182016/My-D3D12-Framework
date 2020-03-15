@@ -55,7 +55,7 @@ PixelOut PS(VertexOut pin)
 {
 	PixelOut pout = (PixelOut)0.0f;
 
-	float4 diffuse; float3 specular; float roughness;
+	float4 diffuse = 0.0f; float3 specular = 0.0f; float roughness = 0.0f;
 	GetMaterialAttibute(gObjMaterialIndex, diffuse, specular, roughness);
 
 	diffuse *= GetDiffuseMapSample(gObjMaterialIndex, pin.mTexC);
@@ -68,10 +68,8 @@ PixelOut PS(VertexOut pin)
 	pin.mTangentW = normalize(pin.mTangentW);
 	pin.mBinormalW = normalize(pin.mBinormalW);
 
-#ifdef SSAO
-	// SSAO에서 사용하기 위하여 노멀 맵을 사용하지 않는 노멀을 추출한다.
+	// 노멀맵을 사용하지 않은 노멀을 저장한다.
 	pout.mNormalx = float4(pin.mNormalW, 1.0f);
-#endif
 
 	float3 bumpedNormalW = pin.mNormalW;
 
@@ -86,7 +84,7 @@ PixelOut PS(VertexOut pin)
 		bumpedNormalW = normalize(bumpedNormalW);
 	}
 
-	pout.mDiffuse = diffuse;
+	pout.mDiffuse = float4(diffuse.rgb, 1.0f);
 	pout.mSpecularRoughness = float4(specular, roughness);
 	pout.mPosition = float4(pin.mPosW, 1.0f);
 	pout.mNormal = float4(bumpedNormalW, 1.0f);

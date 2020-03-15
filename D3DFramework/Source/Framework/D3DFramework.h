@@ -53,16 +53,18 @@ private:
 	void UpdateParticleBuffer(float deltaTime);
 	void UpdateSsaoBuffer(float deltaTime);
 	void UpdateTerrainBuffer(float deltaTime);
+	void UpdateSsrBuffer(float deltaTime);
 	void UpdateObjectBufferPool();
 
-	void ParticleUpdate(ID3D12GraphicsCommandList* cmdList);
 	void WireframePass(ID3D12GraphicsCommandList* cmdList);
 	void ShadowMapPass(ID3D12GraphicsCommandList* cmdList);
 	void GBufferPass(ID3D12GraphicsCommandList* cmdList);
-	void SsaoPass(ID3D12GraphicsCommandList* cmdList);
 	void LightingPass(ID3D12GraphicsCommandList* cmdList);
 	void ForwardPass(ID3D12GraphicsCommandList* cmdList);
-	void TerrainPass(ID3D12GraphicsCommandList* cmdList, bool isWireframe);
+	void PostProcessPass(ID3D12GraphicsCommandList* cmdList);
+
+	void ParticleUpdate(ID3D12GraphicsCommandList* cmdList);
+	void DrawTerrain(ID3D12GraphicsCommandList* cmdList, bool isWireframe);
 
 	void Init(ID3D12GraphicsCommandList* cmdList);
 	void MidFrame(ID3D12GraphicsCommandList* cmdList);
@@ -92,6 +94,8 @@ private:
 	std::unique_ptr<class Camera> mCamera;
 	std::unique_ptr<class Octree> mOctreeRoot;
 	std::unique_ptr<class Ssao> mSsao;
+	std::unique_ptr<class Ssr> mSsr;
+	std::unique_ptr<class BlurFilter> mBlurFilter;
 	
 	DirectX::BoundingFrustum mWorldCamFrustum;
 };

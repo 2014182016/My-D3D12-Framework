@@ -30,13 +30,17 @@ VertexOut VS(uint vid : SV_VertexID)
 
 float4 PS(VertexOut pin) : SV_Target
 {
-	float4 diffuse;
-	float3 specular, posW, normal;
-	float roughness, depth;
-	GetGBufferAttribute(int3(pin.mPosH.xy, 0), diffuse, specular, roughness, posW, normal, depth);
+	float4 diffuse = 0.0f; float4 position = 0.0f;
+	float3 specular = 0.0f; float3 normal = 0.0f;
+	float roughness = 0.0f; float depth = 0.0f;
+	GetGBufferAttribute(int3(pin.mPosH.xy, 0), diffuse, specular, roughness, position, normal, depth);
+
+	// 해당 픽셀이 기록되어 있는지 확인한다.
+	if (diffuse.a <= 0.0f)
+		return 0.0f;
 
 	// 조명되는 픽셀에서 눈으로의 벡터
-	float3 toEyeW = gEyePosW - posW;
+	float3 toEyeW = gEyePosW - position.xyz;
 	float distToEye = length(toEyeW);
 	toEyeW /= distToEye; // normalize
 
@@ -48,15 +52,15 @@ float4 PS(VertexOut pin) : SV_Target
 	Material mat = { diffuse, specular, shininess };
 
 	// Lighting을 실시한다.
-	float4 directLight = ComputeShadowLighting(gLights, mat, posW, normal, toEyeW);
+	float4 directLight = ComputeShadowLighting(gLights, mat, position.xyz, normal, toEyeW);
 	float4 litColor = ambient + directLight;
 
 #ifdef SSAO
-	litColor *= GetAmbientAccess(posW);
+	litColor.rgb *= GetAmbientAccess(position.xyz);
 #endif
 
-	// 분산 재질에서 알파를 가져온다.
-	litColor.a = diffuse.a;
+	// Diferred rendering에서는 불투명한 물체만 렌더링 가능하다.
+	litColor.a = 1.0f;
 
 	if (gFogEnabled)
 	{

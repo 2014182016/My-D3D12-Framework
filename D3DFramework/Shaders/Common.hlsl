@@ -11,9 +11,11 @@ Texture2D gDiffuseMap : register(t0, space2);
 Texture2D gSpecularRoughnessMap : register(t1, space2);
 Texture2D gPositonMap : register(t2, space2);
 Texture2D gNormalMap : register(t3, space2);
-Texture2D gNormalxMap : register(t4, space2); // Normal Map x
+Texture2D gNormalMapx : register(t4, space2); // Normal Map x
 Texture2D gDepthMap : register(t5, space2);
 Texture2D gSsaoMap : register(t6, space2);
+Texture2D gSsrMap : register(t7, space2);
+Texture2D gBluredSsrMap : register(t8, space2);
 
 StructuredBuffer<Light> gLights : register(t0, space3);
 StructuredBuffer<MaterialData> gMaterialData : register(t1, space3);
@@ -109,6 +111,10 @@ float CalcShadowFactor(float4 shadowPosH, int shadowMapIndex)
 {
 	// w를 나눔으로써 투영을 완료한다.
 	shadowPosH.xyz /= shadowPosH.w;
+
+	// 그림자 맵의 범위를 벗어난 것은 라이팅을 그림자를 드리우지 않는다.
+	if (shadowPosH.x < 0.0f || shadowPosH.x > 1.0f || shadowPosH.y < 0.0f || shadowPosH.y > 1.0f)
+		return 1.0f;
 
 	// NDC 공간에서의 깊이
 	float depth = shadowPosH.z;
@@ -231,13 +237,13 @@ float4 GetNormalMapSample(uint materialIndex, float2 tex)
 }
 
 void GetGBufferAttribute(in uint3 tex, out float4 diffuse, out float3 specular, out float roughness,
-	out float3 position, out float3 normal, out float depth)
+	out float4 position, out float3 normal, out float depth)
 {
 	diffuse = gDiffuseMap.Load(tex);
 	float4 specularAndroughness = gSpecularRoughnessMap.Load(tex);
 	specular = specularAndroughness.rgb;
 	roughness = specularAndroughness.a;
-	position = gPositonMap.Load(tex).xyz;
+	position = gPositonMap.Load(tex);
 	normal = gNormalMap.Load(tex).xyz;
 	depth = gDepthMap.Load(tex).r;
 }

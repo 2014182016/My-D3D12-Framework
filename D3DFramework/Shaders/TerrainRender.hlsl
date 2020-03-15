@@ -3,8 +3,7 @@
 Texture2D gTextureMaps[TEX_NUM] : register(t0, space0);
 Texture2D gLODLookupMap : register(t0, space1);
 Texture2D gNormalMap : register(t1, space1);
-StructuredBuffer<Light> gLights : register(t2, space1);
-StructuredBuffer<MaterialData> gMaterialData : register(t3, space1);
+StructuredBuffer<MaterialData> gMaterialData : register(t2, space1);
 
 SamplerState gsamLinearClamp      : register(s0);
 SamplerState gsamAnisotropicWrap  : register(s1);
@@ -83,37 +82,14 @@ struct DomainOut
 	float  mHeight : HEIGHT;
 };
 
-float4 GetFogBlend(float4 litColor, float distToEye)
+struct PixelOut
 {
-	float4 result = 0.0f;
-
-	switch (gFogType)
-	{
-	case FOG_LINEAR:
-	{
-		// 거리에 따라 안개 색상을 선형 감쇠로 계산한다.
-		float fogAmount = saturate((distToEye - gFogStart) / gFogRange);
-		result = lerp(litColor, gFogColor, fogAmount);
-		break;
-	}
-	case FOG_EXPONENTIAL:
-	{
-		// 지수적으로 멀리 있을수록 안개가 더 두꺼워진다.
-		float fogAmount = exp(-distToEye * gFogDensity);
-		result = lerp(gFogColor, litColor, fogAmount);
-		break;
-	}
-	case FOG_EXPONENTIAL2:
-	{
-		// 매우 두꺼운 안개를 나타낸다.
-		float fogAmount = exp(-pow(distToEye * gFogDensity, 2));
-		result = lerp(gFogColor, litColor, fogAmount);
-		break;
-	}
-	}
-
-	return result;
-}
+	float4 mDiffuse  : SV_TARGET0;
+	float4 mSpecularRoughness : SV_TARGET1;
+	float4 mPosition : SV_TARGET2;
+	float4 mNormal   : SV_TARGET3;
+	float4 mNormalx  : SV_TARGET4;
+};
 
 float3 ComputePatchMidPoint(float3 p0, float3 p1, float3 p2, float3 p3)
 {
@@ -350,8 +326,10 @@ DomainOut DS(PatchTess patchTess,
 	return dout;
 }
 
-float4 PS(DomainOut pin) : SV_Target
+PixelOut PS(DomainOut pin)
 {
+	PixelOut pout = (PixelOut)0.0f;
+
 	MaterialData materialData = gMaterialData[gMaterialIndex];
 	float4 diffuse = materialData.mDiffuseAlbedo;
 	float3 specular = materialData.mSpecular;
@@ -364,35 +342,25 @@ float4 PS(DomainOut pin) : SV_Target
 	}
 
 	// 미리 계산된 노멀맵에서 해당 픽셀 위치의 노멀을 가져온다.
-	float3 normal = normalize(gNormalMap.SampleLevel(gsamLinearClamp, pin.mTexC, 0.0f).xyz);
+	float3 normal = normalize(gNormalMap.SampleLevel(gsamAnisotropicWrap, pin.mTexC, 0.0f).xyz);
 
 	// Terrain의 절반이상부터는 꼭대기에 눈이 쌓인듯한 효과를 준다.
 	if (pin.mHeight > 0.5f)
 	{
-		float snowAmount = (pin.mHeight - 0.5f) * 2.0f;
+		float snowAmount = smoothstep(0.5f, 1.0f, pin.mHeight);
 		diffuse = lerp(diffuse, 1.0f, snowAmount);
 	}
 
-	// 조명되는 픽셀에서 눈으로의 벡터
-	float3 toEyeW = gEyePosW - pin.mPosW;
-	float distToEye = length(toEyeW);
-	toEyeW /= distToEye; // normalize
+	pout.mDiffuse = float4(diffuse.rgb, 1.0f);
+	pout.mSpecularRoughness = float4(specular, roughness);
+	pout.mPosition = float4(pin.mPosW, 0.0f);
+	pout.mNormal = float4(normal, 1.0f);
 
-	// Diffuse를 전반적으로 밝혀주는 Ambient항
-	float4 ambient = gAmbientLight * diffuse;
+	return pout;
+}
 
-	// roughness와 normal를 이용하여 shininess를 계산한다.
-	const float shininess = 1.0f - roughness;
-	Material mat = { diffuse, specular, shininess };
-
-	// Terrain에선 gLight의 DirectionalLight만을 라이팅한다.
-	float4 directLight = ComputeOnlyDirectionalLight(gLights, mat, normal, toEyeW);
-	float4 litColor = ambient + directLight;
-
-	if (gFogEnabled)
-	{
-		litColor = GetFogBlend(litColor, distToEye);
-	}
-
-	return litColor;
+float4 PS_Wireframe(DomainOut pin) : SV_Target
+{
+	MaterialData materialData = gMaterialData[gMaterialIndex];
+	return materialData.mDiffuseAlbedo;
 }

@@ -45,3 +45,13 @@ float4 SsaoMapDebugPS(VertexOut pin) : SV_Target
 {
 	return float4(gSsaoMap.Sample(gsamLinearWrap, pin.mTexC).rrr, 1.0f);
 }
+
+float4 SsrMapDebugPS(VertexOut pin) : SV_Target
+{
+	return float4(gSsrMap.Sample(gsamLinearWrap, pin.mTexC).rgb, 1.0f);
+}
+
+float4 BluredSsrMapDebugPS(VertexOut pin) : SV_Target
+{
+	return float4(gBluredSsrMap.Sample(gsamLinearWrap, pin.mTexC).rgb, 1.0f);
+}

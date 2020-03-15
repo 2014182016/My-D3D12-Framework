@@ -20,7 +20,8 @@ public:
 	std::vector<float> CalcGaussWeights(float sigma);
 
 	void BuildDescriptors(ID3D12Device* device,
-		CD3DX12_GPU_DESCRIPTOR_HANDLE hNormalGpuSrv,
+		CD3DX12_GPU_DESCRIPTOR_HANDLE hNormalMapGpuSrv,
+		CD3DX12_GPU_DESCRIPTOR_HANDLE hDiffuseMapGpuSrv,
 		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
 		CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
 		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv);
@@ -55,7 +56,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> mAmbientMap1;
 
 	CD3DX12_GPU_DESCRIPTOR_HANDLE mhNormalMapGpuSrv;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE mhDepthMapGpuSrv;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE mhDiffuseMapGpuSrv;
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE mhRandomVectorMapCpuSrv;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE mhRandomVectorMapGpuSrv;

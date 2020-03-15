@@ -44,7 +44,7 @@ VertexOut VS(VertexIn vin)
 
 float4 PS(VertexOut pin) : SV_Target
 {
-	float4 diffuse; float3 specular; float roughness;
+	float4 diffuse = 0.0f; float3 specular = 0.0f; float roughness = 0.0f;
 	GetMaterialAttibute(gObjMaterialIndex, diffuse, specular, roughness);
 
 	diffuse *= GetDiffuseMapSample(gObjMaterialIndex, pin.mTexC);

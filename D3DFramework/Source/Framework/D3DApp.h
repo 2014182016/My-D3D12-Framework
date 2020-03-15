@@ -6,6 +6,7 @@
 #define LIGHT_NUM 1
 
 //#define SSAO
+#define SSR
 #define MULTITHREAD_RENDERING
 
 class D3DApp : public WinApp
@@ -101,12 +102,13 @@ protected:
 	D3D12_RECT mScissorRect;
 	UINT m4xMsaaQuality = 0;
 
-	DirectX::XMFLOAT4 mBackBufferClearColor = (DirectX::XMFLOAT4)DirectX::Colors::LightSteelBlue;
+	DirectX::XMFLOAT4 mBackBufferClearColor = DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+
 	const std::array<DirectX::XMFLOAT4, DEFERRED_BUFFER_COUNT> mDeferredBufferClearColors =
 	{
-		DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f), // Diffuse
+		DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f), // Diffuse, 알파 값은 라이팅의 체크여부를 다룬다
 		DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f), // Specular Roughness
-		DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f), // Position
+		DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f), // Position, 알파 값은 SSAO 및 SSR 체크 여부를 다룬다.
 		DirectX::XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f), // Normal
 		DirectX::XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f), // Normal(Normal Map x)
 	};

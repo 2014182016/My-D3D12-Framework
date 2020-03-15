@@ -4,7 +4,7 @@
 
 cbuffer cbSsao : register(b0)
 {
-	float4 gOffsetVectors[14];
+	float4 gOffsetVectors[14]; 
 	float4 gBlurWeights[3];
 
 	float gOcclusionRadius;

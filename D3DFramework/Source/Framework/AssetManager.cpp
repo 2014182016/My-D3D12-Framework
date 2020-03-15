@@ -477,7 +477,7 @@ void AssetManager::BuildMaterial()
 	mat->SetNormalMapIndex(FindTexture("Bricks2_nmap"s)->mTextureIndex);
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.1f, 0.1f, 0.1f);
-	mat->SetRoughtness(0.25f);
+	mat->SetRoughtness(0.9f);
 	mMaterials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Tile0"s);
@@ -485,7 +485,7 @@ void AssetManager::BuildMaterial()
 	mat->SetNormalMapIndex(FindTexture("Tile_nmap"s)->mTextureIndex);
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.2f, 0.2f, 0.2f);
-	mat->SetRoughtness(0.1f);
+	mat->SetRoughtness(0.3f);
 	mat->SetScale(5.0f, 5.0f);
 	mMaterials[mat->GetName()] = std::move(mat);
 

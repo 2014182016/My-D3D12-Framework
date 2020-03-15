@@ -100,6 +100,17 @@ struct SsaoConstants
 	float mPadding0;
 };
 
+struct SsrConstants
+{
+	float mMaxDistance;
+	float mThickness;
+	std::int32_t mRayTraceStep;
+	std::int32_t mBinaryStep;
+	DirectX::XMFLOAT2 mScreenEdgeFadeStart;
+	float mStrideCutoff;
+	float mResolutuon;
+};
+
 struct ParticleData
 {
 	DirectX::XMFLOAT4 mColor;

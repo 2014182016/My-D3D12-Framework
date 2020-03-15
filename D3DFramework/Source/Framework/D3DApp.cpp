@@ -4,6 +4,7 @@
 #include "Structure.h"
 #include "AssetManager.h"
 #include "Ssao.h"
+#include "Ssr.h"
 #include "Global.h"
 
 using Microsoft::WRL::ComPtr;
@@ -83,8 +84,8 @@ void D3DApp::OnDestroy()
 void D3DApp::CreateRtvAndDsvDescriptorHeaps(UINT shadowMapNum)
 {
 	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc;
-#ifdef SSAO
-	rtvHeapDesc.NumDescriptors = SWAP_CHAIN_BUFFER_COUNT + DEFERRED_BUFFER_COUNT + 2; // Back Buffer, Deferred Buffer, Ssao Map
+#if defined(SSAO) || defined(SSR)
+	rtvHeapDesc.NumDescriptors = SWAP_CHAIN_BUFFER_COUNT + DEFERRED_BUFFER_COUNT + 3; // Ssao Map, Ssr Map
 #else
 	rtvHeapDesc.NumDescriptors = SWAP_CHAIN_BUFFER_COUNT + DEFERRED_BUFFER_COUNT;
 #endif
@@ -136,7 +137,14 @@ void D3DApp::OnResize(int screenWidth, int screenHeight)
 	for (UINT i = 0; i < SWAP_CHAIN_BUFFER_COUNT; i++)
 	{
 		ThrowIfFailed(mSwapChain->GetBuffer(i, IID_PPV_ARGS(&mSwapChainBuffer[i])));
-		md3dDevice->CreateRenderTargetView(mSwapChainBuffer[i].Get(), nullptr, rtvHeapHandle);
+
+		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+		rtvDesc.Format = mBackBufferFormat;
+		rtvDesc.Texture2D.MipSlice = 0;
+		rtvDesc.Texture2D.PlaneSlice = 0;
+
+		md3dDevice->CreateRenderTargetView(mSwapChainBuffer[i].Get(), &rtvDesc, rtvHeapHandle);
 		rtvHeapHandle.Offset(1, DescriptorSize::rtvDescriptorSize);
 	}
 
@@ -541,11 +549,12 @@ void D3DApp::CreateRootSignatures(UINT textureNum, UINT shadowMapNum)
 
 	///////////////////////////////////////// Common /////////////////////////////////////
 	{
-		CD3DX12_DESCRIPTOR_RANGE texTable[4];
+		CD3DX12_DESCRIPTOR_RANGE texTable[5];
 		texTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, textureNum, 0, 0);
 		texTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, shadowMapNum, 0, 1);
 		texTable[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, DEFERRED_BUFFER_COUNT + 1, 0, 2); // Deferred Map + Depth Map
 		texTable[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, DEFERRED_BUFFER_COUNT + 1, 2); // SSAO Map
+		texTable[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, DEFERRED_BUFFER_COUNT + 2, 2); // Ssr Map
 
 		std::array<CD3DX12_ROOT_PARAMETER, (int)RpCommon::Count> slotRootParameter;
 
@@ -558,6 +567,7 @@ void D3DApp::CreateRootSignatures(UINT textureNum, UINT shadowMapNum)
 		slotRootParameter[(int)RpCommon::ShadowMap].InitAsDescriptorTable(1, &texTable[1], D3D12_SHADER_VISIBILITY_PIXEL);
 		slotRootParameter[(int)RpCommon::GBuffer].InitAsDescriptorTable(1, &texTable[2], D3D12_SHADER_VISIBILITY_PIXEL);
 		slotRootParameter[(int)RpCommon::Ssao].InitAsDescriptorTable(1, &texTable[3], D3D12_SHADER_VISIBILITY_PIXEL);
+		slotRootParameter[(int)RpCommon::Ssr].InitAsDescriptorTable(1, &texTable[4], D3D12_SHADER_VISIBILITY_PIXEL);
 
 		// 그래픽 응용 프로그램이 사용하는 표본추출기의 수는 그리 많지 않으므로
 		// 미리 만들어서 Root Signature에 포함시켜 둔다.
@@ -658,9 +668,10 @@ void D3DApp::CreateRootSignatures(UINT textureNum, UINT shadowMapNum)
 
 	///////////////////////////////////////// SSAO /////////////////////////////////////
 	{
-	CD3DX12_DESCRIPTOR_RANGE texTables[2];
+	CD3DX12_DESCRIPTOR_RANGE texTables[3];
 	texTables[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 0, 0);
 	texTables[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2, 0);
+	texTables[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 3, 0);
 
 	std::array<CD3DX12_ROOT_PARAMETER, (int)RpSsao::Count> slotRootParameter;
 
@@ -670,6 +681,7 @@ void D3DApp::CreateRootSignatures(UINT textureNum, UINT shadowMapNum)
 	slotRootParameter[(int)RpSsao::Constants].InitAsConstants(1, 2);
 	slotRootParameter[(int)RpSsao::BufferMap].InitAsDescriptorTable(1, &texTables[0], D3D12_SHADER_VISIBILITY_PIXEL);
 	slotRootParameter[(int)RpSsao::SsaoMap].InitAsDescriptorTable(1, &texTables[1], D3D12_SHADER_VISIBILITY_PIXEL);
+	slotRootParameter[(int)RpSsao::DiffuseMap].InitAsDescriptorTable(1, &texTables[2], D3D12_SHADER_VISIBILITY_PIXEL);
 
 	const CD3DX12_STATIC_SAMPLER_DESC pointClamp(
 		0, // shaderRegister
@@ -819,8 +831,7 @@ void D3DApp::CreateRootSignatures(UINT textureNum, UINT shadowMapNum)
 		slotRootParameter[(int)RpTerrainGraphics::Pass].InitAsConstantBufferView(1);
 		slotRootParameter[(int)RpTerrainGraphics::Texture].InitAsDescriptorTable(1, &texTables[0], D3D12_SHADER_VISIBILITY_ALL);
 		slotRootParameter[(int)RpTerrainGraphics::Srv].InitAsDescriptorTable(1, &texTables[1], D3D12_SHADER_VISIBILITY_ALL);
-		slotRootParameter[(int)RpTerrainGraphics::Light].InitAsShaderResourceView(2, 1);
-		slotRootParameter[(int)RpTerrainGraphics::Material].InitAsShaderResourceView(3, 1);
+		slotRootParameter[(int)RpTerrainGraphics::Material].InitAsShaderResourceView(2, 1);
 
 		// 선형 필터링, 순환 좌표 지정 모드
 		const CD3DX12_STATIC_SAMPLER_DESC linearWrap(
@@ -899,13 +910,135 @@ void D3DApp::CreateRootSignatures(UINT textureNum, UINT shadowMapNum)
 			serializedRootSig->GetBufferSize(),
 			IID_PPV_ARGS(&mRootSignatures["TerrainCompute"])));
 	}
+
+	///////////////////////////////////////// Ssr /////////////////////////////////////
+	{
+		CD3DX12_DESCRIPTOR_RANGE texTables[3];
+		texTables[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
+		texTables[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0);
+		texTables[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2, 0);
+
+		std::array<CD3DX12_ROOT_PARAMETER, (int)RpSsr::Count> slotRootParameter;
+
+		// 퍼포먼스 TIP: 가장 자주 사용하는 것을 앞에 놓는다.
+		slotRootParameter[(int)RpSsr::PositionMap].InitAsDescriptorTable(1, &texTables[0]);
+		slotRootParameter[(int)RpSsr::NormalMap].InitAsDescriptorTable(1, &texTables[1]);
+		slotRootParameter[(int)RpSsr::ColorMap].InitAsDescriptorTable(1, &texTables[2]);
+		slotRootParameter[(int)RpSsr::SsrCB].InitAsConstantBufferView(0);
+		slotRootParameter[(int)RpSsr::Pass].InitAsConstantBufferView(1);
+
+		// 선형 필터링, 순환 좌표 지정 모드
+		const CD3DX12_STATIC_SAMPLER_DESC linearWrap(
+			0, // shaderRegister
+			D3D12_FILTER_MIN_MAG_MIP_LINEAR, // filter
+			D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
+			D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
+			D3D12_TEXTURE_ADDRESS_MODE_CLAMP); // addressW
+
+		std::array<CD3DX12_STATIC_SAMPLER_DESC, 1> staticSamplers = { linearWrap };
+
+		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc((UINT)slotRootParameter.size(), slotRootParameter.data(),
+			(UINT)staticSamplers.size(), staticSamplers.data(),
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+		// Root Signature를 직렬화한 후 객체를 생성한다.
+		ComPtr<ID3DBlob> serializedRootSig = nullptr;
+		ComPtr<ID3DBlob> errorBlob = nullptr;
+		HRESULT hr = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+			serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
+
+		if (errorBlob != nullptr)
+		{
+			::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+		}
+		ThrowIfFailed(hr);
+
+		ThrowIfFailed(md3dDevice->CreateRootSignature(
+			0,
+			serializedRootSig->GetBufferPointer(),
+			serializedRootSig->GetBufferSize(),
+			IID_PPV_ARGS(&mRootSignatures["Ssr"])));
+	}
+
+	///////////////////////////////////////// Reflection /////////////////////////////////////
+	{
+		CD3DX12_DESCRIPTOR_RANGE texTables[3];
+		texTables[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
+		texTables[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1, 0);
+		texTables[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 3, 0);
+
+		std::array<CD3DX12_ROOT_PARAMETER, (int)RpReflection::Count> slotRootParameter;
+
+		// 퍼포먼스 TIP: 가장 자주 사용하는 것을 앞에 놓는다.
+		slotRootParameter[(int)RpReflection::ColorMap].InitAsDescriptorTable(1, &texTables[0]);
+		slotRootParameter[(int)RpReflection::BufferMap].InitAsDescriptorTable(1, &texTables[1]);
+		slotRootParameter[(int)RpReflection::SsrMap].InitAsDescriptorTable(1, &texTables[2]);
+
+		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc((UINT)slotRootParameter.size(), slotRootParameter.data(),
+			0, nullptr,
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+		// Root Signature를 직렬화한 후 객체를 생성한다.
+		ComPtr<ID3DBlob> serializedRootSig = nullptr;
+		ComPtr<ID3DBlob> errorBlob = nullptr;
+		HRESULT hr = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+			serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
+
+		if (errorBlob != nullptr)
+		{
+			::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+		}
+		ThrowIfFailed(hr);
+
+		ThrowIfFailed(md3dDevice->CreateRootSignature(
+			0,
+			serializedRootSig->GetBufferPointer(),
+			serializedRootSig->GetBufferSize(),
+			IID_PPV_ARGS(&mRootSignatures["Reflection"])));
+	}
+
+	///////////////////////////////////////// Blur /////////////////////////////////////
+	{
+		CD3DX12_DESCRIPTOR_RANGE texTables[2];
+		texTables[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
+		texTables[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 0);
+
+		std::array<CD3DX12_ROOT_PARAMETER, (int)RpBlur::Count> slotRootParameter;
+
+		// 퍼포먼스 TIP: 가장 자주 사용하는 것을 앞에 놓는다.
+		slotRootParameter[(int)RpBlur::BlurConstants].InitAsConstants(20, 0);
+		slotRootParameter[(int)RpBlur::InputSrv].InitAsDescriptorTable(1, &texTables[0]);
+		slotRootParameter[(int)RpBlur::OutputUav].InitAsDescriptorTable(1, &texTables[1]);
+
+		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc((UINT)slotRootParameter.size(), slotRootParameter.data(),
+			0, nullptr,
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+		// Root Signature를 직렬화한 후 객체를 생성한다.
+		ComPtr<ID3DBlob> serializedRootSig = nullptr;
+		ComPtr<ID3DBlob> errorBlob = nullptr;
+		HRESULT hr = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+			serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
+
+		if (errorBlob != nullptr)
+		{
+			::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+		}
+		ThrowIfFailed(hr);
+
+		ThrowIfFailed(md3dDevice->CreateRootSignature(
+			0,
+			serializedRootSig->GetBufferPointer(),
+			serializedRootSig->GetBufferSize(),
+			IID_PPV_ARGS(&mRootSignatures["Blur"])));
+	}
 }
 
 void D3DApp::CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum, UINT particleNum)
 {
 	D3D12_DESCRIPTOR_HEAP_DESC cbvSrvUavDescriptorHeap = {};
-	cbvSrvUavDescriptorHeap.NumDescriptors = textureNum +  shadowMapNum + (particleNum * 3) + DEFERRED_BUFFER_COUNT
-		+ 1 + 3 + 4; // Depth Buffer, SsaoMaps, Terrain
+	cbvSrvUavDescriptorHeap.NumDescriptors = textureNum +  shadowMapNum + (particleNum * 3) + DEFERRED_BUFFER_COUNT + SWAP_CHAIN_BUFFER_COUNT
+		+ 1 + 3 + 4 + 1 + 4; // Depth Buffer, SsaoMaps, Terrain, SsrMap, BlurFilter
 	cbvSrvUavDescriptorHeap.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	cbvSrvUavDescriptorHeap.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&cbvSrvUavDescriptorHeap, IID_PPV_ARGS(&mCbvSrvUavDescriptorHeap)));
@@ -918,8 +1051,19 @@ void D3DApp::CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum, UINT part
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Texture2D.MostDetailedMip = 0;
 	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+	srvDesc.Format = mBackBufferFormat;
+	srvDesc.Texture2D.MipLevels = 1;
 
-	DescriptorIndex::textureHeapIndex = 0;
+	DescriptorIndex::renderTargetHeapIndex = 0;
+	for (UINT i = 0; i < SWAP_CHAIN_BUFFER_COUNT; ++i)
+	{
+		md3dDevice->CreateShaderResourceView(mSwapChainBuffer[i].Get(), &srvDesc, hDescriptor);
+
+		// next descriptor
+		hDescriptor.Offset(1, DescriptorSize::cbvSrvUavDescriptorSize);
+	}
+
+	DescriptorIndex::textureHeapIndex = DescriptorIndex::renderTargetHeapIndex + SWAP_CHAIN_BUFFER_COUNT;
 	// 각 텍스처마다 힙에 Shader Resource View를 생성한다.
 	for (UINT i = 0; i < textureNum; ++i)
 	{
@@ -934,7 +1078,7 @@ void D3DApp::CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum, UINT part
 		hDescriptor.Offset(1, DescriptorSize::cbvSrvUavDescriptorSize);
 	}
 
-	DescriptorIndex::deferredBufferHeapIndex = textureNum;
+	DescriptorIndex::deferredBufferHeapIndex = DescriptorIndex::textureHeapIndex + textureNum;
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	for (UINT i = 0; i < DEFERRED_BUFFER_COUNT; ++i)
 	{
@@ -948,7 +1092,7 @@ void D3DApp::CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum, UINT part
 		hDescriptor.Offset(1, DescriptorSize::cbvSrvUavDescriptorSize);
 	}
 
-	
+	DescriptorIndex::depthBufferHeapIndex = DescriptorIndex::deferredBufferHeapIndex + DEFERRED_BUFFER_COUNT;
 	srvDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
 	// G-Buffer에 사용되는 깊이 버퍼에 대한 SRV를 생성한다.
 	md3dDevice->CreateShaderResourceView(mDepthStencilBuffer.Get(), &srvDesc, hDescriptor);
@@ -1008,6 +1152,8 @@ void D3DApp::CreateShadersAndInputLayout()
 	mShaders["PositionMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "PositionMapDebugPS", "ps_5_1");
 	mShaders["ShadowMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "ShadowMapDebugPS", "ps_5_1");
 	mShaders["SsaoMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "SsaoMapDebugPS", "ps_5_1");
+	mShaders["SsrMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "SsrMapDebugPS", "ps_5_1");
+	mShaders["BluredSsrMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "BluredSsrMapDebugPS", "ps_5_1");
 
 	mShaders["LightingPassVS"] = D3DUtil::CompileShader(L"Shaders\\LightingPass.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["LightingPassPS"] = D3DUtil::CompileShader(L"Shaders\\LightingPass.hlsl", defines, "PS", "ps_5_1");
@@ -1021,8 +1167,17 @@ void D3DApp::CreateShadersAndInputLayout()
 	mShaders["TerrainHS"] = D3DUtil::CompileShader(L"Shaders\\TerrainRender.hlsl", nullptr, "HS", "hs_5_1");
 	mShaders["TerrainDS"] = D3DUtil::CompileShader(L"Shaders\\TerrainRender.hlsl", nullptr, "DS", "ds_5_1");
 	mShaders["TerrainPS"] = D3DUtil::CompileShader(L"Shaders\\TerrainRender.hlsl", nullptr, "PS", "ps_5_1");
+	mShaders["TerrainWireframePS"] = D3DUtil::CompileShader(L"Shaders\\TerrainRender.hlsl", nullptr, "PS_Wireframe", "ps_5_1");
 	mShaders["TerrainStdDevCS"] = D3DUtil::CompileShader(L"Shaders\\TerrainCompute.hlsl", nullptr, "CS_StdDev", "cs_5_1");
 	mShaders["TerrainNormalCS"] = D3DUtil::CompileShader(L"Shaders\\TerrainCompute.hlsl", nullptr, "CS_Normal", "cs_5_1");
+
+	mShaders["SsrVS"] = D3DUtil::CompileShader(L"Shaders\\Ssr.hlsl", nullptr, "VS", "vs_5_1");
+	mShaders["SsrPS"] = D3DUtil::CompileShader(L"Shaders\\Ssr.hlsl", nullptr, "PS", "ps_5_1");
+	mShaders["ReflectionVS"] = D3DUtil::CompileShader(L"Shaders\\Reflection.hlsl", nullptr, "VS", "vs_5_1");
+	mShaders["ReflectionPS"] = D3DUtil::CompileShader(L"Shaders\\Reflection.hlsl", nullptr, "PS", "ps_5_1");
+
+	mShaders["BlurHorzCS"] = D3DUtil::CompileShader(L"Shaders\\Blur.hlsl", nullptr, "CS_BlurHorz", "cs_5_1");
+	mShaders["BlurVertCS"] = D3DUtil::CompileShader(L"Shaders\\Blur.hlsl", nullptr, "CS_BlurVert", "cs_5_1");
 
 	mDefaultLayout =
 	{
@@ -1406,6 +1561,26 @@ void D3DApp::CreatePSOs()
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&ssaoMapDebugPsoDesc, IID_PPV_ARGS(&mPSOs["SsaoMapDebug"])));
 
 
+	// PSO for SsrMapDebug
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC ssrMapDebugPsoDesc = widgetPsoDesc;
+	ssrMapDebugPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["SsrMapDebugPS"]->GetBufferPointer()),
+		mShaders["SsrMapDebugPS"]->GetBufferSize()
+	};
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&ssrMapDebugPsoDesc, IID_PPV_ARGS(&mPSOs["SsrMapDebug"])));
+
+
+	// PSO for BluredSsrMapDebug
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC bluredSsrMapDebugPsoDesc = widgetPsoDesc;
+	bluredSsrMapDebugPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["BluredSsrMapDebugPS"]->GetBufferPointer()),
+		mShaders["BluredSsrMapDebugPS"]->GetBufferSize()
+	};
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&bluredSsrMapDebugPsoDesc, IID_PPV_ARGS(&mPSOs["BluredSsrMapDebug"])));
+
+
 	// PSO for LightingPass
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC lightingPassPsoDesc = widgetPsoDesc;
 	lightingPassPsoDesc.InputLayout = { nullptr, 0 };
@@ -1424,7 +1599,7 @@ void D3DApp::CreatePSOs()
 
 
 	// PSO for TerrainPass
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC terrainPsoDesc = forwardPsoDesc;
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC terrainPsoDesc = gBufferPsoDesc;
 	terrainPsoDesc.InputLayout = { mTerrainLayout.data(), (UINT)mTerrainLayout.size() };
 	terrainPsoDesc.pRootSignature = mRootSignatures["TerrainRender"].Get();
 	terrainPsoDesc.VS =
@@ -1453,9 +1628,30 @@ void D3DApp::CreatePSOs()
 
 
 	// PSO for TerrainWireframePass
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC terrainWireframePsoDesc = terrainPsoDesc;
-	terrainWireframePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
-	terrainWireframePsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC terrainWireframePsoDesc = opaqueWireframePsoDesc;
+	terrainWireframePsoDesc.InputLayout = { mTerrainLayout.data(), (UINT)mTerrainLayout.size() };
+	terrainWireframePsoDesc.pRootSignature = mRootSignatures["TerrainRender"].Get();
+	terrainWireframePsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["TerrainVS"]->GetBufferPointer()),
+		mShaders["TerrainVS"]->GetBufferSize()
+	};
+	terrainWireframePsoDesc.HS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["TerrainHS"]->GetBufferPointer()),
+		mShaders["TerrainHS"]->GetBufferSize()
+	};
+	terrainWireframePsoDesc.DS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["TerrainDS"]->GetBufferPointer()),
+		mShaders["TerrainDS"]->GetBufferSize()
+	};
+	terrainWireframePsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["TerrainWireframePS"]->GetBufferPointer()),
+		mShaders["TerrainWireframePS"]->GetBufferSize()
+	};
+	terrainWireframePsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&terrainWireframePsoDesc, IID_PPV_ARGS(&mPSOs["TerrainWireframe"])));
 
 
@@ -1479,6 +1675,64 @@ void D3DApp::CreatePSOs()
 		mShaders["TerrainNormalCS"]->GetBufferSize()
 	};
 	ThrowIfFailed(md3dDevice->CreateComputePipelineState(&terrainNormalPsoDesc, IID_PPV_ARGS(&mPSOs["TerrainNormal"])));
+
+
+	// PSO for Ssr
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC ssrPsoDesc = forwardPsoDesc;
+	ssrPsoDesc.InputLayout = { nullptr, 0 };
+	ssrPsoDesc.pRootSignature = mRootSignatures["Ssr"].Get();
+	ssrPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["SsrVS"]->GetBufferPointer()),
+		mShaders["SsrVS"]->GetBufferSize()
+	};
+	ssrPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["SsrPS"]->GetBufferPointer()),
+		mShaders["SsrPS"]->GetBufferSize()
+	};
+	ssrPsoDesc.DepthStencilState.DepthEnable = false;
+	ssrPsoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+	ssrPsoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
+	ssrPsoDesc.RTVFormats[0] = Ssr::ssrMapFormat;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&ssrPsoDesc, IID_PPV_ARGS(&mPSOs["Ssr"])));
+
+
+	// PSO for Reflection
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC reflectionPsoDesc = lightingPassPsoDesc;
+	reflectionPsoDesc.pRootSignature = mRootSignatures["Reflection"].Get();
+	reflectionPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["ReflectionVS"]->GetBufferPointer()),
+		mShaders["ReflectionVS"]->GetBufferSize()
+	};
+	reflectionPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["ReflectionPS"]->GetBufferPointer()),
+		mShaders["ReflectionPS"]->GetBufferSize()
+	};
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&reflectionPsoDesc, IID_PPV_ARGS(&mPSOs["Reflection"])));
+
+
+	// PSO for BlurHorz
+	D3D12_COMPUTE_PIPELINE_STATE_DESC blurHorzPsoDesc = {};
+	blurHorzPsoDesc.pRootSignature = mRootSignatures["Blur"].Get();
+	blurHorzPsoDesc.CS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["BlurHorzCS"]->GetBufferPointer()),
+		mShaders["BlurHorzCS"]->GetBufferSize()
+	};
+	ThrowIfFailed(md3dDevice->CreateComputePipelineState(&blurHorzPsoDesc, IID_PPV_ARGS(&mPSOs["BlurHorz"])));
+
+	// PSO for BlurVert
+	D3D12_COMPUTE_PIPELINE_STATE_DESC blurVertPsoDesc = {};
+	blurVertPsoDesc.pRootSignature = mRootSignatures["Blur"].Get();
+	blurVertPsoDesc.CS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["BlurVertCS"]->GetBufferPointer()),
+		mShaders["BlurVertCS"]->GetBufferSize()
+	};
+	ThrowIfFailed(md3dDevice->CreateComputePipelineState(&blurVertPsoDesc, IID_PPV_ARGS(&mPSOs["BlurVert"])));
 }
 
 void D3DApp::SetGamma(float gamma)

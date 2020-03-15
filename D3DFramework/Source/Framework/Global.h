@@ -24,10 +24,13 @@ public:
 class DescriptorIndex
 {
 public:
+	static inline UINT renderTargetHeapIndex = 0;
 	static inline UINT textureHeapIndex = 0;
 	static inline UINT shadowMapHeapIndex = 0;
 	static inline UINT deferredBufferHeapIndex = 0;
+	static inline UINT depthBufferHeapIndex = 0;
 	static inline UINT ssaoMapHeapIndex = 0;
+	static inline UINT ssrMapHeapIndex = 0;
 	static inline UINT particleHeapIndex = 0;
 	static inline UINT terrainHeapIndex = 0;
 };

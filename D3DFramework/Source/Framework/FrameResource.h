@@ -33,6 +33,8 @@ public:
 		if (mParticlePool->GetBuffer()) return mParticlePool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0; }
 	D3D12_GPU_VIRTUAL_ADDRESS GetTerrainVirtualAddress() const {
 		if (mTerrainPool->GetBuffer()) return mTerrainPool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0; }
+	D3D12_GPU_VIRTUAL_ADDRESS GetSsrVirtualAddress() const {
+		if (mSsrPool->GetBuffer()) return mSsrPool->GetBuffer()->GetResource()->GetGPUVirtualAddress(); return 0; }
  
 public:
 	static inline UINT processorCoreNum = 0;
@@ -61,6 +63,7 @@ public:
 	std::unique_ptr<BufferMemoryPool<ObjectConstants>> mWidgetPool = nullptr;
 	std::unique_ptr<BufferMemoryPool<ParticleConstants>> mParticlePool = nullptr;
 	std::unique_ptr<BufferMemoryPool<TerrainConstants>> mTerrainPool = nullptr;
+	std::unique_ptr<BufferMemoryPool<SsrConstants>> mSsrPool = nullptr;
 
 	std::vector<std::unique_ptr<UploadBuffer<WidgetVertex>>> mWidgetVBs;
 };

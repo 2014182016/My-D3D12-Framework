@@ -92,6 +92,7 @@ enum class RpCommon : int
 	ShadowMap,
 	GBuffer,
 	Ssao,
+	Ssr,
 	Count
 };
 
@@ -102,6 +103,7 @@ enum class RpSsao : int
 	Constants,
 	BufferMap,
 	SsaoMap,
+	DiffuseMap,
 	Count
 };
 
@@ -128,7 +130,6 @@ enum class RpTerrainGraphics : int
 	Pass,
 	Texture,
 	Srv,
-	Light,
 	Material,
 	Count
 };
@@ -137,6 +138,32 @@ enum class RpTerrainCompute : int
 {
 	HeightMap = 0,
 	Uav,
+	Count
+};
+
+enum class RpSsr : int
+{
+	PositionMap = 0,
+	NormalMap,
+	ColorMap,
+	SsrCB,
+	Pass,
+	Count
+};
+
+enum class RpReflection : int
+{
+	ColorMap = 0,
+	BufferMap,
+	SsrMap,
+	Count
+};
+
+enum class RpBlur : int
+{
+	InputSrv = 0,
+	OutputUav,
+	BlurConstants,
 	Count
 };
 

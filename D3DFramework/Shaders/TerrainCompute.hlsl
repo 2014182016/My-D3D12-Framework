@@ -12,38 +12,6 @@ float ComputeDistanceFromPlane(float4 plane, float3 position)
 	return dot(plane.xyz, position) - plane.w;
 }
 
-float3 Sobel(uint2 uv)
-{
-	// 필요한 오프셋들을 계산한다.
-	uint2 o00 = uv + uint2(-1, -1);
-	uint2 o10 = uv + uint2(0, -1);
-	uint2 o20 = uv + uint2(1, -1);
-	uint2 o01 = uv + uint2(-1, 0);
-	uint2 o02 = uv + uint2(-1, 1);
-	uint2 o12 = uv + uint2(0, 1);
-	uint2 o21 = uv + uint2(1, 0.);
-	uint2 o22 = uv + uint2(1, 1);
-
-	// 소벨 필터를 적용하려면 현재 필셀 주위의 여덟 픽셀이 필요한다.
-	float h00 = gHeightMap.Load(uint3(o00, 0)).r;
-	float h10 = gHeightMap.Load(uint3(o10, 0)).r;
-	float h20 = gHeightMap.Load(uint3(o20, 0)).r;
-	float h01 = gHeightMap.Load(uint3(o01, 0)).r;
-	float h02 = gHeightMap.Load(uint3(o02, 0)).r;
-	float h12 = gHeightMap.Load(uint3(o12, 0)).r;
-	float h21 = gHeightMap.Load(uint3(o21, 0)).r;
-	float h22 = gHeightMap.Load(uint3(o22, 0)).r;
-
-	// 소벨 필터들을 평가한다.
-	float gx = h00 - h20 + 2.0f * h01 - 2.0f * h21 + h02 - h22;
-	float gy = h00 + 2.0f * h10 + h20 - h02 - 2.0f * h12 - h22;
-
-	// 빠진 z 성분을 생성한다.
-	float gz = 0.01f * sqrt(max(0.0f, 1.0f - gx * gx - gy * gy));
-
-	return normalize(float3(2.0f * gx, gz, 2.0f * gy));
-}
-
 groupshared float gGroupResults[16 * 16];
 groupshared float3 gRawNormals[2][2];
 groupshared float3 gCorners[2][2];
@@ -159,17 +127,40 @@ void CS_StdDev(uint3 groupID : SV_GroupID, uint3 dispatchThreadID : SV_DispatchT
 	}
 }
 
-groupshared float gHeightValue[16][16];
+float3 Sobel(uint2 uv)
+{
+	// 필요한 오프셋들을 계산한다.
+	uint2 o00 = uv + uint2(-1, -1);
+	uint2 o10 = uv + uint2(0, -1);
+	uint2 o20 = uv + uint2(1, -1);
+	uint2 o01 = uv + uint2(-1, 0);
+	uint2 o02 = uv + uint2(-1, 1);
+	uint2 o12 = uv + uint2(0, 1);
+	uint2 o21 = uv + uint2(1, 0);
+	uint2 o22 = uv + uint2(1, 1);
+
+	// 소벨 필터를 적용하려면 현재 필셀 주위의 여덟 픽셀이 필요한다.
+	float h00 = gHeightMap.Load(uint3(o00, 0)).r;
+	float h10 = gHeightMap.Load(uint3(o10, 0)).r;
+	float h20 = gHeightMap.Load(uint3(o20, 0)).r;
+	float h01 = gHeightMap.Load(uint3(o01, 0)).r;
+	float h02 = gHeightMap.Load(uint3(o02, 0)).r;
+	float h12 = gHeightMap.Load(uint3(o12, 0)).r;
+	float h21 = gHeightMap.Load(uint3(o21, 0)).r;
+	float h22 = gHeightMap.Load(uint3(o22, 0)).r;
+
+	// 소벨 필터들을 평가한다.
+	float gx = h00 - h20 + 2.0f * h01 - 2.0f * h21 + h02 - h22;
+	float gy = h00 + 2.0f * h10 + h20 - h02 - 2.0f * h12 - h22;
+
+	// 빠진 z 성분을 생성한다.
+	float gz = 0.01f * sqrt(max(0.0f, 1.0f - gx * gx - gy * gy));
+
+	return normalize(float3(2.0f * gx, gz, 2.0f * gy));
+}
 
 [numthreads(16, 16, 1)]
 void CS_Normal(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-	// HeightMap의 모든 값을 공유 메모리에 적재한다.
-	gHeightValue[dispatchThreadID.x][dispatchThreadID.y] = gHeightMap.Load(uint3(dispatchThreadID.xy, 0)).r;
-
-	// 그룹의 모든 스레드가 읽기 작업을 마칠 때까지 실행을 차단한다.
-	GroupMemoryBarrierWithGroupSync();
-	
-	// 소벨 연산자를 사용하여 노멀을 계산한다.
 	gNormalMap[dispatchThreadID.xy] = float4(Sobel(dispatchThreadID.xy), 1.0f);
 }

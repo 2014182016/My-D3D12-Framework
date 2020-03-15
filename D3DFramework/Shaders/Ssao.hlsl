@@ -3,8 +3,10 @@
 //=============================================================================
 
 #include "SsaoRS.hlsl"
+#include "Global.hlsl"
 
 Texture2D gRandomVecMap : register(t2);
+Texture2D gPositionMap : register(t3);
 
 struct VertexOut
 {
@@ -34,6 +36,10 @@ float4 PS(VertexOut pin) :SV_Target
 	// n : p에서의 법선 벡터
 	// q : p 주변의 무작위 점
 	// r : p를 가릴 가능성이 있는 잠재적 차폐점
+
+	// Position의 알파 값은 SSAO 및 SSR 체크 여부를 다룬다.
+	if (gPositionMap.Load(uint3(pin.mTexC, 0)).a <= 0.0f)
+		return 1.0f;
 
 	float3 normal = normalize(gNormalMap.SampleLevel(gsamPointClamp, pin.mTexC, 0.0f).xyz);
 	normal = mul(normal, (float3x3)gView);

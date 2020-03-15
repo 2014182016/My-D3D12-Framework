@@ -122,18 +122,12 @@ void Particle::Tick(float deltaTime)
 		mSpawnTime -= deltaTime;
 	}
 
-	std::uint32_t* count = nullptr;
-	D3D12_RANGE readRange;
-	readRange.Begin = 0;
-	readRange.End = 1 * sizeof(std::uint32_t);
-	ThrowIfFailed(mReadBackCounter->Map(0, &readRange, reinterpret_cast<void**>(&count)));
-	mCurrentParticleNum = count[0];
-	mReadBackCounter->Unmap(0, nullptr);
-
 #ifdef BUFFER_COPY
 	static int frameCount = 0;
 
 	ParticleData* mappedData = nullptr;
+	D3D12_RANGE readRange;
+	readRange.Begin = 0;
 	readRange.End = mMaxParticleNum * sizeof(ParticleData);
 	ThrowIfFailed(mReadBackBuffer->Map(0, &readRange, reinterpret_cast<void**>(&mappedData)));
 	auto name = GetName() + ".txt";
@@ -236,4 +230,12 @@ void Particle::CopyData(ID3D12GraphicsCommandList* cmdList)
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mBuffer.Get(),
 		D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 #endif
+
+	std::uint32_t* count = nullptr;
+	D3D12_RANGE readRange;
+	readRange.Begin = 0;
+	readRange.End = 1 * sizeof(std::uint32_t);
+	ThrowIfFailed(mReadBackCounter->Map(0, &readRange, reinterpret_cast<void**>(&count)));
+	mCurrentParticleNum = count[0];
+	mReadBackCounter->Unmap(0, nullptr);
 }

@@ -51,13 +51,15 @@ std::vector<float> Ssao::CalcGaussWeights(float sigma)
 }
 
 void Ssao::BuildDescriptors(ID3D12Device* device, 
-	CD3DX12_GPU_DESCRIPTOR_HANDLE hNormalGpuSrv,
+	CD3DX12_GPU_DESCRIPTOR_HANDLE hNormalMapGpuSrv,
+	CD3DX12_GPU_DESCRIPTOR_HANDLE hDiffuseMapGpuSrv,
 	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
 	CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
 	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv)
 {
 	// Normal Map과 Depth Map은 2개가 연속해서 만들어져있다.
-	mhNormalMapGpuSrv = hNormalGpuSrv; 
+	mhNormalMapGpuSrv = hNormalMapGpuSrv;
+	mhDiffuseMapGpuSrv = hDiffuseMapGpuSrv;
 
 	mhAmbientMap0CpuSrv = hCpuSrv;
 	mhAmbientMap1CpuSrv = hCpuSrv.Offset(1, DescriptorSize::cbvSrvUavDescriptorSize);
@@ -134,6 +136,7 @@ void Ssao::ComputeSsao(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* 
 	cmdList->SetGraphicsRootConstantBufferView((int)RpSsao::SsaoCB, ssaoCBAddress);
 	cmdList->SetGraphicsRootConstantBufferView((int)RpSsao::Pass, passCBAddress);
 	cmdList->SetGraphicsRoot32BitConstant((int)RpSsao::Constants, 0, 0);
+	cmdList->SetGraphicsRootDescriptorTable((int)RpSsao::DiffuseMap, mhNormalMapGpuSrv);
 	cmdList->SetGraphicsRootDescriptorTable((int)RpSsao::BufferMap, mhNormalMapGpuSrv);
 	cmdList->SetGraphicsRootDescriptorTable((int)RpSsao::SsaoMap, mhRandomVectorMapGpuSrv);
 

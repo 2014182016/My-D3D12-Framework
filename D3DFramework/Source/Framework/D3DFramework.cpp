@@ -11,9 +11,11 @@
 #include "Octree.h"
 #include "Interface.h"
 #include "Ssao.h"
+#include "Ssr.h"
 #include "StopWatch.h"
 #include "Random.h"
 #include "Global.h"
+#include "BlurFilter.h"
 
 #include "GameObject.h"
 #include "Material.h"
@@ -66,6 +68,8 @@ D3DFramework::~D3DFramework()
 	mCamera = nullptr;
 	mOctreeRoot = nullptr;
 	mSsao = nullptr;
+	mSsr = nullptr;
+	mBlurFilter = nullptr;
 }
 
 
@@ -104,6 +108,13 @@ void D3DFramework::OnResize(int screenWidth, int screenHeight)
 	if(mSsao)
 		mSsao->OnResize(md3dDevice.Get(), screenWidth, screenHeight);
 #endif
+	
+#ifdef SSR
+	if (mSsr)
+		mSsr->OnResize(md3dDevice.Get(), screenWidth, screenHeight);
+	if (mBlurFilter)
+		mBlurFilter->OnResize(md3dDevice.Get(), screenWidth, screenHeight);
+#endif
 }
 
 void D3DFramework::InitFramework()
@@ -117,6 +128,11 @@ void D3DFramework::InitFramework()
 
 #ifdef SSAO
 	mSsao = std::make_unique<Ssao>(md3dDevice.Get(), mMainCommandList.Get(), mScreenWidth, mScreenHeight);
+#endif
+
+#ifdef SSR
+	mSsr = std::make_unique<Ssr>(md3dDevice.Get(), mScreenWidth, mScreenHeight);
+	mBlurFilter = std::make_unique<BlurFilter>(md3dDevice.Get(), mScreenWidth, mScreenHeight, Ssr::ssrMapFormat);
 #endif
 
 	CreateObjects();
@@ -143,7 +159,8 @@ void D3DFramework::InitFramework()
 
 		// 하이트맵에 대한 표준편차를 계산한다.
 		mMainCommandList->SetComputeRootSignature(mRootSignatures["TerrainCompute"].Get());
-		mMainCommandList->SetComputeRootDescriptorTable((int)RpTerrainCompute::HeightMap, GetGpuSrv(mTerrain->GetMaterial()->GetHeightMapIndex()));
+		mMainCommandList->SetComputeRootDescriptorTable((int)RpTerrainCompute::HeightMap, 
+			GetGpuSrv(DescriptorIndex::textureHeapIndex + mTerrain->GetMaterial()->GetHeightMapIndex()));
 		mTerrain->SetUavDescriptors(mMainCommandList.Get());
 
 		mMainCommandList->SetPipelineState(mPSOs["TerrainStdDev"].Get());
@@ -174,16 +191,31 @@ void D3DFramework::CreateDescriptorHeaps(UINT textureNum, UINT shadowMapNum, UIN
 {
 	D3DApp::CreateDescriptorHeaps(textureNum, shadowMapNum, particleNum);
 
-	DescriptorIndex::ssaoMapHeapIndex = DescriptorIndex::deferredBufferHeapIndex + DEFERRED_BUFFER_COUNT + 1;
+	DescriptorIndex::ssaoMapHeapIndex = DescriptorIndex::depthBufferHeapIndex + 1;
 #ifdef SSAO
 	mSsao->BuildDescriptors(md3dDevice.Get(),
-		GetGpuSrv(DescriptorIndex::deferredBufferHeapIndex + 4), // Normal Map 
+		GetGpuSrv(DescriptorIndex::deferredBufferHeapIndex + 4), // Normalx Map, Depth Map
+		GetGpuSrv(DescriptorIndex::deferredBufferHeapIndex), // Diffuse Map
 		GetCpuSrv(DescriptorIndex::ssaoMapHeapIndex),
 		GetGpuSrv(DescriptorIndex::ssaoMapHeapIndex),
 		GetRtv(SWAP_CHAIN_BUFFER_COUNT + DEFERRED_BUFFER_COUNT));
 #endif
 
-	DescriptorIndex::shadowMapHeapIndex = DescriptorIndex::ssaoMapHeapIndex + 3;
+	DescriptorIndex::ssrMapHeapIndex = DescriptorIndex::ssaoMapHeapIndex + 3;
+#ifdef SSR
+	mSsr->BuildDescriptors(md3dDevice.Get(),
+		GetGpuSrv(DescriptorIndex::deferredBufferHeapIndex + 2), // Position Map
+		GetGpuSrv(DescriptorIndex::deferredBufferHeapIndex + 4), // Normal Map x
+		GetCpuSrv(DescriptorIndex::ssrMapHeapIndex),
+		GetGpuSrv(DescriptorIndex::ssrMapHeapIndex),
+		GetRtv(SWAP_CHAIN_BUFFER_COUNT + DEFERRED_BUFFER_COUNT + 2)); // Ssao의 두 개의 렌더타겟
+	mBlurFilter->BuildDescriptors(md3dDevice.Get(),
+		GetCpuSrv(DescriptorIndex::ssrMapHeapIndex + 1), 
+		GetGpuSrv(DescriptorIndex::ssrMapHeapIndex + 1));
+#endif
+
+
+	DescriptorIndex::shadowMapHeapIndex = DescriptorIndex::ssrMapHeapIndex + 5; // Ssr Map, BlurFilter Srv, Uav
 	UINT i = 0;
 	for (const auto& light : mLights)
 	{
@@ -239,6 +271,11 @@ void D3DFramework::SetCommonState(ID3D12GraphicsCommandList* cmdList)
 	// Ssao Map을 바인딩한다. 단, Ssao를 사용할 경우에만 바인딩한다.
 	cmdList->SetGraphicsRootDescriptorTable((int)RpCommon::Ssao, GetGpuSrv(DescriptorIndex::ssaoMapHeapIndex));
 #endif
+
+#ifdef SSR
+	// Ssr Map을 바인딩한다. 단, Ssao를 사용할 경우에만 바인딩한다.
+	cmdList->SetGraphicsRootDescriptorTable((int)RpCommon::Ssr, GetGpuSrv(DescriptorIndex::ssrMapHeapIndex));
+#endif
 }
 
 void D3DFramework::Render()
@@ -260,9 +297,9 @@ void D3DFramework::Render()
 #ifdef MULTITHREAD_RENDERING
 		auto cmdListPre = mCurrentFrameResource->mFrameCmdLists[0].Get();
 		auto cmdListPost = mCurrentFrameResource->mFrameCmdLists[1].Get();
-
+	
 		Init(cmdListPre);
-
+		ParticleUpdate(cmdListPre);
 		ShadowMapPass(cmdListPre);
 
 		ThrowIfFailed(cmdListPre->Close());
@@ -274,13 +311,13 @@ void D3DFramework::Render()
 		mCommandQueue->ExecuteCommandLists((UINT)mCurrentFrameResource->mExecutableCmdLists.size(), 
 			mCurrentFrameResource->mExecutableCmdLists.data());
 
+		DrawTerrain(cmdListPost, false);
+
 		MidFrame(cmdListPost);
-#ifdef SSAO
-		SsaoPass(cmdListPost);
-#endif
 		LightingPass(cmdListPost);
 		ForwardPass(cmdListPost);
-		ParticleUpdate(cmdListPost);
+		PostProcessPass(cmdListPost);
+
 		Finish(cmdListPost);
 
 		ThrowIfFailed(cmdListPost->Close());
@@ -290,17 +327,17 @@ void D3DFramework::Render()
 		auto cmdList = mCurrentFrameResource->mFrameCmdLists[0].Get();
 
 		Init(cmdList);
-
+		ParticleUpdate(cmdList);
 		ShadowMapPass(cmdList);
+
 		GBufferPass(nullptr);
+		DrawTerrain(cmdList, false);
 
 		MidFrame(cmdList);
-#ifdef SSAO
-		SsaoPass(cmdList);
-#endif
 		LightingPass(cmdList);
 		ForwardPass(cmdList);
-		ParticleUpdate(cmdList);
+		PostProcessPass(cmdList);
+
 		Finish(cmdList);
 
 		ThrowIfFailed(cmdList->Close());
@@ -347,6 +384,7 @@ void D3DFramework::Tick(float deltaTime)
 	UpdateWidgetBuffer(deltaTime);
 	UpdateParticleBuffer(deltaTime);
 	UpdateTerrainBuffer(deltaTime);
+	UpdateSsrBuffer(deltaTime);
 
 #ifdef SSAO
 	UpdateSsaoBuffer(deltaTime);
@@ -589,14 +627,14 @@ void D3DFramework::UpdateParticleBuffer(float deltaTime)
 
 void D3DFramework::UpdateSsaoBuffer(float deltaTime)
 {
-	static UINT isSsaoUpdate = NUM_FRAME_RESOURCES;
+	static UINT isSsaoCBUpdate = NUM_FRAME_RESOURCES;
 	static const XMMATRIX T(
 		0.5f, 0.0f, 0.0f, 0.0f,
 		0.0f, -0.5f, 0.0f, 0.0f,
 		0.0f, 0.0f, 1.0f, 0.0f,
 		0.5f, 0.5f, 0.0f, 1.0f);
 
-	if (isSsaoUpdate > 0)
+	if (isSsaoCBUpdate > 0)
 	{
 		SsaoConstants ssaoCB;
 
@@ -617,7 +655,7 @@ void D3DFramework::UpdateSsaoBuffer(float deltaTime)
 		auto currSsaoCB = mCurrentFrameResource->mSsaoPool->GetBuffer();
 		currSsaoCB->CopyData(0, ssaoCB);
 
-		--isSsaoUpdate;
+		--isSsaoCBUpdate;
 	}
 }
 
@@ -635,12 +673,33 @@ void D3DFramework::UpdateTerrainBuffer(float deltaTime)
 		terrainConstants.mMaxLOD = 64.0f;
 		terrainConstants.mMinDistance = 300.0f;
 		terrainConstants.mMaxDistance = 1000.0f;
-		terrainConstants.mHeightScale = 50.0f;
+		terrainConstants.mHeightScale = 100.0f;
 		terrainConstants.mTexScale = 10.0f;
 		terrainConstants.mMaterialIndex = mTerrain->GetMaterial()->GetMaterialIndex();
 		currTerrainCB->CopyData(0, terrainConstants);
 
 		mTerrain->DecreaseNumFrames();
+	}
+}
+
+void D3DFramework::UpdateSsrBuffer(float deltaTime)
+{
+	static UINT isSsrCBUpdate = NUM_FRAME_RESOURCES;
+	auto currSsrCB = mCurrentFrameResource->mSsrPool->GetBuffer();
+
+	if (isSsrCBUpdate > 0)
+	{
+		SsrConstants ssrConstants;
+		ssrConstants.mMaxDistance = 10.0f;
+		ssrConstants.mThickness = 0.5f;
+		ssrConstants.mRayTraceStep = 20;
+		ssrConstants.mBinaryStep = 5;
+		ssrConstants.mScreenEdgeFadeStart = XMFLOAT2(100.0f, 50.0f);
+		ssrConstants.mStrideCutoff = 10.0f;
+		ssrConstants.mResolutuon = 0.1f;
+		currSsrCB->CopyData(0, ssrConstants);
+
+		--isSsrCBUpdate;
 	}
 }
 
@@ -699,7 +758,7 @@ void D3DFramework::CreateObjects()
 		object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Mirror0"s));
 		object->SetMesh(AssetManager::GetInstance()->FindMesh("Sphere"s));
 		object->SetCollisionEnabled(true);
-		mRenderableObjects[(int)RenderLayer::Transparent].push_back(object);
+		mRenderableObjects[(int)RenderLayer::Opaque].push_back(object);
 		mGameObjects.push_back(object);
 
 		object = std::make_shared<GameObject>("SphereRight"s + std::to_string(i));
@@ -707,7 +766,7 @@ void D3DFramework::CreateObjects()
 		object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Mirror0"s));
 		object->SetMesh(AssetManager::GetInstance()->FindMesh("Sphere"s));
 		object->SetCollisionEnabled(true);
-		mRenderableObjects[(int)RenderLayer::Transparent].push_back(object);
+		mRenderableObjects[(int)RenderLayer::Opaque].push_back(object);
 		mGameObjects.push_back(object);
 	}
 }
@@ -791,7 +850,7 @@ void D3DFramework::CreateWidgets(ID3D12Device* device, ID3D12GraphicsCommandList
 	widget->SetMaterial(AssetManager::GetInstance()->FindMaterial("Default"s));
 	mWidgets.push_back(std::move(widget));
 
-	widget = std::make_shared<Widget>("ShadowMapDebug"s, device, cmdList);
+	widget = std::make_shared<Widget>("SsrMapDebug"s, device, cmdList);
 	widget->SetPosition(960, -120);
 	widget->SetSize(160, 120);
 	widget->SetAnchor(0.0f, 1.0f);
@@ -988,7 +1047,7 @@ void D3DFramework::WireframePass(ID3D12GraphicsCommandList* cmdList)
 
 	PIXEndEvent(cmdList);
 
-	TerrainPass(cmdList, true);
+	DrawTerrain(cmdList, true);
 
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
@@ -1027,8 +1086,9 @@ void D3DFramework::GBufferPass(ID3D12GraphicsCommandList* cmdList)
 	WaitForMultipleObjects(FrameResource::processorCoreNum, mWorkerFinishedFrameEvents.data(), TRUE, INFINITE);
 }
 
-void D3DFramework::SsaoPass(ID3D12GraphicsCommandList* cmdList)
+void D3DFramework::LightingPass(ID3D12GraphicsCommandList* cmdList)
 {
+#ifdef SSAO
 	ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvSrvUavDescriptorHeap.Get() };
 	cmdList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
@@ -1039,10 +1099,8 @@ void D3DFramework::SsaoPass(ID3D12GraphicsCommandList* cmdList)
 	mSsao->BlurAmbientMap(cmdList, mPSOs["SsaoBlur"].Get(), 3);
 
 	PIXEndEvent(cmdList);
-}
+#endif
 
-void D3DFramework::LightingPass(ID3D12GraphicsCommandList* cmdList)
-{
 	SetCommonState(cmdList);
 
 	PIXBeginEvent(cmdList, 0, L"LightingPass Rendering");
@@ -1062,11 +1120,10 @@ void D3DFramework::ForwardPass(ID3D12GraphicsCommandList* cmdList)
 {
 	cmdList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
 
-	TerrainPass(cmdList, false);
+	SetCommonState(cmdList);
 
 	PIXBeginEvent(cmdList, 0, L"Sky Rendering");
 
-	SetCommonState(cmdList);
 	cmdList->SetPipelineState(mPSOs["Sky"].Get());
 	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Sky], mCurrentFrameResource->GetObjectVirtualAddress());
 
@@ -1131,12 +1188,60 @@ void D3DFramework::ForwardPass(ID3D12GraphicsCommandList* cmdList)
 		RenderObject(cmdList, (*iter++).get(), mCurrentFrameResource->GetWidgetVirtualAddress());
 #endif
 
-		cmdList->SetPipelineState(mPSOs["ShadowMapDebug"].Get());
+#ifdef SSR
+		cmdList->SetPipelineState(mPSOs["SsrMapDebug"].Get());
 		RenderObject(cmdList, (*iter++).get(), mCurrentFrameResource->GetWidgetVirtualAddress());
+#endif
 	}
 #endif
 
 	PIXEndEvent(cmdList);
+}
+
+void D3DFramework::PostProcessPass(ID3D12GraphicsCommandList* cmdList)
+{
+#ifdef SSR
+	ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvSrvUavDescriptorHeap.Get() };
+	cmdList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
+	PIXBeginEvent(cmdList, 0, L"Ssr Rendering");
+
+	cmdList->SetGraphicsRootSignature(mRootSignatures["Ssr"].Get());
+	cmdList->SetPipelineState(mPSOs["Ssr"].Get());
+	mSsr->ComputeSsr(cmdList, GetGpuSrv(DescriptorIndex::renderTargetHeapIndex + mCurrentBackBuffer),
+		mCurrentFrameResource->GetSsrVirtualAddress(), mCurrentFrameResource->GetPassVirtualAddress());
+
+	PIXEndEvent(cmdList);
+
+	PIXBeginEvent(cmdList, 0, L"Blur");
+
+	cmdList->SetComputeRootSignature(mRootSignatures["Blur"].Get());
+	mBlurFilter->Execute(cmdList, mPSOs["BlurHorz"].Get(), mPSOs["BlurVert"].Get(),
+		mSsr->GetResource(), D3D12_RESOURCE_STATE_GENERIC_READ, 1);
+
+	PIXEndEvent(cmdList);
+
+	PIXBeginEvent(cmdList, 0, L"Reflection Rendering");
+
+	cmdList->RSSetViewports(1, &mScreenViewport);
+	cmdList->RSSetScissorRects(1, &mScissorRect);
+
+	cmdList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, nullptr);
+
+	cmdList->SetGraphicsRootSignature(mRootSignatures["Reflection"].Get());
+	cmdList->SetPipelineState(mPSOs["Reflection"].Get());
+
+	cmdList->SetGraphicsRootDescriptorTable((int)RpReflection::ColorMap, GetGpuSrv(DescriptorIndex::renderTargetHeapIndex + mCurrentBackBuffer));
+	cmdList->SetGraphicsRootDescriptorTable((int)RpReflection::BufferMap, GetGpuSrv(DescriptorIndex::deferredBufferHeapIndex + 1));
+	cmdList->SetGraphicsRootDescriptorTable((int)RpReflection::SsrMap, GetGpuSrv(DescriptorIndex::ssrMapHeapIndex));
+
+	cmdList->IASetVertexBuffers(0, 0, nullptr);
+	cmdList->IASetIndexBuffer(nullptr);
+	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	cmdList->DrawInstanced(6, 1, 0, 0);
+
+	PIXEndEvent(cmdList);
+#endif
 }
 
 void D3DFramework::ParticleUpdate(ID3D12GraphicsCommandList* cmdList)
@@ -1180,22 +1285,30 @@ void D3DFramework::ParticleUpdate(ID3D12GraphicsCommandList* cmdList)
 	PIXEndEvent(cmdList);
 }
 
-void D3DFramework::TerrainPass(ID3D12GraphicsCommandList* cmdList, bool isWireframe)
+void D3DFramework::DrawTerrain(ID3D12GraphicsCommandList* cmdList, bool isWireframe)
 {
+	cmdList->RSSetViewports(1, &mScreenViewport);
+	cmdList->RSSetScissorRects(1, &mScissorRect);
+
+	ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvSrvUavDescriptorHeap.Get() };
+	cmdList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
 	cmdList->SetGraphicsRootSignature(mRootSignatures["TerrainRender"].Get());
 	if (isWireframe)
 	{
 		PIXBeginEvent(cmdList, 0, "TerrainWirefrmae Rendering");
+
 		cmdList->SetPipelineState(mPSOs["TerrainWireframe"].Get());
 	}
 	else
 	{
 		PIXBeginEvent(cmdList, 0, "Terrain Rendering");
+
+		cmdList->OMSetRenderTargets(DEFERRED_BUFFER_COUNT, &GetDefferedBufferView(0), true, &GetDepthStencilView());
 		cmdList->SetPipelineState(mPSOs["TerrainRender"].Get());
 	}
 	cmdList->SetGraphicsRootConstantBufferView((int)RpTerrainGraphics::Pass, mCurrentFrameResource->GetPassVirtualAddress());
 	cmdList->SetGraphicsRootDescriptorTable((int)RpTerrainGraphics::Texture, GetGpuSrv(DescriptorIndex::textureHeapIndex));
-	cmdList->SetGraphicsRootShaderResourceView((int)RpTerrainGraphics::Light, mCurrentFrameResource->GetLightVirtualAddress());
 	cmdList->SetGraphicsRootShaderResourceView((int)RpTerrainGraphics::Material, mCurrentFrameResource->GetMaterialVirtualAddress());
 	mTerrain->SetSrvDescriptors(cmdList);
 	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Terrain], mCurrentFrameResource->GetTerrainVirtualAddress());
@@ -1222,13 +1335,13 @@ void D3DFramework::Init(ID3D12GraphicsCommandList* cmdList)
 	}
 
 	// 각 G-Buffer의 버퍼들과 렌더 타겟, 깊이 버퍼를 사용하기 위해 자원 상태를를 전환한다.
-	CD3DX12_RESOURCE_BARRIER transitions[DEFERRED_BUFFER_COUNT + 1];
-	transitions[0] = CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
-		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	CD3DX12_RESOURCE_BARRIER transitions[DEFERRED_BUFFER_COUNT];
 	for (int i = 0; i < DEFERRED_BUFFER_COUNT; i++)
-		transitions[i + 1] = CD3DX12_RESOURCE_BARRIER::Transition(mDeferredBuffer[i].Get(),
+		transitions[i] = CD3DX12_RESOURCE_BARRIER::Transition(mDeferredBuffer[i].Get(),
 			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET);
-	cmdList->ResourceBarrier(DEFERRED_BUFFER_COUNT + 1, transitions);
+	cmdList->ResourceBarrier(DEFERRED_BUFFER_COUNT, transitions);
+	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
+		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 	for (int i = 0; i < DEFERRED_BUFFER_COUNT; i++)
 		cmdList->ClearRenderTargetView(GetDefferedBufferView(i), (float*)&mDeferredBufferClearColors[i], 0, nullptr);

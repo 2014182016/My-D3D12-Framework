@@ -68,6 +68,7 @@ FrameResource::FrameResource(ID3D12Device* device, bool isMultiThread,
 	mWidgetPool = std::make_unique<BufferMemoryPool<ObjectConstants>>(device, widgetCount, true);
 	mParticlePool = std::make_unique<BufferMemoryPool<ParticleConstants>>(device, particleCount, true);
 	mTerrainPool = std::make_unique<BufferMemoryPool<TerrainConstants>>(device, 1, true);
+	mSsrPool = std::make_unique<BufferMemoryPool<SsrConstants>>(device, 1, true);
 }
 
 FrameResource::~FrameResource() 
@@ -86,6 +87,7 @@ FrameResource::~FrameResource()
 	mWidgetPool = nullptr;
 	mParticlePool = nullptr;
 	mTerrainPool = nullptr;
+	mSsrPool = nullptr;
 
 	mWidgetVBs.clear();
 }

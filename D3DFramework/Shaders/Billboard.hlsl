@@ -95,7 +95,7 @@ PixelOut PS(GeoOut pin)
 {
 	PixelOut pout = (PixelOut)0.0f;
 
-	float4 diffuse; float3 specular; float roughness;
+	float4 diffuse = 0.0f; float3 specular = 0.0f; float roughness = 0.0f;
 	GetMaterialAttibute(gObjMaterialIndex, diffuse, specular, roughness);
 	diffuse *= GetDiffuseMapSample(gObjMaterialIndex, pin.mTexC);
 
@@ -105,7 +105,7 @@ PixelOut PS(GeoOut pin)
 	// 법선을 보간하면 단위 길이가 아니게 될 수 있으므로 다시 정규화한다.
 	pin.mNormal = normalize(pin.mNormal);
 
-	pout.mDiffuse = diffuse;
+	pout.mDiffuse = float4(diffuse.rgb, 1.0f);
 	pout.mSpecularRoughness = float4(specular, roughness);
 	pout.mNormal = float4(pin.mNormal, 1.0f);
 	pout.mNormalx = float4(pin.mNormal, 1.0f);
