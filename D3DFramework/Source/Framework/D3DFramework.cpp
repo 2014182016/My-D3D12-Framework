@@ -650,7 +650,7 @@ void D3DFramework::UpdateSsaoBuffer(float deltaTime)
 		ssaoCB.mSurfaceEpsilon = 0.05f;
 
 		ssaoCB.mRenderTargetInvSize = DirectX::XMFLOAT2(1.0f / mSsao->GetMapWidth(), 1.0f / mSsao->GetMapHeight());
-		ssaoCB.mSsaoContrast = 4.0f;
+		ssaoCB.mSsaoContrast = 2.0f;
 
 		auto currSsaoCB = mCurrentFrameResource->mSsaoPool->GetBuffer();
 		currSsaoCB->CopyData(0, ssaoCB);
@@ -729,6 +729,14 @@ void D3DFramework::CreateObjects()
 
 	object = std::make_shared<GameObject>("Floor0"s);
 	object->SetScale(20.0f, 0.1f, 30.0f);
+	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tile0"s));
+	object->SetMesh(AssetManager::GetInstance()->FindMesh("Cube_AABB"s));
+	object->SetCollisionEnabled(true);
+	mRenderableObjects[(int)RenderLayer::Opaque].push_back(object);
+	mGameObjects.push_back(object);
+
+	object = std::make_shared<GameObject>("Cube"s);
+	object->Move(0.0f, 0.5f, 0.0f);
 	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tile0"s));
 	object->SetMesh(AssetManager::GetInstance()->FindMesh("Cube_AABB"s));
 	object->SetCollisionEnabled(true);
@@ -873,13 +881,13 @@ void D3DFramework::CreateParticles()
 	end.mSize = XMFLOAT2(0.25f, 0.25f);
 	end.mSpeed = 1.0f;
 
-	particle = std::make_unique<Particle>("Particle0"s, 1000);
+	particle = std::make_unique<Particle>("Particle0"s, 10000);
 	particle->SetParticleDataStart(start);
 	particle->SetParticleDataEnd(end);
 	particle->SetSpawnTimeRange(0.2f);
-	particle->SetEmitNum(10);
+	particle->SetEmitNum(200);
 	particle->SetEnabledInfinite(true);
-	particle->SetPosition(0.0f, 5.0f, 0.0f);
+	particle->SetPosition(0.0f, 20.0f, 0.0f);
 	particle->SetMaterial(AssetManager::GetInstance()->FindMaterial("Radial_Gradient"s));
 	mParticles.push_back(std::move(particle));
 }

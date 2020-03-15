@@ -5,7 +5,7 @@
 #define DEFERRED_BUFFER_COUNT 5
 #define LIGHT_NUM 1
 
-//#define SSAO
+#define SSAO
 #define SSR
 #define MULTITHREAD_RENDERING
 

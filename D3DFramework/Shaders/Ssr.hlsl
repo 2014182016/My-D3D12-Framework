@@ -60,12 +60,6 @@ float4 GetViewPosition(float2 uv)
 	return mul(pos, gView);
 }
 
-float4 LoadViewPosition(uint2 uv)
-{
-	float4 pos = gPositionMap.Load(uint3(uv, 0));
-	return mul(pos, gView);
-}
-
 struct VertexOut
 {
 	float4 mPosH : SV_POSITION;

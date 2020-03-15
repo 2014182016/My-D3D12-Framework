@@ -38,7 +38,7 @@ float4 PS(VertexOut pin) :SV_Target
 	// r : p를 가릴 가능성이 있는 잠재적 차폐점
 
 	// Position의 알파 값은 SSAO 및 SSR 체크 여부를 다룬다.
-	if (gPositionMap.Load(uint3(pin.mTexC, 0)).a <= 0.0f)
+	if (gPositionMap.Sample(gsamLinearClamp, pin.mTexC, 0.0f).a <= 0.001f)
 		return 1.0f;
 
 	float3 normal = normalize(gNormalMap.SampleLevel(gsamPointClamp, pin.mTexC, 0.0f).xyz);
