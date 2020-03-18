@@ -3,6 +3,7 @@
 #include "GameObject.h"
 #include "Mesh.h"
 #include "Enumeration.h"
+#include "D3DDebug.h"
 
 using namespace DirectX;
 
@@ -282,7 +283,6 @@ void Octree::Update(float deltaTime)
 		if (obj == nullptr)
 		{
 			iter = mWeakObjectList.erase(iter);
-			++iter;
 		}
 		else
 		{
@@ -493,4 +493,17 @@ void Octree::DeleteWeakObject(std::shared_ptr<class GameObject> obj)
 	mWeakObjectList.remove_if([&obj](std::weak_ptr<GameObject>& weakObj)->bool
 	{ auto listedObj = weakObj.lock();
 	if (obj == listedObj) return true; return false; });
+}
+
+void Octree::DrawDebug()
+{
+	D3DDebug::GetInstance()->Draw(mBoundingBox, FLT_MAX, (XMFLOAT4)Colors::Green);
+
+	for (int i = 0; i < 8; ++i)
+	{
+		if (mChildNodes[i] != nullptr)
+		{
+			mChildNodes[i]->DrawDebug();
+		}
+	}
 }

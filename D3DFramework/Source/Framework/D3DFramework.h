@@ -28,8 +28,17 @@ public:
 	void RenderObjects(ID3D12GraphicsCommandList* cmdList, const std::list<std::shared_ptr<class Renderable>>& list,
 		D3D12_GPU_VIRTUAL_ADDRESS startAddress, DirectX::BoundingFrustum* frustum = nullptr, UINT threadIndex = 0, UINT threadNum = 1) const;
 	void RenderActualObjects(ID3D12GraphicsCommandList* cmdList, DirectX::BoundingFrustum* frustum = nullptr);
-	class GameObject* Picking(int screenX, int screenY, float distance = 1000.0f, bool isMeshCollision = false) const;
 	void WorkerThread(UINT threadIndex);
+
+public:
+	class GameObject* Picking(int screenX, int screenY, float distance = 1000.0f, bool isMeshCollision = false) const;
+	class GameObject* FindGameObject(std::string name);
+	class GameObject* FindGameObject(long uid);
+
+public:
+	void DrawDebugOctree();
+	void DrawDebugCollision();
+	void DrawDebugLight();
 
 public:
 	inline static D3DFramework* GetInstance() { return instance; }
@@ -44,6 +53,7 @@ private:
 	void CreateTerrain();
 	void CreateFrameResources(ID3D12Device* device);
 	void CreateThreads();
+	void CreateTerrainStdDevAndNormalMap();
 
 	void UpdateObjectBuffer(float deltaTime);
 	void UpdateLightBuffer(float deltaTime);
@@ -96,6 +106,7 @@ private:
 	std::unique_ptr<class Ssao> mSsao;
 	std::unique_ptr<class Ssr> mSsr;
 	std::unique_ptr<class BlurFilter> mBlurFilter;
+	std::unique_ptr<class D3DDebug> mD3DDebug;
 	
 	DirectX::BoundingFrustum mWorldCamFrustum;
 };

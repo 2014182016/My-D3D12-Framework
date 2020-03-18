@@ -25,6 +25,8 @@ AssetManager::~AssetManager()
 	mMaterials.clear();
 	mTextures.clear();
 	mSounds.clear();
+
+	delete this;
 }
 
 void AssetManager::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, IDirectSound8* d3dSound)
@@ -469,7 +471,7 @@ void AssetManager::BuildMaterial()
 	mat->SetNormalMapIndex(DISABLED);
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.1f, 0.1f, 0.1f);
-	mat->SetRoughtness(0.25f);
+	mat->SetRoughness(0.25f);
 	mMaterials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Brick0"s);
@@ -477,7 +479,7 @@ void AssetManager::BuildMaterial()
 	mat->SetNormalMapIndex(FindTexture("Bricks2_nmap"s)->mTextureIndex);
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.1f, 0.1f, 0.1f);
-	mat->SetRoughtness(0.9f);
+	mat->SetRoughness(0.9f);
 	mMaterials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Tile0"s);
@@ -485,7 +487,7 @@ void AssetManager::BuildMaterial()
 	mat->SetNormalMapIndex(FindTexture("Tile_nmap"s)->mTextureIndex);
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.2f, 0.2f, 0.2f);
-	mat->SetRoughtness(0.3f);
+	mat->SetRoughness(0.1f);
 	mat->SetScale(5.0f, 5.0f);
 	mMaterials[mat->GetName()] = std::move(mat);
 
@@ -494,7 +496,7 @@ void AssetManager::BuildMaterial()
 	mat->SetNormalMapIndex(FindTexture("Default_nmap"s)->mTextureIndex);
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.98f, 0.97f, 0.95f);
-	mat->SetRoughtness(0.1f);
+	mat->SetRoughness(0.1f);
 	mat->SetOpacity(0.5f);
 	mMaterials[mat->GetName()] = std::move(mat);
 
@@ -503,7 +505,7 @@ void AssetManager::BuildMaterial()
 	mat->SetNormalMapIndex(DISABLED);
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.1f, 0.1f, 0.1f);
-	mat->SetRoughtness(0.25f);
+	mat->SetRoughness(0.25f);
 	mMaterials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Tree0"s);
@@ -511,7 +513,7 @@ void AssetManager::BuildMaterial()
 	mat->SetNormalMapIndex(DISABLED);
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.01f, 0.01f, 0.01f);
-	mat->SetRoughtness(0.125f);
+	mat->SetRoughness(0.125f);
 	mMaterials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Sky"s);
@@ -519,7 +521,7 @@ void AssetManager::BuildMaterial()
 	mat->SetNormalMapIndex(DISABLED);
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.1f, 0.1f, 0.1f);
-	mat->SetRoughtness(1.0f);
+	mat->SetRoughness(1.0f);
 	mat->SetScale(2.0f, 2.0f);
 	mMaterials[mat->GetName()] = std::move(mat);
 
@@ -528,7 +530,7 @@ void AssetManager::BuildMaterial()
 	mat->SetNormalMapIndex(DISABLED);
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.1f, 0.1f, 0.1f);
-	mat->SetRoughtness(1.0f);
+	mat->SetRoughness(1.0f);
 	mMaterials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Terrain"s);
@@ -537,7 +539,7 @@ void AssetManager::BuildMaterial()
 	mat->SetHeightMapIndex(FindTexture("HeightMap"s)->mTextureIndex);
 	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
 	mat->SetSpecular(0.1f, 0.1f, 0.1f);
-	mat->SetRoughtness(0.9f);
+	mat->SetRoughness(0.9f);
 	mMaterials[mat->GetName()] = std::move(mat);
 }
 

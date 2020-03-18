@@ -29,6 +29,8 @@ public:
 	inline DirectX::BoundingBox GetBoundingBox() const { return mBoundingBox; }
 	void GetBoundingWorlds(std::vector<DirectX::XMFLOAT4X4>& worlds) const;
 
+	void DrawDebug();
+
 private:
 	Octree* CreateNode(const DirectX::BoundingBox& boundingBox, std::list<std::shared_ptr<class GameObject>> objList);
 	Octree* CreateNode(const DirectX::BoundingBox& boundingBox, std::shared_ptr<class GameObject> obj);

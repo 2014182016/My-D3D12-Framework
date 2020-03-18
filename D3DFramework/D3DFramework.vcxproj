@@ -21,6 +21,18 @@
   <ItemGroup>
     <FxCompile Include="Shaders\Blur.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Shaders\Debug.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="Shaders\Reflection.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
@@ -238,6 +250,7 @@
     <ClCompile Include="Source\Framework\Camera.cpp" />
     <ClCompile Include="Source\Framework\CubeRenderTarget.cpp" />
     <ClCompile Include="Source\Framework\D3DApp.cpp" />
+    <ClCompile Include="Source\Framework\D3DDebug.cpp" />
     <ClCompile Include="Source\Framework\D3DFramework.cpp" />
     <ClCompile Include="Source\Framework\D3DUtil.cpp" />
     <ClCompile Include="Source\Framework\DDSTextureLoader.cpp">
@@ -289,6 +302,7 @@
     <ClInclude Include="Source\Framework\Camera.h" />
     <ClInclude Include="Source\Framework\CubeRenderTarget.h" />
     <ClInclude Include="Source\Framework\D3DApp.h" />
+    <ClInclude Include="Source\Framework\D3DDebug.h" />
     <ClInclude Include="Source\Framework\D3DFramework.h" />
     <ClInclude Include="Source\Framework\D3DUtil.h" />
     <ClInclude Include="Source\Framework\d3dx12.h" />

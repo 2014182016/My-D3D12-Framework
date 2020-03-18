@@ -27,7 +27,7 @@ public:
 	void SetSpecular(float r, float g, float b);
 
 	inline float GetRoughness() const { return mRoughness; }
-	inline void SetRoughtness(float roughness) { mRoughness = roughness; }
+	inline void SetRoughness(float roughness) { mRoughness = roughness; }
 
 	inline float GetOpacity() const { return mDiffuseAlbedo.w; }
 	inline void SetOpacity(float opacity) { mDiffuseAlbedo.w = opacity; }

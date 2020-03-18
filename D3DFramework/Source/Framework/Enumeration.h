@@ -4,14 +4,10 @@
 
 enum class Option : int
 {
-	Debug_Collision = 0,
-	Debug_Octree,
-	Debug_Light,
-	Debug_GBuffer,
+	Debug_GBuffer = 0,
 	Wireframe,
 	Fullscreen,
 	Fog,
-	Lighting,
 	Msaa,
 	Count,
 };

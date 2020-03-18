@@ -16,6 +16,7 @@
 #include "Random.h"
 #include "Global.h"
 #include "BlurFilter.h"
+#include "D3DDebug.h"
 
 #include "GameObject.h"
 #include "Material.h"
@@ -150,30 +151,16 @@ void D3DFramework::InitFramework()
 	CreateRootSignatures(textureNum, shadowMapNum);
 	CreateDescriptorHeaps(textureNum, shadowMapNum, particleNum);
 	CreatePSOs();
-
-	// Terrain에서 사용할 표준 편차 LODMap과 노멀 맵을 미리 계산한다.
-	// 이들은 다시 계산할 필요가 없다.
-	{
-		ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvSrvUavDescriptorHeap.Get() };
-		mMainCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
-
-		// 하이트맵에 대한 표준편차를 계산한다.
-		mMainCommandList->SetComputeRootSignature(mRootSignatures["TerrainCompute"].Get());
-		mMainCommandList->SetComputeRootDescriptorTable((int)RpTerrainCompute::HeightMap, 
-			GetGpuSrv(DescriptorIndex::textureHeapIndex + mTerrain->GetMaterial()->GetHeightMapIndex()));
-		mTerrain->SetUavDescriptors(mMainCommandList.Get());
-
-		mMainCommandList->SetPipelineState(mPSOs["TerrainStdDev"].Get());
-		mTerrain->LODCompute(mMainCommandList.Get());
-
-		mMainCommandList->SetPipelineState(mPSOs["TerrainNormal"].Get());
-		mTerrain->NormalCompute(mMainCommandList.Get());
-	}
+	CreateTerrainStdDevAndNormalMap();
 
 	// 초기화 명령들을 실행한다.
 	ThrowIfFailed(mMainCommandList->Close());
 	ID3D12CommandList* cmdLists[] = { mMainCommandList.Get() };
 	mCommandQueue->ExecuteCommandLists(1, cmdLists);
+
+#if defined(DEBUG) || defined(_DEBUG)
+	D3DDebug::GetInstance()->CreateCommandObjects(md3dDevice.Get());
+#endif
 
 	// 초기화가 끝날 때까지 기다린다.
 	FlushCommandQueue();
@@ -346,6 +333,7 @@ void D3DFramework::Render()
 #endif
 	}
 
+
 	// 전면 버퍼와 후면 버퍼를 바꾼다.
 	ThrowIfFailed(mSwapChain->Present(0, 0));
 	mCurrentBackBuffer = (mCurrentBackBuffer + 1) % SWAP_CHAIN_BUFFER_COUNT;
@@ -388,6 +376,10 @@ void D3DFramework::Tick(float deltaTime)
 
 #ifdef SSAO
 	UpdateSsaoBuffer(deltaTime);
+#endif
+
+#if defined(DEBUG) || defined(_DEBUG)
+	D3DDebug::GetInstance()->Update(deltaTime);
 #endif
 }
 
@@ -736,9 +728,10 @@ void D3DFramework::CreateObjects()
 	mGameObjects.push_back(object);
 
 	object = std::make_shared<GameObject>("Cube"s);
-	object->Move(0.0f, 0.5f, 0.0f);
+	object->Move(0.0f, 5.0f, 0.0f);
+	object->Rotate(45.0f, 45.0f, 45.0f);
 	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tile0"s));
-	object->SetMesh(AssetManager::GetInstance()->FindMesh("Cube_AABB"s));
+	object->SetMesh(AssetManager::GetInstance()->FindMesh("Cube_OBB"s));
 	object->SetCollisionEnabled(true);
 	mRenderableObjects[(int)RenderLayer::Opaque].push_back(object);
 	mGameObjects.push_back(object);
@@ -915,6 +908,27 @@ void D3DFramework::CreateFrameResources(ID3D12Device* device)
 	}
 }
 
+void D3DFramework::CreateTerrainStdDevAndNormalMap()
+{
+	// Terrain에서 사용할 표준 편차 LODMap과 노멀 맵을 미리 계산한다.
+	// 이들은 다시 계산할 필요가 없다.
+
+	ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvSrvUavDescriptorHeap.Get() };
+	mMainCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
+	// 하이트맵에 대한 표준편차를 계산한다.
+	mMainCommandList->SetComputeRootSignature(mRootSignatures["TerrainCompute"].Get());
+	mMainCommandList->SetComputeRootDescriptorTable((int)RpTerrainCompute::HeightMap,
+		GetGpuSrv(DescriptorIndex::textureHeapIndex + mTerrain->GetMaterial()->GetHeightMapIndex()));
+	mTerrain->SetUavDescriptors(mMainCommandList.Get());
+
+	mMainCommandList->SetPipelineState(mPSOs["TerrainStdDev"].Get());
+	mTerrain->LODCompute(mMainCommandList.Get());
+
+	mMainCommandList->SetPipelineState(mPSOs["TerrainNormal"].Get());
+	mTerrain->NormalCompute(mMainCommandList.Get());
+}
+
 void D3DFramework::RenderObject(ID3D12GraphicsCommandList* cmdList, Renderable* obj,
 	D3D12_GPU_VIRTUAL_ADDRESS startAddress, BoundingFrustum* frustum) const
 {
@@ -1032,9 +1046,40 @@ GameObject* D3DFramework::Picking(int screenX, int screenY, float distance, bool
 	{
 		std::cout << "Picking : " << hitObj->ToString() << std::endl;
 	}
+
+	D3DDebug::GetInstance()->DrawRay(rayOrigin, rayOrigin + (rayDir * distance));
 #endif
 
-	return hitObj;
+	if (nearestDist < distance)
+	{
+		return hitObj;
+	}
+
+	return nullptr;
+}
+
+GameObject* D3DFramework::FindGameObject(std::string name)
+{
+	auto iter = std::find_if(mGameObjects.begin(), mGameObjects.end(),
+		[&name](const std::shared_ptr<GameObject> obj) -> bool
+	{ if (name.compare(obj->GetName()) == 0) return true; return false; });
+
+	if (iter != mGameObjects.end())
+		return iter->get();
+
+	return nullptr;
+}
+
+GameObject* D3DFramework::FindGameObject(long uid)
+{
+	auto iter = std::find_if(mGameObjects.begin(), mGameObjects.end(),
+		[&uid](const std::shared_ptr<GameObject> obj) -> bool
+	{ if (uid == obj->GetUID()) return true; return false; });
+
+	if (iter != mGameObjects.end())
+		return iter->get();
+
+	return nullptr;
 }
 
 void D3DFramework::WireframePass(ID3D12GraphicsCommandList* cmdList)
@@ -1056,6 +1101,13 @@ void D3DFramework::WireframePass(ID3D12GraphicsCommandList* cmdList)
 	PIXEndEvent(cmdList);
 
 	DrawTerrain(cmdList, true);
+
+	SetCommonState(cmdList);
+
+#if defined(DEBUG) || defined(_DEBUG)
+	cmdList->SetPipelineState(mPSOs["Debug"].Get());
+	D3DDebug::GetInstance()->Render(cmdList);
+#endif
 
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
@@ -1171,6 +1223,8 @@ void D3DFramework::ForwardPass(ID3D12GraphicsCommandList* cmdList)
 		RenderObject(cmdList, (*iter).get(), mCurrentFrameResource->GetWidgetVirtualAddress());
 	}
 
+	PIXEndEvent(cmdList);
+
 #if defined(DEBUG) || defined(_DEBUG)
 	if (GetOptionEnabled(Option::Debug_GBuffer))
 	{
@@ -1201,9 +1255,10 @@ void D3DFramework::ForwardPass(ID3D12GraphicsCommandList* cmdList)
 		RenderObject(cmdList, (*iter++).get(), mCurrentFrameResource->GetWidgetVirtualAddress());
 #endif
 	}
-#endif
 
-	PIXEndEvent(cmdList);
+	cmdList->SetPipelineState(mPSOs["Debug"].Get());
+	D3DDebug::GetInstance()->Render(cmdList);
+#endif
 }
 
 void D3DFramework::PostProcessPass(ID3D12GraphicsCommandList* cmdList)
@@ -1429,5 +1484,49 @@ void D3DFramework::CreateThreads()
 		mWorkerFinishedFrameEvents.push_back(CreateEvent(NULL, FALSE, FALSE, NULL));
 
 		mWorkerThread.emplace_back([this, i]() { this->WorkerThread(i); });
+	}
+}
+
+void D3DFramework::DrawDebugOctree()
+{
+	mOctreeRoot->DrawDebug();
+}
+
+void D3DFramework::DrawDebugCollision()
+{
+	for (const auto& obj : mGameObjects)
+	{
+		auto meshBounding = obj->GetCollisionBounding();
+		switch (obj->GetCollisionType())
+		{
+		case CollisionType::AABB:
+		{
+			const BoundingBox& aabb = std::any_cast<BoundingBox>(meshBounding);
+			D3DDebug::GetInstance()->Draw(aabb, FLT_MAX);
+			break;
+		}
+		case CollisionType::OBB:
+		{
+			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(meshBounding);
+			D3DDebug::GetInstance()->Draw(obb, FLT_MAX);
+			break;
+		}
+		case CollisionType::Sphere:
+		{
+			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(meshBounding);
+			D3DDebug::GetInstance()->Draw(sphere, FLT_MAX);
+			break;
+		}
+		}
+	}
+}
+
+void D3DFramework::DrawDebugLight()
+{
+	static const float lightRadius = 1.0f;
+
+	for (const auto& light : mLights)
+	{
+		D3DDebug::GetInstance()->DrawSphere(light->GetPosition(), lightRadius, FLT_MAX, (XMFLOAT4)Colors::Yellow);
 	}
 }

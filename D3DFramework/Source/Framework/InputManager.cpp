@@ -4,6 +4,10 @@
 #include "Camera.h"
 #include "AssetManager.h"
 #include "Sound.h"
+#include "GameObject.h"
+#include "D3DDebug.h"
+
+using namespace DirectX;
 
 InputManager::InputManager()
 {
@@ -27,7 +31,7 @@ void InputManager::OnMouseDown(WPARAM btnState, int x, int y)
 	}
 	else if ((btnState & MK_RBUTTON) != 0)
 	{
-		D3DFramework::GetInstance()->Picking(x, y);
+		GameObject* obj = D3DFramework::GetInstance()->Picking(x, y);
 	}
 }
 
@@ -66,12 +70,22 @@ void InputManager::OnKeyUp(unsigned int input)
 {
 	mKeys[input] = false;
 
+#if defined(DEBUG) || defined(_DEBUG)
 	if (input == VK_ESCAPE)
 		DestroyWindow(D3DFramework::GetInstance()->GetMainWnd());
 	else if (input == VK_F1)
 		D3DFramework::GetInstance()->SwitchOptionEnabled(Option::Wireframe);
-	else if (input == VK_F5)
+	else if (input == VK_F2)
 		D3DFramework::GetInstance()->SwitchOptionEnabled(Option::Debug_GBuffer);
+	else if (input == VK_F5)
+		D3DFramework::GetInstance()->DrawDebugCollision();
+	else if (input == VK_F6)
+		D3DFramework::GetInstance()->DrawDebugLight();
+	else if (input == VK_F7)
+		D3DFramework::GetInstance()->DrawDebugOctree();
+	else if (input == VK_F8)
+		D3DDebug::GetInstance()->Clear();
+#endif
 }
 
 void InputManager::Tick(float deltaTime) 
