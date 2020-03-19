@@ -57,7 +57,6 @@
 #include <float.h>
 #include <random>
 #include "d3dx12.h"
-#include "DDSTextureLoader.h"
 #include "GeometryGenerator.h"
 
 #define SWAP_CHAIN_BUFFER_COUNT 2

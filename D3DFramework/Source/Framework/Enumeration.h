@@ -117,6 +117,7 @@ enum class RpParticleCompute : int
 	ParticleCB = 0,
 	Counter,
 	Uav,
+	Pass,
 	Count
 };
 

@@ -205,6 +205,7 @@ void Particle::SetParticleConstants(ParticleConstants& constants)
 	constants.mStart = mStart;
 	constants.mEnd = mEnd;
 	constants.mEmitterLocation = GetPosition();
+	constants.mEnabledGravity = mEnabledGravity;
 	constants.mMaxParticleNum = (std::uint32_t)mMaxParticleNum;
 	constants.mParticleCount = (std::uint32_t)mCurrentParticleNum;
 	constants.mEmitNum = (std::uint32_t)mEmitNum;

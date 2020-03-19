@@ -5,6 +5,26 @@
 #include "pch.h"
 #include "Enumeration.h"
 
+struct MeshInfo
+{
+	std::string mName;
+	std::wstring mFileName;
+	CollisionType mCollisionType;
+};
+
+struct TextureInfo
+{
+	std::string mName;
+	std::wstring mFileName;
+};
+
+struct SoundInfo
+{
+	std::string mName;
+	std::string mFileName;
+	SoundType mSoundType;
+};
+
 struct WaveHeaderType
 {
 	char chunkId[4];
@@ -128,7 +148,7 @@ struct ParticleConstants
 	ParticleData mStart;
 	ParticleData mEnd;
 	DirectX::XMFLOAT3 mEmitterLocation;
-	float mDeltaTime;
+	std::uint32_t mEnabledGravity;
 	std::uint32_t mMaxParticleNum;
 	std::uint32_t mParticleCount;
 	std::uint32_t mEmitNum;

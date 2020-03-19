@@ -14,33 +14,6 @@ Texture2D gTextureMaps[TEX_NUM] : register(t0, space1);
 
 SamplerState gsamLinearWrap : register(s0);
 
-cbuffer cbPass : register(b1)
-{
-	float4x4 gView;
-	float4x4 gInvView;
-	float4x4 gProj;
-	float4x4 gInvProj;
-	float4x4 gViewProj;
-	float4x4 gInvViewProj;
-	float4x4 gProjTex;
-	float4x4 gViewProjTex;
-	float4x4 gIdentity;
-	float4 gAmbientLight;
-	float2 gRenderTargetSize;
-	float2 gInvRenderTargetSize;
-	float3 gEyePosW;
-	float gNearZ;
-	float gFarZ;
-	float gTotalTime;
-	float gDeltaTime;
-	bool gFogEnabled;
-	float4 gFogColor;
-	float gFogStart;
-	float gFogRange;
-	float gFogDensity;
-	uint gFogType;
-};
-
 struct VertexOut
 {
 	float3 mPosW   : POSITION;
@@ -82,9 +55,10 @@ void GS(point VertexOut gin[1],
 
 	// 빌보드가 xz 평면에 붙어서 y 방향으로 세워진 상태에서 카메라를
 	// 향하게 만드는 세계 공간 기준 빌보드 지역 좌표계를 계산한다.
+	float3 centerV = mul(gin[0].mPosW, gView);
 	float3 up = float3(0.0f, 1.0f, 0.0f);
 	float3 look = gEyePosW - gin[0].mPosW;
-	look.y = 0.0f; // y 축 정렬이므로 sz평면에 투영
+	//look.y = 0.0f; // y 축 정렬이므로 sz평면에 투영
 	look = normalize(look);
 	float3 right = cross(up, look);
 

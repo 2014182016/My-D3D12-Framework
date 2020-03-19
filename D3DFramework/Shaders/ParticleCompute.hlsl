@@ -1,13 +1,16 @@
 #include "ParticleRS.hlsl"
 
+#define GA 9.8f
+
 RWStructuredBuffer<uint> gCounter : register(u0);
 RWStructuredBuffer<ParticleData> gParticles : register(u1);
 
 float rand(in float2 uv)
 {
 	float2 noise = (frac(sin(dot(uv, float2(12.9898f, 78.233f)*2.0f)) * 43758.5453f));
-	return abs(noise.x + noise.y) * 0.5f;
+	return frac(abs(noise.x + noise.y) * 0.5f);
 }
+
 
 #define NUM_EMIT_THREADS 8
 [numthreads(NUM_EMIT_THREADS, 1, 1)]
@@ -71,13 +74,18 @@ void CS_Update(uint3 dispatchThreadID : SV_DispatchThreadID)
 			}
 			else
 			{
-				gParticles[myID].mLifeTime -= gpDeltaTime;
+				gParticles[myID].mLifeTime -= gDeltaTime;
 
 				float period = saturate(gParticles[myID].mLifeTime / gStart.mLifeTime);
 				gParticles[myID].mColor = lerp(gEnd.mColor, gStart.mColor, period);
 				gParticles[myID].mSpeed = lerp(gEnd.mSpeed, gStart.mSpeed, period);
 				gParticles[myID].mSize = lerp(gEnd.mSize, gStart.mSize, period);
-				gParticles[myID].mPosition += gParticles[myID].mDirection * gParticles[myID].mSpeed * gpDeltaTime;
+				gParticles[myID].mPosition += gParticles[myID].mDirection * gParticles[myID].mSpeed * gDeltaTime;
+
+				if (gEnabledGravity == 1)
+				{
+					gParticles[myID].mPosition.y -= GA * gDeltaTime;
+				}
 			}
 		}
 	}

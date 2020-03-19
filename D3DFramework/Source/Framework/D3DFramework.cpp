@@ -144,7 +144,7 @@ void D3DFramework::InitFramework()
 	CreateFrameResources(md3dDevice.Get());
 	CreateThreads();
 
-	UINT textureNum = (UINT)AssetManager::GetInstance()->GetTextures().size();
+	UINT textureNum = (UINT)AssetManager::GetInstance()->mTextures.size();
 	UINT shadowMapNum = (UINT)LIGHT_NUM;
 	UINT particleNum = (UINT)mParticles.size();
 
@@ -464,7 +464,7 @@ void D3DFramework::UpdateLightBuffer(float deltaTime)
 void D3DFramework::UpdateMaterialBuffer(float deltaTime)
 {
 	auto currMaterialBuffer = mCurrentFrameResource->mMaterialBufferPool->GetBuffer();
-	for (const auto& e : AssetManager::GetInstance()->GetMaterials())
+	for (const auto& e : AssetManager::GetInstance()->mMaterials)
 	{
 		Material* mat = e.second.get();
 		mat->Tick(deltaTime);
@@ -607,7 +607,6 @@ void D3DFramework::UpdateParticleBuffer(float deltaTime)
 		{
 			ParticleConstants particleConstants;
 			particle->SetParticleConstants(particleConstants);
-			particleConstants.mDeltaTime = deltaTime;
 			currParticleCB->CopyData(particleIndex, particleConstants);
 
 			particle->DecreaseNumFrames();
@@ -685,7 +684,7 @@ void D3DFramework::UpdateSsrBuffer(float deltaTime)
 		ssrConstants.mMaxDistance = 10.0f;
 		ssrConstants.mThickness = 0.5f;
 		ssrConstants.mRayTraceStep = 20;
-		ssrConstants.mBinaryStep = 5;
+		ssrConstants.mBinaryStep = 3;
 		ssrConstants.mScreenEdgeFadeStart = XMFLOAT2(100.0f, 50.0f);
 		ssrConstants.mStrideCutoff = 10.0f;
 		ssrConstants.mResolutuon = 0.1f;
@@ -728,7 +727,7 @@ void D3DFramework::CreateObjects()
 	mGameObjects.push_back(object);
 
 	object = std::make_shared<GameObject>("Cube"s);
-	object->Move(0.0f, 5.0f, 0.0f);
+	object->Move(0.0f, 1.0f, 0.0f);
 	object->Rotate(45.0f, 45.0f, 45.0f);
 	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tile0"s));
 	object->SetMesh(AssetManager::GetInstance()->FindMesh("Cube_OBB"s));
@@ -864,10 +863,10 @@ void D3DFramework::CreateParticles()
 	std::shared_ptr<Particle> particle;
 
 	ParticleData start;
+	start.mLifeTime = 5.0f;
 	start.mColor = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.5f);
-	start.mLifeTime = 2.0f;
 	start.mSize = XMFLOAT2(1.0f, 1.0f);
-	start.mSpeed = 10.0f;
+	start.mSpeed = 25.0f;
 
 	ParticleData end;
 	end.mColor = XMFLOAT4(0.9f, 0.1f, 0.1f, 0.1f);
@@ -880,7 +879,8 @@ void D3DFramework::CreateParticles()
 	particle->SetSpawnTimeRange(0.2f);
 	particle->SetEmitNum(200);
 	particle->SetEnabledInfinite(true);
-	particle->SetPosition(0.0f, 20.0f, 0.0f);
+	particle->SetEnabledGravity(true);
+	particle->SetPosition(0.0f, 50.0f, 0.0f);
 	particle->SetMaterial(AssetManager::GetInstance()->FindMaterial("Radial_Gradient"s));
 	mParticles.push_back(std::move(particle));
 }
@@ -897,7 +897,7 @@ void D3DFramework::CreateFrameResources(ID3D12Device* device)
 #endif
 		mFrameResources[i] = std::make_unique<FrameResource>(device, isMultithreadRendering,
 			1 + LIGHT_NUM, (UINT)mGameObjects.size() * 2, LIGHT_NUM,
-			(UINT)AssetManager::GetInstance()->GetMaterials().size(), (UINT)mWidgets.size(), (UINT)mParticles.size());
+			(UINT)AssetManager::GetInstance()->mMaterials.size(), (UINT)mWidgets.size(), (UINT)mParticles.size());
 
 		mFrameResources[i]->mWidgetVBs.reserve((UINT)mWidgets.size());
 		for (const auto& widget : mWidgets)
@@ -1315,6 +1315,8 @@ void D3DFramework::ParticleUpdate(ID3D12GraphicsCommandList* cmdList)
 	PIXBeginEvent(cmdList, 0, L"Particle Update");
 
 	cmdList->SetComputeRootSignature(mRootSignatures["ParticleCompute"].Get());
+	cmdList->SetComputeRootConstantBufferView((int)RpParticleCompute::Pass, mCurrentFrameResource->GetPassVirtualAddress());
+
 	cmdList->SetPipelineState(mPSOs["ParticleEmit"].Get());
 	for (const auto& particle : mParticles)
 	{

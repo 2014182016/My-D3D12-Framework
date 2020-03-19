@@ -794,6 +794,7 @@ void D3DApp::CreateRootSignatures(UINT textureNum, UINT shadowMapNum)
 		slotRootParameter[(int)RpParticleCompute::ParticleCB].InitAsConstantBufferView(0);
 		slotRootParameter[(int)RpParticleCompute::Counter].InitAsUnorderedAccessView(0);
 		slotRootParameter[(int)RpParticleCompute::Uav].InitAsUnorderedAccessView(1);
+		slotRootParameter[(int)RpParticleCompute::Pass].InitAsConstantBufferView(1);
 
 		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc((UINT)slotRootParameter.size(), slotRootParameter.data(),
 			0, nullptr,
