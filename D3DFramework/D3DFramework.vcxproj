@@ -245,6 +245,7 @@
     <ClCompile Include="Source\Component\Sound.cpp" />
     <ClCompile Include="Source\Component\Widget.cpp" />
     <ClCompile Include="Source\Framework\Animation.cpp" />
+    <ClCompile Include="Source\Framework\AssetLoader.cpp" />
     <ClCompile Include="Source\Framework\AssetManager.cpp" />
     <ClCompile Include="Source\Framework\BlurFilter.cpp" />
     <ClCompile Include="Source\Framework\Camera.cpp" />
@@ -265,7 +266,6 @@
     </ClCompile>
     <ClCompile Include="Source\Framework\InputManager.cpp" />
     <ClCompile Include="Source\Framework\Main.cpp" />
-    <ClCompile Include="Source\Framework\ObjLoader.cpp" />
     <ClCompile Include="Source\Framework\Octree.cpp" />
     <ClCompile Include="Source\Framework\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -275,7 +275,6 @@
     <ClCompile Include="Source\Framework\SimpleShadowMap.cpp" />
     <ClCompile Include="Source\Framework\Ssao.cpp" />
     <ClCompile Include="Source\Framework\Ssr.cpp" />
-    <ClCompile Include="Source\Framework\WavLoader.cpp" />
     <ClCompile Include="Source\Framework\WinApp.cpp" />
     <ClCompile Include="Source\Object\Billboard.cpp" />
     <ClCompile Include="Source\Object\DirectionalLight.cpp" />
@@ -298,6 +297,7 @@
     <ClInclude Include="Source\Component\Sound.h" />
     <ClInclude Include="Source\Component\Widget.h" />
     <ClInclude Include="Source\Framework\Animation.h" />
+    <ClInclude Include="Source\Framework\AssetLoader.h" />
     <ClInclude Include="Source\Framework\AssetManager.h" />
     <ClInclude Include="Source\Framework\BlurFilter.h" />
     <ClInclude Include="Source\Framework\BufferMemoryPool.hpp" />
@@ -317,7 +317,6 @@
     <ClInclude Include="Source\Framework\InputManager.h" />
     <ClInclude Include="Source\Framework\Interface.h" />
     <ClInclude Include="Source\Framework\ObjectPool.hpp" />
-    <ClInclude Include="Source\Framework\ObjLoader.h" />
     <ClInclude Include="Source\Framework\Octree.h" />
     <ClInclude Include="Source\Framework\pch.h" />
     <ClInclude Include="Source\Framework\SimpleShadowMap.h" />
@@ -327,7 +326,6 @@
     <ClInclude Include="Source\Framework\Structure.h" />
     <ClInclude Include="Source\Framework\Timer.hpp" />
     <ClInclude Include="Source\Framework\UploadBuffer.h" />
-    <ClInclude Include="Source\Framework\WavLoader.h" />
     <ClInclude Include="Source\Framework\WinApp.h" />
     <ClInclude Include="Source\Object\Billboard.h" />
     <ClInclude Include="Source\Object\DirectionalLight.h" />

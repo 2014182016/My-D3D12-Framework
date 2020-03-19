@@ -221,10 +221,7 @@
     <ClCompile Include="Source\Framework\D3DDebug.cpp">
       <Filter>소스 파일\Framework</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Framework\ObjLoader.cpp">
-      <Filter>소스 파일\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\WavLoader.cpp">
+    <ClCompile Include="Source\Framework\AssetLoader.cpp">
       <Filter>소스 파일\Framework</Filter>
     </ClCompile>
   </ItemGroup>
@@ -367,10 +364,7 @@
     <ClInclude Include="Source\Framework\D3DDebug.h">
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\ObjLoader.h">
-      <Filter>헤더 파일\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\WavLoader.h">
+    <ClInclude Include="Source\Framework\AssetLoader.h">
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
   </ItemGroup>

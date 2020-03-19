@@ -4,8 +4,7 @@
 #include "Mesh.h"
 #include "D3DUtil.h"
 #include "Sound.h"
-#include "ObjLoader.h"
-#include "WavLoader.h"
+#include "AssetLoader.h"
 #include "DDSTextureLoader.h"
 
 using namespace DirectX;
@@ -30,45 +29,17 @@ AssetManager::~AssetManager()
 	delete this;
 }
 
-void AssetManager::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, IDirectSound8* d3dSound)
+void AssetManager::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, IDirectSound8* d3dSound)
 {
 	if (isInitialized)
 		return;
 
-	LoadTextures(device, commandList);
+	LoadTextures(device, cmdList);
+	LoadMeshes(device, cmdList);
+	LoadSounds(device, cmdList, d3dSound);
 	BuildMaterial();
 
-	for (const auto& soundInfo : mSoundInfos)
-		mSounds[soundInfo.mName] = WavLoader::LoadWave(d3dSound, soundInfo);
-
-	for (const auto& h3dInfo : mH3dModels)
-		mMeshes[h3dInfo.mName] = ObjLoader::LoadH3d(device, commandList, h3dInfo);
-
 	isInitialized = true;
-}
-
-void AssetManager::LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList)
-{
-	for (size_t i = 0; i < mTexInfos.size(); ++i)
-	{
-		auto[texName, fileName] = mTexInfos[i];
-
-		auto texMap = std::make_unique<Texture>();
-		texMap->mName = texName;
-		texMap->mFilename = fileName;
-		texMap->mTextureIndex = (std::uint32_t)i;
-		ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(device, commandList,
-			texMap->mFilename.c_str(), texMap->mResource, texMap->mUploadHeap));
-
-		mTextures[texName] = std::move(texMap);
-	}
-
-	if ((UINT)mTextures.size() != TEX_NUM)
-	{
-#if defined(DEBUG) || defined(_DEBUG)
-		std::cout << "Max Tex Num Difference Error" << std::endl;
-#endif
-	}
 }
 
 void AssetManager::BuildMaterial()
@@ -150,6 +121,79 @@ void AssetManager::BuildMaterial()
 	mat->SetSpecular(0.1f, 0.1f, 0.1f);
 	mat->SetRoughness(0.9f);
 	mMaterials[mat->GetName()] = std::move(mat);
+}
+
+void AssetManager::LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList)
+{
+	for (size_t i = 0; i < mTexInfos.size(); ++i)
+	{
+		auto[texName, fileName] = mTexInfos[i];
+
+		auto texMap = std::make_unique<Texture>();
+		texMap->mName = texName;
+		texMap->mFilename = fileName;
+		texMap->mTextureIndex = (std::uint32_t)i;
+		ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(device, commandList,
+			texMap->mFilename.c_str(), texMap->mResource, texMap->mUploadHeap));
+
+		mTextures[texName] = std::move(texMap);
+	}
+
+	if ((UINT)mTextures.size() != TEX_NUM)
+	{
+#if defined(DEBUG) || defined(_DEBUG)
+		std::cout << "Max Tex Num Difference Error" << std::endl;
+#endif
+	}
+}
+
+void AssetManager::LoadSounds(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, IDirectSound8* d3dSound)
+{
+	for (const auto& soundInfo : mSoundInfos)
+	{
+		WaveHeaderType header;
+
+		FILE* filePtr = AssetLoader::LoadWave(d3dSound, soundInfo.mFileName, header);
+		if (filePtr == nullptr)
+			continue;
+
+		auto soundName = soundInfo.mName;
+		std::unique_ptr<Sound> sound = std::make_unique<Sound>(std::move(soundName));
+
+		switch (soundInfo.mSoundType)
+		{
+		case SoundType::Sound2D:
+			sound->CreateSoundBuffer2D(d3dSound, filePtr, header);
+			break;
+		case SoundType::Sound3D:
+			sound->CreateSoundBuffer3D(d3dSound, filePtr, header);
+			break;
+		}
+
+		mSounds[soundInfo.mName] = std::move(sound);
+	}
+}
+
+void AssetManager::LoadMeshes(ID3D12Device* device, ID3D12GraphicsCommandList* commandList)
+{
+	for (const auto& h3dInfo : mH3dModels)
+	{
+		std::vector<Vertex> vertices;
+		std::vector<std::uint16_t> indices;
+
+		bool result = AssetLoader::LoadH3d(device, commandList, h3dInfo.mFileName, vertices, indices);
+		if (!result)
+			continue;
+
+		auto meshName = h3dInfo.mName;
+		std::unique_ptr<Mesh> mesh = std::make_unique<Mesh>(std::move(meshName));
+
+		mesh->BuildVertices(device, commandList, (void*)vertices.data(), (UINT)vertices.size(), (UINT)sizeof(Vertex));
+		mesh->BuildIndices(device, commandList, indices.data(), (UINT)indices.size(), (UINT)sizeof(std::uint16_t));
+		mesh->BuildCollisionBound(&vertices[0].mPos, vertices.size(), (size_t)sizeof(Vertex), h3dInfo.mCollisionType);
+
+		mMeshes[h3dInfo.mName] = std::move(mesh);
+	}
 }
 
 Mesh* AssetManager::FindMesh(std::string&& name) const

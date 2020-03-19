@@ -1,18 +1,15 @@
 #include "pch.h"
-#include "ObjLoader.h"
+#include "AssetLoader.h"
 #include "Structure.h"
 #include "Mesh.h"
 
 using namespace DirectX;
 
-std::unique_ptr<Mesh> ObjLoader::LoadH3d(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, const MeshInfo& modelInfo)
+bool AssetLoader::LoadH3d(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, const std::wstring fileName,
+	std::vector<Vertex>& vertices, std::vector<std::uint16_t>& indices)
 {
-	std::vector<Vertex> vertices;
-	std::vector<std::uint16_t> indices;
 	std::fstream fin;
 	char input;
-
-	auto[meshName, fileName, collisionType] = modelInfo;
 
 	fin.open(fileName);
 	if (fin.fail())
@@ -20,7 +17,7 @@ std::unique_ptr<Mesh> ObjLoader::LoadH3d(ID3D12Device* device, ID3D12GraphicsCom
 #if defined(DEBUG) || defined(_DEBUG)
 		std::cout << "Model h3d " << fileName.c_str() << " File Open Failed" << std::endl;
 #endif
-		return nullptr;
+		return false;
 	}
 
 	UINT vertexCount;
@@ -53,17 +50,10 @@ std::unique_ptr<Mesh> ObjLoader::LoadH3d(ID3D12Device* device, ID3D12GraphicsCom
 
 	fin.close();
 
-	std::unique_ptr<Mesh> mesh = std::make_unique<Mesh>(std::move(meshName));
-	mesh->BuildVertices(device, commandList, (void*)vertices.data(), (UINT)vertices.size(), (UINT)sizeof(Vertex));
-	mesh->BuildIndices(device, commandList, indices.data(), (UINT)indices.size(), (UINT)sizeof(std::uint16_t));
-
-	if (collisionType != CollisionType::None)
-		mesh->BuildCollisionBound(&vertices[0].mPos, vertices.size(), (size_t)sizeof(Vertex), collisionType);
-
-	return mesh;
+	return true;
 }
 
-void ObjLoader::ConvertObj(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, const MeshInfo& modelInfo)
+bool AssetLoader::ConvertObj(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, std::wstring fileName)
 {
 	std::vector<XMFLOAT3> positions;
 	std::vector<XMFLOAT2> texcoords;
@@ -71,15 +61,13 @@ void ObjLoader::ConvertObj(ID3D12Device* device, ID3D12GraphicsCommandList* comm
 	std::vector<FaceIndex> faceIndices;
 	std::fstream fin;
 
-	auto[meshName, fileName, collisionType] = modelInfo;
-
 	fin.open(fileName);
 	if (fin.fail())
 	{
 #if defined(DEBUG) || defined(_DEBUG)
 		std::cout << "Model obj " << fileName.c_str() << " File Open Failed" << std::endl;
 #endif
-		return;
+		return false;
 	}
 
 	char input;
@@ -227,19 +215,10 @@ void ObjLoader::ConvertObj(ID3D12Device* device, ID3D12GraphicsCommandList* comm
 	fileName.erase(fileName.size() - 4, 4); // fileName에서 obj 포맷 string을 지운다.
 	ObjToH3d(vertices, indices, fileName); // obj파일은 h3d파일로 변환한다.
 
-	/*
-	std::unique_ptr<Mesh> mesh = std::make_unique<Mesh>(std::move(meshName));
-	mesh->BuildVertices(device, commandList, (void*)vertices.data(), (UINT)vertices.size(), (UINT)sizeof(Vertex));
-	mesh->BuildIndices(device, commandList, indices.data(), (UINT)indices.size(), (UINT)sizeof(std::uint16_t));
-
-	if (collisionType != CollisionType::None)
-		mesh->BuildCollisionBound(&vertices[0].mPos, vertices.size(), (size_t)sizeof(Vertex), collisionType);
-
-	return mesh;
-	*/
+	return true;
 }
 
-void ObjLoader::ObjToH3d(const std::vector<Vertex>& vertices, const std::vector<std::uint16_t> indices, std::wstring fileName)
+void AssetLoader::ObjToH3d(const std::vector<Vertex>& vertices, const std::vector<std::uint16_t> indices, std::wstring fileName)
 {
 	std::wstring fileFormat = L".h3d";
 	fileName += fileFormat;
@@ -268,7 +247,7 @@ void ObjLoader::ObjToH3d(const std::vector<Vertex>& vertices, const std::vector<
 	fout.close();
 }
 
-void ObjLoader::CalculateTBN(const VertexBasic& v1, const VertexBasic& v2, const VertexBasic& v3,
+void AssetLoader::CalculateTBN(const VertexBasic& v1, const VertexBasic& v2, const VertexBasic& v3,
 	XMFLOAT3& normal, XMFLOAT3& tangent, XMFLOAT3& binormal)
 {
 	XMVECTOR pv1, pv2;
@@ -319,4 +298,66 @@ void ObjLoader::CalculateTBN(const VertexBasic& v1, const VertexBasic& v2, const
 	XMStoreFloat3(&normal, normalVec);
 	XMStoreFloat3(&tangent, tangentVec);
 	XMStoreFloat3(&binormal, binormalVec);
+}
+
+
+FILE* AssetLoader::LoadWave(IDirectSound8* d3dSound, const std::string fileName, WaveHeaderType& header)
+{
+	FILE* filePtr = nullptr;
+	if (fopen_s(&filePtr, fileName.c_str(), "rb") != 0)
+	{
+#if defined(DEBUG) || defined(_DEBUG)
+		std::cout << fileName.c_str() << " Wave File not Found" << std::endl;
+#endif
+		return nullptr;
+	}
+
+	if (fread(&header, sizeof(WaveHeaderType), 1, filePtr) == -1)
+		return nullptr;
+
+
+	// RIFF 포맷인지 확인한다.
+	if ((header.chunkId[0] != 'R') || (header.chunkId[1] != 'I') ||
+		(header.chunkId[2] != 'F') || (header.chunkId[3] != 'F'))
+		return nullptr;
+
+	// Wave 포맷인지 확인한다.
+	if ((header.format[0] != 'W') || (header.format[1] != 'A') ||
+		(header.format[2] != 'V') || (header.format[3] != 'E'))
+		return nullptr;
+
+	// fmt 포맷인지 확인한다.
+	if ((header.subChunkId[0] != 'f') || (header.subChunkId[1] != 'm') ||
+		(header.subChunkId[2] != 't') || (header.subChunkId[3] != ' '))
+		return nullptr;
+
+	/*
+	// 오디오 포맷이 WAVE_FORMAT_PCM인지 확인한다.
+	if (header.audioFormat != WAVE_FORMAT_PCM)
+		return nullptr;
+
+	// 스테레오 포맷으로 기록되어 있는지 확인한다.
+	if (header.numChannels != 2)
+		return nullptr;
+
+	// 44.1kHz 비율로 기록되었는지 확인한다.
+	if (header.sampleRate != 44100)
+		return nullptr;
+
+	// 16비트로 기록되어 있는지 확인한다.
+	if (header.bitsPerSample != 16)
+		return nullptr;
+	*/
+
+	// data인지 확인한다.
+	if ((header.dataChunkId[0] != 'd') || (header.dataChunkId[1] != 'a') ||
+		(header.dataChunkId[2] != 't') || (header.dataChunkId[3] != 'a'))
+	{
+#if defined(DEBUG) || defined(_DEBUG)
+		std::cout << fileName.c_str() << " Not Match Data" << std::endl;
+#endif
+		return nullptr;
+	}
+
+	return filePtr;
 }

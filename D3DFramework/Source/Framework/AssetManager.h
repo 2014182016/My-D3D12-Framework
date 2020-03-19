@@ -18,7 +18,7 @@ public:
 	static AssetManager* GetInstance();
 
 public:
-	void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, IDirectSound8* d3dSound);
+	void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, IDirectSound8* d3dSound);
 
 	// 해당 value를 찾기 위한 함수
 	class Mesh* FindMesh(std::string&& name) const;
@@ -37,6 +37,8 @@ public:
 
 private:
 	void LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList);
+	void LoadMeshes(ID3D12Device* device, ID3D12GraphicsCommandList* commandList);
+	void LoadSounds(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, IDirectSound8* d3dSound);
 	void BuildMaterial();
 
 private:
@@ -59,7 +61,7 @@ private:
 		{"Grass", L"Textures/Grass.dds"},
 	};
 
-	const std::vector<struct MeshInfo> mH3dModels =
+	const std::vector<MeshInfo> mH3dModels =
 	{
 		{ "Cube_AABB",  L"Models/Cube.h3d", CollisionType::AABB },
 		{ "Cube_OBB",  L"Models/Cube.h3d", CollisionType::OBB },

@@ -6,19 +6,6 @@
 class Mesh : public Component
 {
 public:
-	// 이 구조체는 Mesh가 대표하는 기하구조 그룹(메시)의 부분 구간, 부분 
-	// 메시를 정의한다. 부분 메시는 하나의 정점/색인 버퍼에 여러 개의 기하구조가
-	// 들어 있는 경우에 쓰인다. 이 구조체는 정점/색인 버퍼에 저장된 메시의 부분
-	// 메시를 그리는 데 필요한 오프셋들과 자료를 제공한다.
-	struct SubMesh
-	{
-	public:
-		UINT mIndexCount = 0;
-		UINT mStartIndexLocation = 0;
-		INT mBaseVertexLocation = 0;
-	};
-
-public:
 	Mesh(std::string&& name);
 	virtual ~Mesh();
 
@@ -74,9 +61,4 @@ private:
 	UINT mVertexCount = 0;
 
 	D3D12_PRIMITIVE_TOPOLOGY mPrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-
-	// 한 MeshGeomoetry 인스턴스의 한 정점/색인 버퍼에 여러 개의 기하구조를
-	// 담을 수 있다. 부분 메시들을 개별적으로 그릴 수 있도록, 부분 메시 기하구조들을
-	// 컨테이너에 담아 둔다.
-	//std::unordered_map<std::string, SubMesh> mDrawArgs;
 };
