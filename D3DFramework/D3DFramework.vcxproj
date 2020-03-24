@@ -271,6 +271,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="Source\Framework\Physics.cpp" />
     <ClCompile Include="Source\Framework\Random.cpp" />
     <ClCompile Include="Source\Framework\SimpleShadowMap.cpp" />
     <ClCompile Include="Source\Framework\Ssao.cpp" />
@@ -319,6 +320,7 @@
     <ClInclude Include="Source\Framework\ObjectPool.hpp" />
     <ClInclude Include="Source\Framework\Octree.h" />
     <ClInclude Include="Source\Framework\pch.h" />
+    <ClInclude Include="Source\Framework\Physics.h" />
     <ClInclude Include="Source\Framework\SimpleShadowMap.h" />
     <ClInclude Include="Source\Framework\Ssao.h" />
     <ClInclude Include="Source\Framework\Ssr.h" />

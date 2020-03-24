@@ -30,8 +30,8 @@ public:
 	void SetParticleConstants(ParticleConstants& constants);
 
 public:
-	inline void SetParticleDataStart(ParticleData& data) { mStart = data; }
-	inline void SetParticleDataEnd(ParticleData& data) { mEnd = data; }
+	inline void SetParticleDataStart(const ParticleData& data) { mStart = data; }
+	inline void SetParticleDataEnd(const ParticleData& data) { mEnd = data; }
 
 	inline void SetSpawnTimeRange(float min, float max) { mSpawnTimeRange.first = min; mSpawnTimeRange.second = max; }
 	inline void SetSpawnTimeRange(float time) { mSpawnTimeRange.first = time; mSpawnTimeRange.second = time; }

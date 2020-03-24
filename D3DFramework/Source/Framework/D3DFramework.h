@@ -31,7 +31,8 @@ public:
 	void WorkerThread(UINT threadIndex);
 
 public:
-	class GameObject* Picking(int screenX, int screenY, float distance = 1000.0f, bool isMeshCollision = false) const;
+	bool Picking(struct HitInfo& hitInfo, const int screenX, const int screenY,
+		const float distance = 1000.0f, const bool isMeshCollision = false) const;
 	class GameObject* FindGameObject(std::string name);
 	class GameObject* FindGameObject(long uid);
 

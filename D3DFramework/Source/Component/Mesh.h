@@ -21,8 +21,8 @@ public:
 	// GPU로의 업로드가 끝난 후에 이 메모리를 해제한다.
 	void DisposeUploaders();
 
-	void SetCollisionBoundingAsAABB(DirectX::XMFLOAT3 extents);
-	void SetCollisionBoundingAsOBB(DirectX::XMFLOAT3 extents);
+	void SetCollisionBoundingAsAABB(const DirectX::XMFLOAT3& extents);
+	void SetCollisionBoundingAsOBB(const DirectX::XMFLOAT3& extents);
 	void SetCollisionBoundingAsSphere(float radius);
 
 public:

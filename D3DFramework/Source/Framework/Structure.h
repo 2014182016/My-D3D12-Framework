@@ -5,6 +5,22 @@
 #include "pch.h"
 #include "Enumeration.h"
 
+struct HitInfo
+{
+	DirectX::XMFLOAT3 mRayOrigin = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f);
+	float mNearestDist;
+	DirectX::XMFLOAT3 mRayDirection = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f);
+	void* mObj;
+};
+
+struct ContactInfo
+{
+	DirectX::XMFLOAT3 mContactNormal = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f);
+	float mPenetration = 0.0f;
+	DirectX::XMFLOAT3 mContactPoint = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f);
+	float mNormalDirection = 1.0f;
+};
+
 struct MeshInfo
 {
 	std::string mName;

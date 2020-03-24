@@ -4,6 +4,7 @@
 #include "Mesh.h"
 #include "Enumeration.h"
 #include "D3DDebug.h"
+#include "Physics.h"
 
 using namespace DirectX;
 
@@ -68,53 +69,14 @@ void Octree::BuildTree()
 		if (obj == nullptr)
 			continue;
 
-		auto objBounding = obj->GetCollisionBounding();
-		switch (obj->GetCollisionType())
+		for (int i = 0; i < 8; ++i)
 		{
-		case CollisionType::AABB:
-		{
-			const BoundingBox& aabb = std::any_cast<BoundingBox>(objBounding);
-			for (int i = 0; i < 8; ++i)
+			if (Physics::Contain(obj.get(), octant[i]))
 			{
-				if (octant[i].Contains(aabb) == ContainmentType::CONTAINS)
-				{
-					octList[i].emplace_front(obj);
-					delist.emplace_front(obj);
-					break;
-				}
+				octList[i].emplace_front(obj);
+				delist.emplace_front(obj);
 			}
-			break;
 		}
-		case CollisionType::OBB:
-		{
-			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(objBounding);
-			for (int i = 0; i < 8; ++i)
-			{
-				if (octant[i].Contains(obb) == ContainmentType::CONTAINS)
-				{
-					octList[i].emplace_front(obj);
-					delist.emplace_front(obj);
-					break;
-				}
-			}
-			break;
-		}
-		case CollisionType::Sphere:
-		{
-			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(objBounding);
-			for (int i = 0; i < 8; ++i)
-			{
-				if (octant[i].Contains(sphere) == ContainmentType::CONTAINS)
-				{
-					octList[i].emplace_front(obj);
-					delist.emplace_front(obj);
-					break;
-				}
-			}
-			break;
-		}
-		}
-
 	}
 
 	// 하위 노드에 포함된 오브젝트는 이 노드에서부터 삭제한다.
@@ -141,6 +103,9 @@ void Octree::BuildTree()
 
 bool Octree::Insert(std::shared_ptr<GameObject> obj)
 {
+	if (obj->GetCollisionType() != CollisionType::None)
+		return false;
+
 	if (mWeakObjectList.size() == 0)
 	{
 		mWeakObjectList.emplace_front(obj);
@@ -169,77 +134,25 @@ bool Octree::Insert(std::shared_ptr<GameObject> obj)
 	octant[6] = (mChildNodes[6] != nullptr) ? mChildNodes[6]->GetBoundingBox() : BoundingBox((center + XMFLOAT3(extents.x, extents.y, -extents.z)) / 2.0f, XMFLOAT3(half, half, half));
 	octant[7] = (mChildNodes[7] != nullptr) ? mChildNodes[7]->GetBoundingBox() : BoundingBox((center + XMFLOAT3(-extents.x, extents.y, -extents.z)) / 2.0f, XMFLOAT3(half, half, half));
 
-	auto objBounding = obj->GetCollisionBounding();
-	switch (obj->GetCollisionType())
+	for (int i = 0; i < 8; ++i)
 	{
-	case CollisionType::AABB:
-	{
-		const BoundingBox& aabb = std::any_cast<BoundingBox>(objBounding);
-		for (int i = 0; i < 8; ++i)
+		if (Physics::Contain(obj.get(), octant[i]))
 		{
-			if (octant[i].Contains(aabb) == ContainmentType::CONTAINS)
+			if (mChildNodes[i] != nullptr)
 			{
-				if (mChildNodes[i] != nullptr)
-				{
-					return mChildNodes[i]->Insert(obj);
-				}
-				else
-				{
-					mChildNodes[i] = CreateNode(octant[i], obj);
-					mActiveNodes |= (byte)(1 << i);
-					return mChildNodes[i]->Insert(obj);
-				}
+				return mChildNodes[i]->Insert(obj);
+			}
+			else
+			{
+				mChildNodes[i] = CreateNode(octant[i], obj);
+				mActiveNodes |= (byte)(1 << i);
+				return mChildNodes[i]->Insert(obj);
 			}
 		}
-
-		mWeakObjectList.emplace_front(obj);
-		return true;
-	}
-	case CollisionType::OBB:
-	{
-		const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(objBounding);
-		for (int i = 0; i < 8; ++i)
-		{
-			if (octant[i].Contains(obb) == ContainmentType::CONTAINS)
-			{
-				if (mChildNodes[i] != nullptr)
-					return mChildNodes[i]->Insert(obj);
-				else
-				{
-					mChildNodes[i] = CreateNode(octant[i], obj);
-					mActiveNodes |= (byte)(1 << i);
-					return mChildNodes[i]->Insert(obj);
-				}
-			}
-		}
-
-		mWeakObjectList.emplace_front(obj);
-		return true;
-	}
-	case CollisionType::Sphere:
-	{
-		const BoundingSphere& sphere = std::any_cast<BoundingSphere>(objBounding);
-		for (int i = 0; i < 8; ++i)
-		{
-			if (octant[i].Contains(sphere) == ContainmentType::CONTAINS)
-			{
-				if (mChildNodes[i] != nullptr)
-					return mChildNodes[i]->Insert(obj);
-				else
-				{
-					mChildNodes[i] = CreateNode(octant[i], obj);
-					mActiveNodes |= (byte)(1 << i);
-					return mChildNodes[i]->Insert(obj);
-				}
-			}
-		}
-
-		mWeakObjectList.emplace_front(obj);
-		return true;
-	}
 	}
 
-	return false;
+	mWeakObjectList.emplace_front(obj);
+	return true;
 }
 
 void Octree::Update(float deltaTime)
@@ -339,42 +252,42 @@ void Octree::Update(float deltaTime)
 		// 오브젝트의 바운딩 박스를 완전히 포함할 부모 노드를 계속해서 찾아간다.
 		switch (obj->GetCollisionType())
 		{
-		case CollisionType::AABB:
-		{
-			const BoundingBox& aabb = std::any_cast<BoundingBox>(objBounding);
-			while (currentNode->GetBoundingBox().Contains(aabb) != ContainmentType::CONTAINS)
+			case CollisionType::AABB:
 			{
-				if (currentNode->GetParent() != nullptr)
-					currentNode = currentNode->GetParent();
-				else
-					break;
+				const BoundingBox& aabb = std::any_cast<BoundingBox>(objBounding);
+				while (currentNode->GetBoundingBox().Contains(aabb) != ContainmentType::CONTAINS)
+				{
+					if (currentNode->GetParent() != nullptr)
+						currentNode = currentNode->GetParent();
+					else
+						break;
+				}
+				break;
 			}
-			break;
-		}
-		case CollisionType::OBB:
-		{
-			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(objBounding);
-			while (currentNode->GetBoundingBox().Contains(obb) != ContainmentType::CONTAINS)
+			case CollisionType::OBB:
 			{
-				if (currentNode->GetParent() != nullptr)
-					currentNode = currentNode->GetParent();
-				else
-					break;
+				const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(objBounding);
+				while (currentNode->GetBoundingBox().Contains(obb) != ContainmentType::CONTAINS)
+				{
+					if (currentNode->GetParent() != nullptr)
+						currentNode = currentNode->GetParent();
+					else
+						break;
+				}
+				break;
 			}
-			break;
-		}
-		case CollisionType::Sphere:
-		{
-			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(objBounding);
-			while (currentNode->GetBoundingBox().Contains(sphere) != ContainmentType::CONTAINS)
+			case CollisionType::Sphere:
 			{
-				if (currentNode->GetParent() != nullptr)
-					currentNode = currentNode->GetParent();
-				else
-					break;
+				const BoundingSphere& sphere = std::any_cast<BoundingSphere>(objBounding);
+				while (currentNode->GetBoundingBox().Contains(sphere) != ContainmentType::CONTAINS)
+				{
+					if (currentNode->GetParent() != nullptr)
+						currentNode = currentNode->GetParent();
+					else
+						break;
+				}
+				break;
 			}
-			break;
-		}
 		}
 	
 		if (currentNode == this)
@@ -400,9 +313,9 @@ void Octree::Update(float deltaTime)
 		for (auto& weakOther : currentObjList)
 		{
 			auto other = weakOther.lock();
-			if (obj->IsCollision(other.get()))
+			if (Physics::IsCollision(obj.get(), other.get()))
 			{
-				obj->Collide(other.get());
+				Physics::Collide(obj.get(), other.get(), deltaTime);
 			}
 		}
 	}
@@ -415,9 +328,9 @@ void Octree::Update(float deltaTime)
 		for (auto& weakOther : currentObjList)
 		{
 			auto other = weakOther.lock();
-			if (obj->IsCollision(other.get()))
+			if (Physics::IsCollision(obj.get(), other.get()))
 			{
-				obj->Collide(other.get());
+				Physics::Collide(obj.get(), other.get(), deltaTime);
 			}
 		}
 	}

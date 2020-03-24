@@ -15,7 +15,7 @@ public:
 	void BuildBillboardMesh(ID3D12Device* device, ID3D12GraphicsCommandList* commandList);
 
 public:
-	inline void SetSize(DirectX::XMFLOAT2 size) { mSize = size; }
+	inline void SetSize(const DirectX::XMFLOAT2& size) { mSize = size; }
 	inline DirectX::XMFLOAT2 GetSize() const { return mSize; }
 
 protected:

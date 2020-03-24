@@ -80,9 +80,21 @@ namespace DirectX
 
 	DirectX::XMFLOAT3 operator+(const DirectX::XMFLOAT3& lhs, const float rhs);
 	DirectX::XMFLOAT3 operator*(const DirectX::XMFLOAT3& lhs, const float rhs);
+	DirectX::XMFLOAT3 operator/(const DirectX::XMFLOAT3& lhs, const float rhs);
 	DirectX::XMFLOAT3 operator+(const DirectX::XMFLOAT3& lhs, const DirectX::XMFLOAT3& rhs);
 	DirectX::XMFLOAT3 operator-(const DirectX::XMFLOAT3& lhs, const DirectX::XMFLOAT3& rhs);
-	DirectX::XMFLOAT3 operator/(const DirectX::XMFLOAT3& lhs, const float rhs);
+	DirectX::XMFLOAT3 operator*(const DirectX::XMFLOAT3& lhs, const DirectX::XMFLOAT3& rhs);
+	bool operator==(const DirectX::XMFLOAT3& lhs, const DirectX::XMFLOAT3& rhs);
+}
+
+
+namespace std
+{
+	template<typename T>
+	inline T lerp(T a, T b, T f)
+	{
+		return a + f * (b - a);
+	}
 }
 
 

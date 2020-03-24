@@ -16,7 +16,7 @@ void Object::Tick(float deltaTime)
 {
 	if (mIsWorldUpdate)
 	{
-		WorldUpdate();
+		CalculateWorld();
 		UpdateNumFrames();
 
 		mIsWorldUpdate = false;
@@ -26,8 +26,44 @@ void Object::Tick(float deltaTime)
 
 XMMATRIX Object::GetWorld() const
 {
-	XMMATRIX mWorldMatrix = XMLoadFloat4x4(&mWorld);
-	return mWorldMatrix;
+	XMMATRIX matWorld = XMLoadFloat4x4(&mWorld);
+	return matWorld;
+}
+
+XMMATRIX Object::GetWorldWithoutScailing() const
+{
+	XMMATRIX matWorld = XMLoadFloat4x4(&mWorldNoScailing);
+	return matWorld;
+}
+
+XMVECTOR Object::GetAxis(int index) const
+{
+	XMMATRIX matWorld = XMLoadFloat4x4(&mWorldNoScailing);
+	return matWorld.r[index];
+}
+
+XMFLOAT3 Object::TransformWorldToLocal(const XMFLOAT3& pos) const
+{
+	XMVECTOR position = XMLoadFloat3(&pos);
+	XMMATRIX world = XMLoadFloat4x4(&mWorldNoScailing);
+	position = XMVector3Transform(position, XMMatrixInverse(&XMMatrixDeterminant(world), world));
+
+	XMFLOAT3 result;
+	XMStoreFloat3(&result, position);
+
+	return result;
+}
+
+XMFLOAT3 Object::TransformLocalToWorld(const XMFLOAT3& pos) const
+{
+	XMVECTOR position = XMLoadFloat3(&pos);
+	XMMATRIX world = XMLoadFloat4x4(&mWorldNoScailing);
+	position = XMVector3Transform(position, world);
+
+	XMFLOAT3 result;
+	XMStoreFloat3(&result, position);
+
+	return result;
 }
 
 //게임 객체의 로컬 x-축 벡터를 반환한다.
@@ -69,11 +105,26 @@ void Object::SetPosition(float posX, float posY, float posZ)
 	mIsWorldUpdate = true;
 }
 
+void Object::SetPosition(const XMFLOAT3& pos)
+{
+	mPosition = pos;
+
+	mIsWorldUpdate = true;
+}
+
 void Object::SetRotation(float rotX, float rotY, float rotZ)
 {
 	mRotation.x = rotX;
 	mRotation.y = rotY;
 	mRotation.z = rotZ;
+
+	mIsWorldUpdate = true;
+}
+
+
+void Object::SetRotation(const XMFLOAT3& rot)
+{
+	mRotation = rot;
 
 	mIsWorldUpdate = true;
 }
@@ -87,6 +138,13 @@ void Object::SetScale(float scaleX, float scaleY, float scaleZ)
 	mIsWorldUpdate = true;
 }
 
+void Object::SetScale(const XMFLOAT3& scale)
+{
+	mScale = scale;
+
+	mIsWorldUpdate = true;
+}
+
 void Object::Move(float x, float y, float z)
 {
 	mPosition.x += x;
@@ -96,7 +154,7 @@ void Object::Move(float x, float y, float z)
 	mIsWorldUpdate = true;
 }
 
-void Object::Move(DirectX::XMFLOAT3 distance)
+void Object::Move(const XMFLOAT3& distance)
 {
 	Move(distance.x, distance.y, distance.z);
 }
@@ -150,14 +208,7 @@ void Object::Rotate(float pitch, float yaw, float roll)
 	mIsWorldUpdate = true;
 }
 
-void Object::Rotate(XMFLOAT3* axis, float angle)
-{
-	XMMATRIX rotation = XMMatrixRotationAxis(XMLoadFloat3(axis), XMConvertToRadians(angle));
-	XMMATRIX world = XMMatrixMultiply(rotation, XMLoadFloat4x4(&mWorld));
-	XMStoreFloat4x4(&mWorld, world);
-}
-
-void Object::WorldUpdate()
+void Object::CalculateWorld()
 {
 	XMMATRIX translation = XMMatrixTranslation(mPosition.x, mPosition.y, mPosition.z);
 	XMMATRIX rotation = XMMatrixRotationRollPitchYaw(mRotation.x, mRotation.y, mRotation.z);
@@ -166,4 +217,7 @@ void Object::WorldUpdate()
 	// S * R * T순으로 곱하여 world에 대입한다.
 	XMMATRIX world = scailing * (rotation * translation);
 	XMStoreFloat4x4(&mWorld, world);
+
+	XMMATRIX worldNoScailing = rotation * translation;
+	XMStoreFloat4x4(&mWorldNoScailing, worldNoScailing);
 }

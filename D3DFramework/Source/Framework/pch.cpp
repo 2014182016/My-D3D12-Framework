@@ -41,6 +41,18 @@ namespace DirectX
 		return result;
 	}
 
+	DirectX::XMFLOAT3 operator/(const DirectX::XMFLOAT3& lhs, const float rhs)
+	{
+		DirectX::XMFLOAT3 result;
+
+		DirectX::XMVECTOR vecLhs = DirectX::XMLoadFloat3(&lhs);
+		DirectX::XMVECTOR vecRhs = DirectX::XMVectorReplicate(rhs);
+		DirectX::XMVECTOR vecResult = vecLhs / vecRhs;
+
+		DirectX::XMStoreFloat3(&result, vecResult);
+		return result;
+	}
+
 	DirectX::XMFLOAT3 operator+(const DirectX::XMFLOAT3& lhs, const DirectX::XMFLOAT3& rhs)
 	{
 		DirectX::XMFLOAT3 result;
@@ -65,15 +77,23 @@ namespace DirectX
 		return result;
 	}
 
-	DirectX::XMFLOAT3 operator/(const DirectX::XMFLOAT3& lhs, const float rhs)
+	DirectX::XMFLOAT3 operator*(const DirectX::XMFLOAT3& lhs, const DirectX::XMFLOAT3& rhs)
 	{
 		DirectX::XMFLOAT3 result;
 
 		DirectX::XMVECTOR vecLhs = DirectX::XMLoadFloat3(&lhs);
-		DirectX::XMVECTOR vecRhs = DirectX::XMVectorReplicate(rhs);
-		DirectX::XMVECTOR vecResult = vecLhs / vecRhs;
+		DirectX::XMVECTOR vecRhs = DirectX::XMLoadFloat3(&rhs);
+		DirectX::XMVECTOR vecResult = vecLhs * vecRhs;
 
 		DirectX::XMStoreFloat3(&result, vecResult);
 		return result;
+	}
+
+	bool operator==(const DirectX::XMFLOAT3& lhs, const DirectX::XMFLOAT3& rhs)
+	{
+		DirectX::XMVECTOR vecLhs = DirectX::XMLoadFloat3(&lhs);
+		DirectX::XMVECTOR vecRhs = DirectX::XMLoadFloat3(&rhs);
+
+		return XMVector3Equal(vecLhs, vecRhs);
 	}
 }

@@ -29,6 +29,7 @@
 #include "Billboard.h"
 #include "SkySphere.h"
 #include "Terrain.h"
+#include "Physics.h"
 
 #include <pix3.h>
 
@@ -719,18 +720,65 @@ void D3DFramework::CreateObjects()
 	mGameObjects.push_back(object);
 
 	object = std::make_shared<GameObject>("Floor0"s);
-	object->SetScale(20.0f, 0.1f, 30.0f);
+	object->SetScale(20.0f, 1.5f, 30.0f);
 	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tile0"s));
 	object->SetMesh(AssetManager::GetInstance()->FindMesh("Cube_AABB"s));
 	object->SetCollisionEnabled(true);
 	mRenderableObjects[(int)RenderLayer::Opaque].push_back(object);
 	mGameObjects.push_back(object);
 
-	object = std::make_shared<GameObject>("Cube"s);
-	object->Move(0.0f, 1.0f, 0.0f);
-	object->Rotate(45.0f, 45.0f, 45.0f);
+	object = std::make_shared<GameObject>("Floor1"s);
+	object->SetScale(1.5f, 15.0f, 30.0f);
+	object->SetPosition(10.0f, 5.0f, 0.0f);
 	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tile0"s));
-	object->SetMesh(AssetManager::GetInstance()->FindMesh("Cube_OBB"s));
+	object->SetMesh(AssetManager::GetInstance()->FindMesh("Cube_AABB"s));
+	object->SetCollisionEnabled(true);
+	mRenderableObjects[(int)RenderLayer::Opaque].push_back(object);
+	mGameObjects.push_back(object);
+
+	object = std::make_shared<GameObject>("Floor2"s);
+	object->SetScale(1.5f, 15.0f, 30.0f);
+	object->SetPosition(-10.0f, 5.0f, 0.0f);
+	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tile0"s));
+	object->SetMesh(AssetManager::GetInstance()->FindMesh("Cube_AABB"s));
+	object->SetCollisionEnabled(true);
+	mRenderableObjects[(int)RenderLayer::Opaque].push_back(object);
+	mGameObjects.push_back(object);
+
+	object = std::make_shared<GameObject>("Floor3"s);
+	object->SetScale(20.0f, 15.0f, 1.5f);
+	object->SetPosition(0.0f, 5.0f, 15.0f);
+	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tile0"s));
+	object->SetMesh(AssetManager::GetInstance()->FindMesh("Cube_AABB"s));
+	object->SetCollisionEnabled(true);
+	mRenderableObjects[(int)RenderLayer::Opaque].push_back(object);
+	mGameObjects.push_back(object);
+
+	object = std::make_shared<GameObject>("Floor4"s);
+	object->SetScale(20.0f, 15.0f, 1.5f);
+	object->SetPosition(0.0f, 5.0f, -15.0f);
+	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tile0"s));
+	object->SetMesh(AssetManager::GetInstance()->FindMesh("Cube_AABB"s));
+	object->SetCollisionEnabled(true);
+	mRenderableObjects[(int)RenderLayer::Opaque].push_back(object);
+	mGameObjects.push_back(object);
+
+	object = std::make_shared<GameObject>("Sphere"s);
+	object->Move(0.1f, 20.0f, 0.0f);
+	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tile0"s));
+	object->SetMesh(AssetManager::GetInstance()->FindMesh("Sphere"s));
+	object->SetCollisionEnabled(true);
+	object->SetPhysics(true);
+	object->SetMass(1.0f);
+	object->SetRestitution(1.0f);
+	mRenderableObjects[(int)RenderLayer::Opaque].push_back(object);
+	mGameObjects.push_back(object);
+
+	object = std::make_shared<GameObject>("Sphere"s);
+	object->Move(0.0f, 5.0f, 0.0f);
+	object->SetScale(5.0f, 5.0f, 5.0f);
+	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tile0"s));
+	object->SetMesh(AssetManager::GetInstance()->FindMesh("Sphere"s));
 	object->SetCollisionEnabled(true);
 	mRenderableObjects[(int)RenderLayer::Opaque].push_back(object);
 	mGameObjects.push_back(object);
@@ -778,7 +826,7 @@ void D3DFramework::CreateTerrain()
 	mTerrain->SetScale(10.0f, 10.0f, 10.0f);
 	mTerrain->BuildMesh(md3dDevice.Get(), mMainCommandList.Get(), 100.0f, 100.0f, 8, 8);
 	mTerrain->SetMaterial(AssetManager::GetInstance()->FindMaterial("Terrain"s));
-	mTerrain->WorldUpdate();
+	mTerrain->CalculateWorld();
 	mRenderableObjects[(int)RenderLayer::Terrain].push_back(mTerrain);
 }
 
@@ -880,9 +928,9 @@ void D3DFramework::CreateParticles()
 	particle->SetEmitNum(200);
 	particle->SetEnabledInfinite(true);
 	particle->SetEnabledGravity(true);
-	particle->SetPosition(0.0f, 50.0f, 0.0f);
+	particle->SetPosition(0.0f, 25.0f, 0.0f);
 	particle->SetMaterial(AssetManager::GetInstance()->FindMaterial("Radial_Gradient"s));
-	mParticles.push_back(std::move(particle));
+	//mParticles.push_back(std::move(particle));
 }
 
 void D3DFramework::CreateFrameResources(ID3D12Device* device)
@@ -968,7 +1016,8 @@ void D3DFramework::RenderActualObjects(ID3D12GraphicsCommandList* cmdList, Direc
 	RenderObjects(cmdList, mRenderableObjects[(int)RenderLayer::Transparent], startAddress, frustum);
 }
 
-GameObject* D3DFramework::Picking(int screenX, int screenY, float distance, bool isMeshCollision) const
+bool D3DFramework::Picking(HitInfo& hitInfo, const int screenX, const int screenY,
+	const float distance, const bool isMeshCollision) const
 {
 	XMFLOAT4X4 proj = mCamera->GetProj4x4f();
 
@@ -991,43 +1040,15 @@ GameObject* D3DFramework::Picking(int screenX, int screenY, float distance, bool
 	float nearestDist = FLT_MAX;
 	GameObject* hitObj = nullptr;
 
+#if defined(DEBUG) || defined(_DEBUG)
+	D3DDebug::GetInstance()->DrawRay(rayOrigin, rayOrigin + (rayDir * distance));
+#endif
+
 	// Picking Ray로 충돌을 검사한다.
 	for (const auto& obj : mGameObjects)
 	{
-		bool isHit = false;
 		float hitDist = FLT_MAX;
-
-		CollisionType collisionType;
-		if (isMeshCollision)
-		{
-			collisionType = obj->GetMeshCollisionType();
-		}
-		else
-		{
-			collisionType = obj->GetCollisionType();
-		}
-
-		switch (collisionType)
-		{
-		case CollisionType::AABB:
-		{
-			const BoundingBox& aabb = std::any_cast<BoundingBox>(obj->GetCollisionBounding());
-			isHit = aabb.Intersects(rayOrigin, rayDir, hitDist);
-			break;
-		}
-		case CollisionType::OBB:
-		{
-			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(obj->GetCollisionBounding());
-			isHit = obb.Intersects(rayOrigin, rayDir, hitDist);
-			break;
-		}
-		case CollisionType::Sphere:
-		{
-			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(obj->GetCollisionBounding());
-			isHit = sphere.Intersects(rayOrigin, rayDir, hitDist);
-			break;
-		}
-		}
+		bool isHit = Physics::IsCollision(obj.get(), rayOrigin, rayDir, hitDist, isMeshCollision);
 
 		if (isHit)
 		{
@@ -1041,21 +1062,27 @@ GameObject* D3DFramework::Picking(int screenX, int screenY, float distance, bool
 		}
 	}
 
+	if (!nearestHit)
+		return false;
+
 #if defined(DEBUG) || defined(_DEBUG)
 	if (nearestHit)
 	{
 		std::cout << "Picking : " << hitObj->ToString() << std::endl;
 	}
-
-	D3DDebug::GetInstance()->DrawRay(rayOrigin, rayOrigin + (rayDir * distance));
 #endif
 
 	if (nearestDist < distance)
 	{
-		return hitObj;
+		hitInfo.mNearestDist = nearestDist;
+		hitInfo.mObj = (void*)hitObj;
+		XMStoreFloat3(&hitInfo.mRayOrigin, rayOrigin);
+		XMStoreFloat3(&hitInfo.mRayDirection, rayDir);
+
+		return true;
 	}
 
-	return nullptr;
+	return false;
 }
 
 GameObject* D3DFramework::FindGameObject(std::string name)

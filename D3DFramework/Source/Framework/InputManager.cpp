@@ -31,7 +31,12 @@ void InputManager::OnMouseDown(WPARAM btnState, int x, int y)
 	}
 	else if ((btnState & MK_RBUTTON) != 0)
 	{
-		GameObject* obj = D3DFramework::GetInstance()->Picking(x, y);
+		D3DFramework::GetInstance()->Impulse(x, y, 10.0f, 10.0f);
+	}
+	else if ((btnState & MK_MBUTTON) != 0)
+	{
+		HitInfo hitInfo;
+		bool result = D3DFramework::GetInstance()->Picking(hitInfo, x, y);
 	}
 }
 

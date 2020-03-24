@@ -3,6 +3,8 @@
 #include "D3DUtil.h"
 #include "Structure.h"
 
+using namespace DirectX;
+
 Sound::Sound(std::string&& name) : Component(std::move(name)){ }
 
 Sound::~Sound() { }
@@ -113,7 +115,7 @@ void Sound::SetPosition(float x, float y, float z)
 		mSound3dBuffer->SetPosition(x, y, z, DS3D_IMMEDIATE);
 }
 
-void Sound::SetPosition(DirectX::XMFLOAT3 pos)
+void Sound::SetPosition(const XMFLOAT3& pos)
 {
 	SetPosition(pos.x, pos.y, pos.z);
 }

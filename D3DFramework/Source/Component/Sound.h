@@ -24,7 +24,7 @@ public:
 	inline float GetSpeed() const { return mSpeed; }
 
 	void SetPosition(float x, float y, float z); // Only 3D
-	void SetPosition(DirectX::XMFLOAT3 pos); // Only 3D
+	void SetPosition(const DirectX::XMFLOAT3& pos); // Only 3D
 	void SetBound(float min, float max); // Only 3D
 
 	void SetVolume(UINT volume);

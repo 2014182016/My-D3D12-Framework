@@ -127,7 +127,7 @@ void Mesh::DisposeUploaders()
 	mIndexBufferUploader = nullptr;
 }
 
-void Mesh::SetCollisionBoundingAsAABB(DirectX::XMFLOAT3 extents)
+void Mesh::SetCollisionBoundingAsAABB(const XMFLOAT3& extents)
 {
 	mCollisionType = CollisionType::AABB;
 
@@ -136,7 +136,7 @@ void Mesh::SetCollisionBoundingAsAABB(DirectX::XMFLOAT3 extents)
 	mCollisionBounding = std::move(aabb);
 }
 
-void Mesh::SetCollisionBoundingAsOBB(DirectX::XMFLOAT3 extents)
+void Mesh::SetCollisionBoundingAsOBB(const XMFLOAT3& extents)
 {
 	mCollisionType = CollisionType::OBB;
 

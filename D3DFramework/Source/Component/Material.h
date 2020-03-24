@@ -19,7 +19,7 @@ public:
 	inline DirectX::XMFLOAT4X4 GetMaterialTransform4x4f() const { return mMatTransform; }
 
 	inline DirectX::XMFLOAT4 GetDiffuse() const { return mDiffuseAlbedo; }
-	inline void SetDiffuse(DirectX::XMFLOAT3 diffuse) { mDiffuseAlbedo = DirectX::XMFLOAT4(diffuse.x, diffuse.y, diffuse.z, 1.0f); }
+	inline void SetDiffuse(const DirectX::XMFLOAT3& diffuse) { mDiffuseAlbedo = DirectX::XMFLOAT4(diffuse.x, diffuse.y, diffuse.z, 1.0f); }
 	void SetDiffuse(float r, float g, float b);
 
 	inline DirectX::XMFLOAT3 GetSpecular() const { return mSpecular; }
