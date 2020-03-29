@@ -8,29 +8,15 @@
 // 많은 수의 텍셀을 담을 수 있다.
 //=============================================================================
 
-#include "SsaoRS.hlsl"
+#include "Ssao.hlsl"
+#include "Fullscreen.hlsl"
 
 Texture2D gInputMap : register(t2);
 
-struct VertexOut
-{
-	float4 mPosH  : SV_POSITION;
-	float2 mTexC  : TEXCOORD;
-};
-
-VertexOut VS(uint vid : SV_VertexID)
-{
-	VertexOut vout;
-
-	vout.mTexC = gTexCoords[vid];
-	vout.mPosH = float4(2.0f * vout.mTexC.x - 1.0f, 1.0f - 2.0f * vout.mTexC.y, 0.0f, 1.0f);
-
-	return vout;
-}
-
 float4 PS(VertexOut pin) : SV_Target
 {
-	float centerDepth = gDepthMap.SampleLevel(gsamDepthMap, pin.mTexC, 0.0f).r;
+	// 월드 좌표계의 깊이를 뷰 공간으로 변환한다.
+	float centerDepth = gDepthMap.SampleLevel(gsamDepthMap, pin.texC, 0.0f).r;
 	centerDepth = NdcDepthToViewDepth(centerDepth);
 
 	// 흐리기 핵 가중치들을 1차원 float 배열에 풀어 놓는다.
@@ -53,7 +39,7 @@ float4 PS(VertexOut pin) : SV_Target
 
 	// 필터 핵 중앙의 값은 항상 총합에 기여한다.
 	float totalWeight = blurWeights[gBlurRadius];
-	float4 color = blurWeights[gBlurRadius] * gInputMap.SampleLevel(gsamLinearWrap, pin.mTexC, 0.0);
+	float4 color = blurWeights[gBlurRadius] * gInputMap.SampleLevel(gsamLinearWrap, pin.texC, 0.0);
 
 	for (float i = -gBlurRadius; i <= gBlurRadius; ++i)
 	{
@@ -61,7 +47,7 @@ float4 PS(VertexOut pin) : SV_Target
 		if (i == 0)
 			continue;
 
-		float2 tex = pin.mTexC + i * texOffset;
+		float2 tex = pin.texC + i * texOffset;
 
 		float  neighborDepth = gDepthMap.SampleLevel(gsamDepthMap, tex, 0.0f).r;
 		neighborDepth = NdcDepthToViewDepth(neighborDepth);

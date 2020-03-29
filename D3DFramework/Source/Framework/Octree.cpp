@@ -1,76 +1,94 @@
-#include "pch.h"
-#include "Octree.h"
-#include "GameObject.h"
-#include "Mesh.h"
-#include "Enumeration.h"
-#include "D3DDebug.h"
-#include "Physics.h"
+#include <Framework/Octree.h>
+#include <Framework/Enumeration.h>
+#include <Framework/D3DDebug.h>
+#include <Framework/Physics.h>
+#include <Component/Mesh.h>
+#include <Object/GameObject.h>
+#include <iostream>
 
-using namespace DirectX;
-
-Octree::Octree(const DirectX::BoundingBox& boundingBox, const std::list<std::shared_ptr<GameObject>>& objList)
+inline XMFLOAT3 operator+(const XMFLOAT3& lhs, const XMFLOAT3& rhs)
 {
-	mBoundingBox = boundingBox;
+	XMFLOAT3 result;
+	
+	result.x = lhs.x + rhs.x;
+	result.y = lhs.y + rhs.y;
+	result.z = lhs.z + rhs.z;
+
+	return result;
+}
+
+inline XMFLOAT3 operator-(const XMFLOAT3& lhs, const XMFLOAT3& rhs)
+{
+	XMFLOAT3 result;
+
+	result.x = lhs.x - rhs.x;
+	result.y = lhs.y - rhs.y;
+	result.z = lhs.z - rhs.z;
+
+	return result;
+}
+
+inline XMFLOAT3 operator/(const XMFLOAT3& lhs, const float scalar)
+{
+	XMFLOAT3 result;
+
+	result.x = lhs.x / scalar;
+	result.y = lhs.y / scalar;
+	result.z = lhs.z / scalar;
+
+	return result;
+}
+
+Octree::Octree(const BoundingBox& boundingBox, const std::list<std::shared_ptr<GameObject>>& objList)
+{
+	this->boundingBox = boundingBox;
 
 	for (const auto& obj : objList)
 	{
-		CollisionType collisionType = obj->GetCollisionType();
-		if(collisionType != CollisionType::None && collisionType != CollisionType::Point)
-			mWeakObjectList.emplace_front(obj);
+		if(IsEnabledCollision(obj))
+			weakObjectList.emplace_front(obj);
 	}
 
-	for (int i = 0; i < 8; ++i)
-		mChildNodes[i] = nullptr;
+	for (int i = 0; i < OCT; ++i)
+		childNodes[i] = nullptr;
 }
 
 Octree::Octree(const BoundingBox& boundingBox)
 {
-	mBoundingBox = boundingBox;
+	this->boundingBox = boundingBox;
 
 	for (int i = 0; i < 8; ++i)
-		mChildNodes[i] = nullptr;
+		childNodes[i] = nullptr;
 }
 
 void Octree::BuildTree()
 {
 	// 오브젝트가 1개 이하일 경우 BuildTree를 종료한다.
-	if (mWeakObjectList.size() <= 1)
+	if (weakObjectList.size() <= 1)
 		return;
 
-	float dimension = mBoundingBox.Extents.x;
-
-	if (dimension <= MIN_SIZE)
+	if (boundingBox.Extents.x <= MIN_SIZE)
 		return;
 
-	float half = dimension / 2.0f;
-	XMFLOAT3 center = mBoundingBox.Center;
-	XMFLOAT3 extents = mBoundingBox.Extents;
-
+	BoundingBox octant[OCT];
 	// 현재 바운딩 박스를 8개의 공간으로 분할
-	BoundingBox octant[8];
-	octant[0] = BoundingBox((center - extents) / 2.0f, XMFLOAT3(half, half, half));
-	octant[1] = BoundingBox((center + XMFLOAT3(-extents.x,-extents.y, extents.z)) / 2.0f, XMFLOAT3(half, half, half));
-	octant[2] = BoundingBox((center + XMFLOAT3(extents.x, -extents.y, extents.z)) / 2.0f, XMFLOAT3(half, half, half));
-	octant[3] = BoundingBox((center + XMFLOAT3(extents.x, -extents.y, -extents.z)) / 2.0f, XMFLOAT3(half, half, half));
-	octant[5] = BoundingBox((center + extents) / 2.0f, XMFLOAT3(half, half, half));
-	octant[4] = BoundingBox((center + XMFLOAT3(-extents.x, extents.y, extents.z)) / 2.0f, XMFLOAT3(half, half, half));
-	octant[6] = BoundingBox((center + XMFLOAT3(extents.x, extents.y, -extents.z)) / 2.0f, XMFLOAT3(half, half, half));
-	octant[7] = BoundingBox((center + XMFLOAT3(-extents.x, extents.y, -extents.z)) / 2.0f, XMFLOAT3(half, half, half));
+	SpatialDivision(octant, boundingBox.Center, boundingBox.Extents);
 
 	// 각 8개의 노드의 오브젝트 리스트
 	std::list<std::shared_ptr<GameObject>> octList[8];
-
 	// 현재 가지고 있는 오브젝트 리스트로부터 없애야 할 오브젝트들을 담는 리스트
 	std::list<std::shared_ptr<GameObject>> delist;
 
-	for (const auto& weakObj : mWeakObjectList)
+	for (const auto& weakObj : weakObjectList)
 	{
 		auto obj = weakObj.lock();
 		if (obj == nullptr)
 			continue;
 
-		for (int i = 0; i < 8; ++i)
+		for (int i = 0; i < OCT; ++i)
 		{
+			// 현재 노드의 바운딩 박스가 객체를 완전히 포함하고
+			// 있다면 하위 노드에 포함시키도록 리스트에 추가한다.
 			if (Physics::Contain(obj.get(), octant[i]))
 			{
 				octList[i].emplace_front(obj);
@@ -79,85 +97,83 @@ void Octree::BuildTree()
 		}
 	}
 
+	delist.unique();
+
 	// 하위 노드에 포함된 오브젝트는 이 노드에서부터 삭제한다.
 	for (auto& obj : delist)
 	{
-		DeleteWeakObject(obj);
+		DeleteObject(obj);
 	}
 
-	// 하위 노드에 오브젝트가 존재한다면 BuildTree를 재귀적으로 실행한다.
-	for (int i = 0; i < 8; ++i)
+	// 자식 노드에 오브젝트가 존재한다면 BuildTree를 재귀적으로 실행한다.
+	for (int i = 0; i < OCT; ++i)
 	{
-		UINT objectCount = (UINT)std::distance(octList[i].begin(), octList[i].end());
-		if (objectCount != 0)
+		if (!octList[i].empty())
 		{
-			mChildNodes[i] = CreateNode(octant[i], octList[i]);
-			mActiveNodes |= (byte)(1 << i);
-			mChildNodes[i]->BuildTree();
+			// 자식 노드를 생성하고 자식 노드도 같은 일을 반복한다.
+			childNodes[i] = CreateNode(octant[i], octList[i]);
+			activeNodes |= (UINT8)(1 << i);
+			childNodes[i]->BuildTree();
 		}
 	}
 
-	mTreeBuilt = true;
-	mTreeReady = true;
+	treeBuilt = true;
+	treeReady = true;
 }
 
 bool Octree::Insert(std::shared_ptr<GameObject> obj)
 {
-	if (obj->GetCollisionType() != CollisionType::None)
+	if (IsEnabledCollision(obj))
 		return false;
 
-	if (mWeakObjectList.size() == 0)
+	// 해당 노드에 저장된 객체가 없다면 공간을 나눌 필요가 없다.
+	if (weakObjectList.size() == 0)
 	{
-		mWeakObjectList.emplace_front(obj);
+		weakObjectList.emplace_front(obj);
 		return true;
 	}
 
-	float dimension = mBoundingBox.Extents.x;
-	if (dimension <= MIN_SIZE)
+	if (boundingBox.Extents.x <= MIN_SIZE)
 	{
-		mWeakObjectList.emplace_front(obj);
+		weakObjectList.emplace_front(obj);
 		return true;
 	}
 
-	float half = dimension / 2.0f;
-	XMFLOAT3 center = mBoundingBox.Center;
-	XMFLOAT3 extents = mBoundingBox.Extents;
-
+	BoundingBox octant[OCT];
 	// 현재 바운딩 박스를 8개의 공간으로 분할
-	BoundingBox octant[8];
-	octant[0] = (mChildNodes[0] != nullptr) ? mChildNodes[0]->GetBoundingBox() : BoundingBox((center - extents) / 2.0f, XMFLOAT3(half, half, half));
-	octant[1] = (mChildNodes[1] != nullptr) ? mChildNodes[1]->GetBoundingBox() : BoundingBox((center + XMFLOAT3(-extents.x, -extents.y, extents.z)) / 2.0f, XMFLOAT3(half, half, half));
-	octant[2] = (mChildNodes[2] != nullptr) ? mChildNodes[2]->GetBoundingBox() : BoundingBox((center + XMFLOAT3(extents.x, -extents.y, extents.z)) / 2.0f, XMFLOAT3(half, half, half));
-	octant[3] = (mChildNodes[3] != nullptr) ? mChildNodes[3]->GetBoundingBox() : BoundingBox((center + XMFLOAT3(extents.x, -extents.y, -extents.z)) / 2.0f, XMFLOAT3(half, half, half));
-	octant[5] = (mChildNodes[4] != nullptr) ? mChildNodes[4]->GetBoundingBox() : BoundingBox((center + extents) / 2.0f, XMFLOAT3(half, half, half));
-	octant[4] = (mChildNodes[5] != nullptr) ? mChildNodes[5]->GetBoundingBox() : BoundingBox((center + XMFLOAT3(-extents.x, extents.y, extents.z)) / 2.0f, XMFLOAT3(half, half, half));
-	octant[6] = (mChildNodes[6] != nullptr) ? mChildNodes[6]->GetBoundingBox() : BoundingBox((center + XMFLOAT3(extents.x, extents.y, -extents.z)) / 2.0f, XMFLOAT3(half, half, half));
-	octant[7] = (mChildNodes[7] != nullptr) ? mChildNodes[7]->GetBoundingBox() : BoundingBox((center + XMFLOAT3(-extents.x, extents.y, -extents.z)) / 2.0f, XMFLOAT3(half, half, half));
+	SpatialDivision(octant, boundingBox.Center, boundingBox.Extents);
 
-	for (int i = 0; i < 8; ++i)
+	for (int i = 0; i < OCT; ++i)
 	{
+		// 현재 바운딩 박스가 객체를 완전히 포함한다면
 		if (Physics::Contain(obj.get(), octant[i]))
 		{
-			if (mChildNodes[i] != nullptr)
+			// 자식 노드가 존재한다면
+			if (childNodes[i] != nullptr)
 			{
-				return mChildNodes[i]->Insert(obj);
+				// 자식 노드에 객체를 삽입한다.
+				return childNodes[i]->Insert(obj);
 			}
+			// 아니라면
 			else
 			{
-				mChildNodes[i] = CreateNode(octant[i], obj);
-				mActiveNodes |= (byte)(1 << i);
-				return mChildNodes[i]->Insert(obj);
+				// 자식 노드를 생성하고 객체를 삽입한다.
+				childNodes[i] = CreateNode(octant[i], obj);
+				activeNodes |= (UINT8)(1 << i);
+				return childNodes[i]->Insert(obj);
 			}
 		}
 	}
 
-	mWeakObjectList.emplace_front(obj);
+	// 모든 자식 노드에 완전히 포함되지 않는다면
+	// 현재 노드에 삽입한다.
+	weakObjectList.emplace_front(obj);
 	return true;
 }
 
 void Octree::Update(float deltaTime)
 {
-	if (mTreeBuilt == false || mTreeReady == false)
+	if (treeBuilt == false || treeReady == false)
 	{
 #if defined(DEBUG) || defined(_DEBUG)
 		std::cout << "Octree isn't built or ready" << std::endl;
@@ -169,33 +185,34 @@ void Octree::Update(float deltaTime)
 	// 카운트 다운이 0이 될 시에 이 노드를 삭제한다.
 	// 죽기 전에 노드를 다시 사용하게 됐다면 수명을 두 배로 늘린다.
 	// 이로써 불필요한 메모리 할당 및 해제를 피할 수 있다.
-	if (mWeakObjectList.size() == 0)
+	if (weakObjectList.size() == 0)
 	{
-		if (!mHasChildren)
+		if (!hasChildren)
 		{
-			if (mCurrLife == -1)
-				mCurrLife = mMaxLifespan;
-			else if (mCurrLife > 0)
-				--mCurrLife;
+			if (currLife == -1)
+				currLife = maxLifespan;
+			else if (currLife > 0)
+				--currLife;
 		}
 	}
 	else
 	{
-		if (mCurrLife != -1)
+		if (currLife != -1)
 		{
-			if (mMaxLifespan <= 64)
-				mMaxLifespan *= 2;
-			mCurrLife = -1;
+			if (maxLifespan <= 64)
+				maxLifespan *= 2;
+			currLife = -1;
 		}
 	}
 
+	// 움직인 노드들을 리스트로 따로 분류한다.
 	std::list<std::shared_ptr<GameObject>> movedObjects;
-	for (auto iter = mWeakObjectList.begin(); iter != mWeakObjectList.end();)
+	for (auto iter = weakObjectList.begin(); iter != weakObjectList.end();)
 	{
 		auto obj = iter->lock();
 		if (obj == nullptr)
 		{
-			iter = mWeakObjectList.erase(iter);
+			iter = weakObjectList.erase(iter);
 		}
 		else
 		{
@@ -207,41 +224,44 @@ void Octree::Update(float deltaTime)
 		}
 	}
 
-	mHasChildren = false;
+	hasChildren = false;
 	// CurrLife가 0이 된 노드는 삭제한다.
-	for (int flags = mActiveNodes, index = 0; flags > 0; flags >>= 1, ++index)
+	for (int flags = activeNodes, index = 0; flags > 0; flags >>= 1, ++index)
 	{
-		if (mChildNodes[index] != nullptr)
+		if (childNodes[index] != nullptr)
 		{
-			mHasChildren = true;
+			hasChildren = true;
 
-			if ((flags & 1) == 1 && (mChildNodes[index]->GetCurrentLife() == 0))
+			if ((flags & 1) == 1 && (childNodes[index]->currLife == 0))
 			{
 				// 오브젝트가 존재할 떄, 노드를 삭제해서는 안된다.
-				if (mChildNodes[index]->GetObjectCount() > 0)
+				if (childNodes[index]->GetObjectCount() > 0)
 				{
-					mChildNodes[index]->SetCurrentLife(-1);
+					childNodes[index]->currLife = -1;
 				}
 				// 오브젝트가 없고, CurrLife = 0이라면 노드를 삭제한다.
 				else
 				{
-					delete mChildNodes[index];
-					mChildNodes[index] = nullptr;
-					mActiveNodes ^= (byte)(1 << index);
+					delete childNodes[index];
+					childNodes[index] = nullptr;
+					activeNodes ^= (UINT8)(1 << index);
 				}
 			}
 		}
 	}
 
 	// 자식 노드들도 업데이트한다.
-	for (int flags = mActiveNodes, index = 0; flags > 0; flags >>= 1, index++)
+	for (int flags = activeNodes, index = 0; flags > 0; flags >>= 1, index++)
 	{
 		if ((flags & 1) == 1)
 		{
-			if (mChildNodes != nullptr && mChildNodes[index] != nullptr)
-				mChildNodes[index]->Update(deltaTime);
+			if (childNodes != nullptr && childNodes[index] != nullptr)
+				childNodes[index]->Update(deltaTime);
 		}
 	}
+	
+	/*****************************************************************************/
+	// 모든 자식 노드들이 업데이트 함수를 수행한 이후이다.
 
 	// 오브젝트가 움직였다면 부모 노드로 이동하여 알맞는 노드를 다시 찾는다.
 	for (auto& obj : movedObjects)
@@ -250,44 +270,12 @@ void Octree::Update(float deltaTime)
 		auto objBounding = obj->GetCollisionBounding();
 
 		// 오브젝트의 바운딩 박스를 완전히 포함할 부모 노드를 계속해서 찾아간다.
-		switch (obj->GetCollisionType())
+		while (Physics::Contain(obj.get(), currentNode->GetBoundingBox()) == false)
 		{
-			case CollisionType::AABB:
-			{
-				const BoundingBox& aabb = std::any_cast<BoundingBox>(objBounding);
-				while (currentNode->GetBoundingBox().Contains(aabb) != ContainmentType::CONTAINS)
-				{
-					if (currentNode->GetParent() != nullptr)
-						currentNode = currentNode->GetParent();
-					else
-						break;
-				}
+			if (currentNode->parent != nullptr)
+				currentNode = currentNode->parent;
+			else
 				break;
-			}
-			case CollisionType::OBB:
-			{
-				const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(objBounding);
-				while (currentNode->GetBoundingBox().Contains(obb) != ContainmentType::CONTAINS)
-				{
-					if (currentNode->GetParent() != nullptr)
-						currentNode = currentNode->GetParent();
-					else
-						break;
-				}
-				break;
-			}
-			case CollisionType::Sphere:
-			{
-				const BoundingSphere& sphere = std::any_cast<BoundingSphere>(objBounding);
-				while (currentNode->GetBoundingBox().Contains(sphere) != ContainmentType::CONTAINS)
-				{
-					if (currentNode->GetParent() != nullptr)
-						currentNode = currentNode->GetParent();
-					else
-						break;
-				}
-				break;
-			}
 		}
 	
 		if (currentNode == this)
@@ -296,13 +284,13 @@ void Octree::Update(float deltaTime)
 		// 현재 노드에서 움직인 오브젝트를 삭제하고,
 		// 알맞은 노드에 다시 삽입한다.
 		currentNode->Insert(obj);
-		DeleteWeakObject(obj);
+		DeleteObject(obj);
 	}
 
 	// 부모노드에 있는 오브젝트들과 1:1검사를 한 뒤
 	// 현재 노드에 있는 오브젝트끼리 충돌검사를 한다.
 	std::list<std::weak_ptr<GameObject>> currentObjList, parentObjList;
-	currentObjList = mWeakObjectList;
+	currentObjList = weakObjectList;
 	GetParentObjectList(parentObjList);
 
 	while (!parentObjList.empty())
@@ -313,8 +301,10 @@ void Octree::Update(float deltaTime)
 		for (auto& weakOther : currentObjList)
 		{
 			auto other = weakOther.lock();
+			// 오브젝트끼리 충돌했다면
 			if (Physics::IsCollision(obj.get(), other.get()))
 			{
+				// 충돌했을 때의 행동을 수행한다.
 				Physics::Collide(obj.get(), other.get(), deltaTime);
 			}
 		}
@@ -328,8 +318,10 @@ void Octree::Update(float deltaTime)
 		for (auto& weakOther : currentObjList)
 		{
 			auto other = weakOther.lock();
+			// 오브젝트끼리 충돌했다면
 			if (Physics::IsCollision(obj.get(), other.get()))
 			{
+				// 충돌했을 때의 행동을 수행한다.
 				Physics::Collide(obj.get(), other.get(), deltaTime);
 			}
 		}
@@ -339,12 +331,11 @@ void Octree::Update(float deltaTime)
 
 Octree* Octree::CreateNode(const BoundingBox& boundingBox, std::list<std::shared_ptr<GameObject>> objList)
 {
-	UINT objCount = (UINT)std::distance(objList.begin(), objList.end());
-	if (objCount == 0)
+	if (objList.empty())
 		return nullptr;
 
 	Octree* newOctant = new Octree(boundingBox, objList);
-	newOctant->SetParent(this);
+	newOctant->parent = this;
 	return newOctant;
 }
 
@@ -354,69 +345,103 @@ Octree* Octree::CreateNode(const BoundingBox& boundingBox, std::shared_ptr<GameO
 	objList.emplace_front(obj);
 
 	Octree* newOctant = new Octree(boundingBox, objList);
-	newOctant->SetParent(this);
+	newOctant->parent = this;
 	return newOctant;
+}
+
+void Octree::SpatialDivision(BoundingBox* octant, const DirectX::XMFLOAT3& center, const DirectX::XMFLOAT3& extents) const
+{
+	float half = extents.x / 2.0f;
+	XMFLOAT3 halfExtents = { half, half, half };
+
+	octant[0] = BoundingBox((center - extents) / 2.0f, halfExtents);
+	octant[1] = BoundingBox((center + XMFLOAT3(-extents.x, -extents.y, extents.z)) / 2.0f, halfExtents);
+	octant[2] = BoundingBox((center + XMFLOAT3(extents.x, -extents.y, extents.z)) / 2.0f, halfExtents);
+	octant[3] = BoundingBox((center + XMFLOAT3(extents.x, -extents.y, -extents.z)) / 2.0f, halfExtents);
+	octant[5] = BoundingBox((center + extents) / 2.0f, halfExtents);
+	octant[4] = BoundingBox((center + XMFLOAT3(-extents.x, extents.y, extents.z)) / 2.0f, halfExtents);
+	octant[6] = BoundingBox((center + XMFLOAT3(extents.x, extents.y, -extents.z)) / 2.0f, halfExtents);
+	octant[7] = BoundingBox((center + XMFLOAT3(-extents.x, extents.y, -extents.z)) / 2.0f, halfExtents);
 }
 
 void Octree::GetBoundingWorlds(std::vector<XMFLOAT4X4>& worlds) const
 {
-	XMMATRIX translation = XMMatrixTranslation(mBoundingBox.Center.x, mBoundingBox.Center.y, mBoundingBox.Center.z);
-	XMMATRIX scailing = XMMatrixScaling(mBoundingBox.Extents.x, mBoundingBox.Extents.y, mBoundingBox.Extents.z);
+	XMMATRIX translation = XMMatrixTranslation(boundingBox.Center.x, boundingBox.Center.y, boundingBox.Center.z);
+	XMMATRIX scailing = XMMatrixScaling(boundingBox.Extents.x, boundingBox.Extents.y, boundingBox.Extents.z);
 	XMMATRIX world = XMMatrixMultiply(scailing, translation);
 	XMFLOAT4X4 world4x4f;
 	XMStoreFloat4x4(&world4x4f, XMMatrixTranspose(world));
 	worlds.push_back(std::move(world4x4f));
 
-	for (int i = 0; i < 8; ++i)
+	for (int i = 0; i < OCT; ++i)
 	{
-		if (mChildNodes[i] != nullptr)
-			mChildNodes[i]->GetBoundingWorlds(worlds);
+		if (childNodes[i] != nullptr)
+			childNodes[i]->GetBoundingWorlds(worlds);
 	}
 }
 
 void Octree::GetParentObjectList(std::list<std::weak_ptr<GameObject>>& objList) const
 {
-	Octree* parentNode = mParent;
+	Octree* parentNode = parent;
 	while (parentNode != nullptr)
 	{
-		const std::list<std::weak_ptr<GameObject>>& parentObjList = parentNode->GetObjectList();
+		const std::list<std::weak_ptr<GameObject>>& parentObjList = parentNode->weakObjectList;
 		objList.insert(objList.end(), parentObjList.begin(), parentObjList.end());
-		parentNode = parentNode->GetParent();
+		parentNode = parentNode->parent;
 	}
 }
 
 void Octree::GetChildObjectList(std::list<std::weak_ptr<class GameObject>>& objList) const
 {
-	if (mChildNodes == nullptr)
+	if (childNodes == nullptr)
 		return;
 
-	for (int i = 0; i < 8; ++i)
+	for (int i = 0; i < OCT; ++i)
 	{
-		if (mChildNodes[i] != nullptr)
+		if (childNodes[i] != nullptr)
 		{
-			const std::list<std::weak_ptr<class GameObject>> chileObjList = mChildNodes[i]->GetObjectList();
+			const std::list<std::weak_ptr<class GameObject>> chileObjList = childNodes[i]->weakObjectList;
 			objList.insert(objList.end(), chileObjList.begin(), chileObjList.end());
-			mChildNodes[i]->GetChildObjectList(objList);
+			childNodes[i]->GetChildObjectList(objList);
 		}
 	}
 }
 
-void Octree::DeleteWeakObject(std::shared_ptr<class GameObject> obj)
+void Octree::DeleteObject(std::shared_ptr<class GameObject> obj)
 {
-	mWeakObjectList.remove_if([&obj](std::weak_ptr<GameObject>& weakObj)->bool
+	// UID를 확인하여 객체가 동일한지 확인 후 삭제한다.
+	weakObjectList.remove_if([&obj](std::weak_ptr<GameObject>& weakObj)->bool
 	{ auto listedObj = weakObj.lock();
-	if (obj == listedObj) return true; return false; });
+	if (obj->GetUID() == listedObj->GetUID()) return true; return false; });
+}
+
+bool Octree::IsEnabledCollision(std::shared_ptr<GameObject> obj)
+{
+	CollisionType collisionType = obj->GetCollisionType();
+	if (collisionType == CollisionType::None || collisionType == CollisionType::Point)
+		return false;
+	return true;
 }
 
 void Octree::DrawDebug()
 {
-	D3DDebug::GetInstance()->Draw(mBoundingBox, FLT_MAX, (XMFLOAT4)Colors::Green);
+	D3DDebug::GetInstance()->Draw(boundingBox, FLT_MAX, (XMFLOAT4)Colors::Green);
 
-	for (int i = 0; i < 8; ++i)
+	for (int i = 0; i < OCT; ++i)
 	{
-		if (mChildNodes[i] != nullptr)
+		if (childNodes[i] != nullptr)
 		{
-			mChildNodes[i]->DrawDebug();
+			childNodes[i]->DrawDebug();
 		}
 	}
+}
+
+UINT32 Octree::GetObjectCount() const
+{
+	return (UINT32)weakObjectList.size();
+}
+
+BoundingBox Octree::GetBoundingBox() const
+{
+	return boundingBox;
 }

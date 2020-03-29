@@ -1,6 +1,4 @@
-
-#ifndef ENUMERATION_H
-#define ENUMERATION_H
+#pragma once
 
 enum class Option : int
 {
@@ -99,7 +97,7 @@ enum class RpSsao : int
 	Constants,
 	BufferMap,
 	SsaoMap,
-	DiffuseMap,
+	PositionMap,
 	Count
 };
 
@@ -164,4 +162,9 @@ enum class RpBlur : int
 	Count
 };
 
-#endif // ENUMERATION_H
+
+enum class RpDebug : int
+{
+	Pass = 0,
+	Count
+};

@@ -1,6 +1,4 @@
-#include "pch.h"
 #include "D3DFramework.h"
-#include "D3DUtil.h"
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PSTR cmdLine, int showCmd)
 {

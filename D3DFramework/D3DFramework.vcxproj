@@ -19,6 +19,39 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="Fullscreen.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Material.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Pass.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </FxCompile>
     <FxCompile Include="Shaders\Blur.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -63,7 +96,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
-    <FxCompile Include="Shaders\Global.hlsl">
+    <FxCompile Include="Shaders\Defines.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
@@ -121,7 +154,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
-    <FxCompile Include="Shaders\ParticleRS.hlsl">
+    <FxCompile Include="Shaders\Particle.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
@@ -157,7 +190,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
-    <FxCompile Include="Shaders\Ssao.hlsl">
+    <FxCompile Include="Shaders\SsaoCompute.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
@@ -173,7 +206,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
-    <FxCompile Include="Shaders\SsaoRS.hlsl">
+    <FxCompile Include="Shaders\Ssao.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
@@ -239,6 +272,9 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="Source\Component\Component.cpp" />
     <ClCompile Include="Source\Component\Material.cpp" />
     <ClCompile Include="Source\Component\Mesh.cpp" />
@@ -249,28 +285,32 @@
     <ClCompile Include="Source\Framework\AssetManager.cpp" />
     <ClCompile Include="Source\Framework\BlurFilter.cpp" />
     <ClCompile Include="Source\Framework\Camera.cpp" />
-    <ClCompile Include="Source\Framework\CubeRenderTarget.cpp" />
     <ClCompile Include="Source\Framework\D3DApp.cpp" />
     <ClCompile Include="Source\Framework\D3DDebug.cpp" />
     <ClCompile Include="Source\Framework\D3DFramework.cpp" />
     <ClCompile Include="Source\Framework\D3DUtil.cpp" />
     <ClCompile Include="Source\Framework\DDSTextureLoader.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Source\Framework\FrameResource.cpp" />
     <ClCompile Include="Source\Framework\GameTimer.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Source\Framework\GeometryGenerator.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Source\Framework\InputManager.cpp" />
     <ClCompile Include="Source\Framework\Main.cpp" />
     <ClCompile Include="Source\Framework\Octree.cpp" />
-    <ClCompile Include="Source\Framework\pch.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
-    </ClCompile>
     <ClCompile Include="Source\Framework\Physics.cpp" />
     <ClCompile Include="Source\Framework\Random.cpp" />
     <ClCompile Include="Source\Framework\SimpleShadowMap.cpp" />
@@ -286,12 +326,14 @@
     <ClCompile Include="Source\Object\PointLight.cpp" />
     <ClCompile Include="Source\Object\SkySphere.cpp" />
     <ClCompile Include="Source\Object\SpotLight.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Source\Object\Terrain.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Random.h" />
     <ClInclude Include="Source\Component\Component.h" />
     <ClInclude Include="Source\Component\Material.h" />
     <ClInclude Include="Source\Component\Mesh.h" />
@@ -303,31 +345,32 @@
     <ClInclude Include="Source\Framework\BlurFilter.h" />
     <ClInclude Include="Source\Framework\BufferMemoryPool.hpp" />
     <ClInclude Include="Source\Framework\Camera.h" />
-    <ClInclude Include="Source\Framework\CubeRenderTarget.h" />
     <ClInclude Include="Source\Framework\D3DApp.h" />
     <ClInclude Include="Source\Framework\D3DDebug.h" />
     <ClInclude Include="Source\Framework\D3DFramework.h" />
+    <ClInclude Include="Source\Framework\D3DStructure.h" />
     <ClInclude Include="Source\Framework\D3DUtil.h" />
     <ClInclude Include="Source\Framework\d3dx12.h" />
     <ClInclude Include="Source\Framework\DDSTextureLoader.h" />
+    <ClInclude Include="Source\Framework\Defines.h" />
     <ClInclude Include="Source\Framework\Enumeration.h" />
     <ClInclude Include="Source\Framework\FrameResource.h" />
     <ClInclude Include="Source\Framework\GameTimer.h" />
     <ClInclude Include="Source\Framework\GeometryGenerator.h" />
-    <ClInclude Include="Source\Framework\Global.h" />
+    <ClInclude Include="Source\Framework\D3DInfo.h" />
     <ClInclude Include="Source\Framework\InputManager.h" />
-    <ClInclude Include="Source\Framework\Interface.h" />
-    <ClInclude Include="Source\Framework\ObjectPool.hpp" />
     <ClInclude Include="Source\Framework\Octree.h" />
-    <ClInclude Include="Source\Framework\pch.h" />
     <ClInclude Include="Source\Framework\Physics.h" />
+    <ClInclude Include="Source\Framework\Random.h" />
+    <ClInclude Include="Source\Framework\Renderable.h" />
+    <ClInclude Include="Source\Framework\ShadowMap.h" />
     <ClInclude Include="Source\Framework\SimpleShadowMap.h" />
     <ClInclude Include="Source\Framework\Ssao.h" />
     <ClInclude Include="Source\Framework\Ssr.h" />
     <ClInclude Include="Source\Framework\StopWatch.h" />
-    <ClInclude Include="Source\Framework\Structure.h" />
     <ClInclude Include="Source\Framework\Timer.hpp" />
     <ClInclude Include="Source\Framework\UploadBuffer.h" />
+    <ClInclude Include="Source\Framework\Vector.h" />
     <ClInclude Include="Source\Framework\WinApp.h" />
     <ClInclude Include="Source\Object\Billboard.h" />
     <ClInclude Include="Source\Object\DirectionalLight.h" />
@@ -339,9 +382,6 @@
     <ClInclude Include="Source\Object\SkySphere.h" />
     <ClInclude Include="Source\Object\SpotLight.h" />
     <ClInclude Include="Source\Object\Terrain.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
@@ -401,7 +441,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <SourcePath>$(SourcePath)</SourcePath>
-    <IncludePath>D:\Visual Studio 2017\Projects\D3DFramework\winpixeventruntime\bin\x64;D:\Visual Studio 2017\Projects\D3DFramework\winpixeventruntime\Include\WinPixEventRuntime;D:\Visual Studio 2017\Projects\D3DFramework\D3DFramework\Source\Framework;D:\Visual Studio 2017\Projects\D3DFramework\D3DFramework\Source\Component;D:\Visual Studio 2017\Projects\D3DFramework\D3DFramework\Source\Object;$(IncludePath)</IncludePath>
+    <IncludePath>D:\Visual Studio 2017\Projects\D3DFramework\D3DFramework\Source;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -427,14 +467,14 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>D:\Visual Studio 2017\Projects\D3DFramework\D3DFramework\Source\Framework;D:\Visual Studio 2017\Projects\D3DFramework\D3DFramework\Source\Object;D:\Visual Studio 2017\Projects\D3DFramework\D3DFramework\Source\Component;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>

@@ -1,39 +1,17 @@
 #include "Common.hlsl"
-
-static const float2 gTexCoords[6] =
-{
-	float2(0.0f, 1.0f),
-	float2(0.0f, 0.0f),
-	float2(1.0f, 0.0f),
-	float2(0.0f, 1.0f),
-	float2(1.0f, 0.0f),
-	float2(1.0f, 1.0f)
-};
-
-struct VertexOut
-{
-	float4 mPosH : SV_POSITION;
-	float2 mTexC : TEXCOORD;
-};
-
-VertexOut VS(uint vid : SV_VertexID)
-{
-	VertexOut vout;
-
-	vout.mTexC = gTexCoords[vid];
-
-	// 스크린 좌표계에서 동차 좌표계로 변환한다.
-	vout.mPosH = float4(2.0f * vout.mTexC.x - 1.0f, 1.0f - 2.0f * vout.mTexC.y, 0.0f, 1.0f);
-
-	return vout;
-}
+#include "Fullscreen.hlsl"
 
 float4 PS(VertexOut pin) : SV_Target
 {
-	float4 diffuse = 0.0f; float4 position = 0.0f;
-	float3 specular = 0.0f; float3 normal = 0.0f;
-	float roughness = 0.0f; float depth = 0.0f;
-	GetGBufferAttribute(int3(pin.mPosH.xy, 0), diffuse, specular, roughness, position, normal, depth);
+	uint3 texCoord = uint3(pin.posH.xy, 0);
+
+	float4 diffuse = gDiffuseMap.Load(texCoord);
+	float4 specularAndroughness = gSpecularRoughnessMap.Load(texCoord);
+	float3 specular = specularAndroughness.rgb;
+	float roughness = specularAndroughness.a;
+	float4 position = gPositonMap.Load(texCoord);
+	float3 normal = gNormalMap.Load(texCoord).xyz;
+	float depth = gDepthMap.Load(texCoord).r;
 
 	// 해당 픽셀이 기록되어 있는지 확인한다.
 	if (diffuse.a <= 0.0f)
@@ -56,7 +34,12 @@ float4 PS(VertexOut pin) : SV_Target
 	float4 litColor = ambient + directLight;
 
 #ifdef SSAO
-	litColor.rgb *= GetAmbientAccess(position.xyz);
+	// SSAO를 사용하는 경우 Ssao맵에서 차폐도를 가져와서 
+	// 빛의 세기를 줄인다.
+	float4 ssaoPosH = mul(float4(position.xyz, 1.0f), gViewProjTex);
+	ssaoPosH /= ssaoPosH.w;
+	float ambientAccess = gSsaoMap.Sample(gsamLinearClamp, ssaoPosH.xy, 0.0f).r;
+	litColor *= ambientAccess;
 #endif
 
 	// Diferred rendering에서는 불투명한 물체만 렌더링 가능하다.
@@ -64,7 +47,8 @@ float4 PS(VertexOut pin) : SV_Target
 
 	if (gFogEnabled)
 	{
-		litColor = GetFogBlend(litColor, distToEye);
+		// 안개를 사용한다면 안개의 설정에 따라 색을 섞는다.
+		litColor = FogBlend(litColor, distToEye);
 	}
 
 	return litColor;

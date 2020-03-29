@@ -1,39 +1,38 @@
-#include "pch.h"
-#include "InputManager.h"
-#include "D3DFramework.h"
-#include "Camera.h"
-#include "AssetManager.h"
-#include "Sound.h"
-#include "GameObject.h"
-#include "D3DDebug.h"
-
-using namespace DirectX;
+#include <Framework/InputManager.h>
+#include <Framework/D3DFramework.h>
+#include <Framework/Camera.h>
+#include <Framework/Physics.h>
+#include <Framework/D3DDebug.h>
 
 InputManager::InputManager()
 {
 	for (int i = 0; i < 256; ++i)
-		mKeys[i] = false;
+		keys[i] = false;
 }
 
 InputManager::~InputManager() { }
+
+InputManager* InputManager::GetInstance()
+{
+	static InputManager* instance = nullptr;
+	if (instance == nullptr)
+		instance = new InputManager();
+	return instance;
+}
 
 void InputManager::OnMouseDown(WPARAM btnState, int x, int y) 
 {
 	if ((btnState & MK_LBUTTON) != 0)
 	{
-		mLastMousePos.x = x;
-		mLastMousePos.y = y;
+		lastMousePos.x = x;
+		lastMousePos.y = y;
 
 		// 마우스를 보이지 않게 한다.
 		::SetCursor(NULL);
 
-		SetCapture(D3DFramework::GetApp()->GetMainWnd());
+		SetCapture(D3DFramework::GetInstance()->GetMainWnd());
 	}
 	else if ((btnState & MK_RBUTTON) != 0)
-	{
-		D3DFramework::GetInstance()->Impulse(x, y, 10.0f, 10.0f);
-	}
-	else if ((btnState & MK_MBUTTON) != 0)
 	{
 		HitInfo hitInfo;
 		bool result = D3DFramework::GetInstance()->Picking(hitInfo, x, y);
@@ -52,28 +51,28 @@ void InputManager::OnMouseMove(WPARAM btnState, int x, int y)
 	// 왼쪽 마우스 버튼이 눌려졌다면 카메라를 회전시킨다.
 	if ((btnState & MK_LBUTTON) != 0)
 	{
-		// 1픽셀 움직임에 mCameraRotateSpeed만큼 회전한다.
-		float dx = DirectX::XMConvertToRadians(mCameraRotateSpeed * static_cast<float>(x - mLastMousePos.x));
-		float dy = DirectX::XMConvertToRadians(mCameraRotateSpeed * static_cast<float>(y - mLastMousePos.y));
+		// 1픽셀 움직임에 cameraRotateSpeed만큼 회전한다.
+		float dx = DirectX::XMConvertToRadians(cameraRotateSpeed * static_cast<float>(x - lastMousePos.x));
+		float dy = DirectX::XMConvertToRadians(cameraRotateSpeed * static_cast<float>(y - lastMousePos.y));
 
 		// 회전의 단위는 라디안이다.
 		camera->RotateY(dx);
 		camera->Pitch(dy);
 	}
 
-	mLastMousePos.x = x;
-	mLastMousePos.y = y;
+	lastMousePos.x = x;
+	lastMousePos.y = y;
 }
 
 void InputManager::OnKeyDown(unsigned int input)
 {
 	// input이 항상 문자만 들어오지 않는다는 것을 주의한다.
-	mKeys[input] = true;
+	keys[input] = true;
 }
 
 void InputManager::OnKeyUp(unsigned int input)
 {
-	mKeys[input] = false;
+	keys[input] = false;
 
 #if defined(DEBUG) || defined(_DEBUG)
 	if (input == VK_ESCAPE)
@@ -97,17 +96,17 @@ void InputManager::Tick(float deltaTime)
 {
 	Camera* camera = D3DFramework::GetInstance()->GetCamera();
 
-	if (mKeys['w'] || mKeys['W'])
-		camera->Walk(mCameraWalkSpeed * deltaTime);
+	if (keys['w'] || keys['W'])
+		camera->Walk(cameraWalkSpeed * deltaTime);
 
-	if (mKeys['s'] || mKeys['S'])
-		camera->Walk(-mCameraWalkSpeed * deltaTime);
+	if (keys['s'] || keys['S'])
+		camera->Walk(-cameraWalkSpeed * deltaTime);
 
-	if (mKeys['a'] || mKeys['A'])
-		camera->Strafe(-mCameraWalkSpeed * deltaTime);
+	if (keys['a'] || keys['A'])
+		camera->Strafe(-cameraWalkSpeed * deltaTime);
 
-	if (mKeys['d'] || mKeys['D'])
-		camera->Strafe(mCameraWalkSpeed * deltaTime);
+	if (keys['d'] || keys['D'])
+		camera->Strafe(cameraWalkSpeed * deltaTime);
 
 	camera->UpdateViewMatrix();
 }

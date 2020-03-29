@@ -1,8 +1,15 @@
 #pragma once
 
-#include "Component.h"
-#include "Interface.h"
+#include <Component/Component.h>
+#include <Framework/Renderable.h>
 
+class Material;
+class Mesh;
+
+/*
+화면 상에 가장 앞쪽에 그려지는 사각형 메쉬
+렌더링에서 가장 마지막에 그려지므로 항상 보인다.
+*/
 class Widget : public Component, public Renderable
 {
 public:
@@ -10,44 +17,29 @@ public:
 	virtual ~Widget();
 
 public:
-	virtual void Render(ID3D12GraphicsCommandList* cmdList, DirectX::BoundingFrustum* frustum = nullptr) const override;
+	virtual void Render(ID3D12GraphicsCommandList* cmdList, BoundingFrustum* frustum = nullptr) const override;
 	virtual void SetConstantBuffer(ID3D12GraphicsCommandList* cmdList, D3D12_GPU_VIRTUAL_ADDRESS startAddress) const override;
 
-public:
-	void SetPosition(int x, int y);
-	void SetSize(std::uint32_t width, std::uint32_t height);
-	void SetAnchor(float x, float y);
+	void SetPosition(const INT32 posX, const INT32 posY);
+	void SetSize(const UINT32 width, const UINT32 height);
+	void SetAnchor(const float anchorX, const float anchorY);
+
+	Mesh* GetMesh() const;
+	void SetMaterial(Material* material);
+	Material* GetMaterial() const;
 
 public:
-	inline int GetPosX() const { return mPosX; }
-	inline int GetPosY() const { return mPosY; }
-	inline std::uint32_t GetWidth() const { return mWidth; }
-	inline std::uint32_t GetHeight() const { return mHeight; }
-	inline float GetAnchorX() const { return mAnchorX; }
-	inline float GetAnchorY() const { return mAnchorY; }
+	INT32 posX = 0;
+	INT32 posY = 0;
+	UINT32 width = 0;
+	UINT32 height = 0;
+	float anchorX = 0.0f;
+	float anchorY = 0.0f;
 
-	inline class Mesh* GetMesh() { return mMesh.get(); }
-	inline class Material* GetMaterial() { return mMaterial; }
-	inline void SetMaterial(class Material* material) { mMaterial = material; }
-
-	inline void SetVisible(bool value) { mIsVisible = value; }
-	inline bool GetIsVisible() const { return mIsVisible; }
-
-	inline void SetCBIndex(UINT index) { mCBIndex = index; }
-	inline UINT GetCBIndex() const { return mCBIndex; }
-
-protected:
-	int mPosX = 0;
-	int mPosY = 0;
-	std::uint32_t mWidth = 0;
-	std::uint32_t mHeight = 0;
-	float mAnchorX = 0.0f;
-	float mAnchorY = 0.0f;
+	UINT32 cbIndex = 0;
+	bool isVisible = true;
 
 private:
-	std::unique_ptr<class Mesh> mMesh;
-	class Material* mMaterial = nullptr;
-
-	UINT mCBIndex = 0;
-	bool mIsVisible = true;
+	std::unique_ptr<Mesh> mesh = nullptr;
+	Material* material = nullptr;
 };

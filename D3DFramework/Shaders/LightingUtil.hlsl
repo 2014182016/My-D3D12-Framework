@@ -4,28 +4,22 @@
 // Contains API for shader lighting.
 //***************************************************************************************
 
-#include "Global.hlsl"
+#include "Defines.hlsl"
+#include "Material.hlsl"
 
 struct Light
 {
-	float4x4 mShadowTransform;
-    float3 mStrength;
-    float mFalloffStart;
-    float3 mDirection;   
-    float mFalloffEnd;   
-    float3 mPosition;    
-    float mSpotAngle;   
-	bool mEnabled;
-	bool mSelected;
-	uint mType;
-	float mPadding0;
-};
-
-struct Material
-{
-    float4 mDiffuseAlbedo;
-    float3 mSpecular;
-    float mShininess;
+	float4x4 shadowTransform;
+    float3 strength;
+    float falloffStart;
+    float3 direction;   
+    float falloffEnd;   
+    float3 position;    
+    float spotAngle;   
+	bool enabled;
+	bool selected;
+	uint type;
+	float padding0;
 };
 
 // 점광과 점적광에 적용하는 선형 감쇠 계수를 계산한다.
@@ -51,11 +45,11 @@ float3 SchlickFresnel(float3 r0, float3 normal, float3 lightVec)
 // 즉, 분산 반사와 반영 반사의 합을 구한다.
 float3 BlinnPhong(float3 lightStrength, float3 lightVec, float3 normal, float3 toEye, Material mat)
 {
-    const float m = mat.mShininess * 256.0f;
+    const float m = mat.shininess * 256.0f;
     float3 halfVec = normalize(toEye + lightVec);
 
     float roughnessFactor = (m + 8.0f)*pow(max(dot(halfVec, normal), 0.0f), m) / 8.0f;
-    float3 specularFactor = SchlickFresnel(mat.mSpecular, halfVec, lightVec);
+    float3 specularFactor = SchlickFresnel(mat.specular, halfVec, lightVec);
 
     float3 specAlbedo = specularFactor * roughnessFactor;
 
@@ -63,17 +57,17 @@ float3 BlinnPhong(float3 lightStrength, float3 lightVec, float3 normal, float3 t
 	// 우리는 LDR 렌더링을 구현하므로, 반사율을 1미만으로 낮춘다.
     specAlbedo = specAlbedo / (specAlbedo + 1.0f);
 
-    return (mat.mDiffuseAlbedo.rgb + specAlbedo) * lightStrength;
+    return (mat.diffuseAlbedo.rgb + specAlbedo) * lightStrength;
 }
 
 float3 ComputeDirectionalLight(Light light, Material mat, float3 normal, float3 toEye)
 {
     // 빛 벡터는 광선들이 나아가는 방향의 반대 방향을 가리킨다.
-    float3 lightVec = -light.mDirection;
+    float3 lightVec = -light.direction;
 
     // 람베트르 코사인 법칙에 따라 빛의 세기를 줄인다.
     float ndotl = max(dot(lightVec, normal), 0.0f);
-    float3 lightStrength = light.mStrength * ndotl;
+    float3 lightStrength = light.strength * ndotl;
 
     return BlinnPhong(lightStrength, lightVec, normal, toEye, mat);
 }
@@ -81,13 +75,13 @@ float3 ComputeDirectionalLight(Light light, Material mat, float3 normal, float3 
 float3 ComputePointLight(Light light, Material mat, float3 pos, float3 normal, float3 toEye)
 {
     // 표면에서 광원으로의 벡터
-    float3 lightVec = light.mPosition - pos;
+    float3 lightVec = light.position - pos;
 
     // 광원과 표면 사이의 거리
     float d = length(lightVec);
 
     //범위 판정
-    if(d > light.mFalloffEnd)
+    if(d > light.falloffEnd)
 		return float3(0.0f, 0.0f, 0.0f);
 
     // 빛 벡터를 정규화한다.
@@ -95,10 +89,10 @@ float3 ComputePointLight(Light light, Material mat, float3 pos, float3 normal, f
 
     // 람베트르 코사인 법칙에 따라 빛의 세기를 줄인다.
     float ndotl = max(dot(lightVec, normal), 0.0f);
-    float3 lightStrength = light.mStrength * ndotl;
+    float3 lightStrength = light.strength * ndotl;
 
     // 거리에 따라 빛을 감쇠한다.
-    float att = CalcAttenuation(d, light.mFalloffStart, light.mFalloffEnd);
+    float att = CalcAttenuation(d, light.falloffStart, light.falloffEnd);
     lightStrength = lightStrength * att;
 
     return BlinnPhong(lightStrength, lightVec, normal, toEye, mat);
@@ -107,13 +101,13 @@ float3 ComputePointLight(Light light, Material mat, float3 pos, float3 normal, f
 float3 ComputeSpotLight(Light light, Material mat, float3 pos, float3 normal, float3 toEye)
 {
     // 표면에서 광원으로의 벡터
-    float3 lightVec = light.mPosition - pos;
+    float3 lightVec = light.position - pos;
 
     // 광원과 표면 사이의 거리
     float d = length(lightVec);
 
     // 범위 판정
-	if (d > light.mFalloffEnd)
+	if (d > light.falloffEnd)
 		return float3(0.0f, 0.0f, 0.0f);
 
     // 빛 벡터를 정규화한다.
@@ -121,15 +115,15 @@ float3 ComputeSpotLight(Light light, Material mat, float3 pos, float3 normal, fl
 
     // 람베트르 코사인 법칙에 따라 빛의 세기를 줄인다.
     float ndotl = max(dot(lightVec, normal), 0.0f);
-    float3 lightStrength = light.mStrength * ndotl;
+    float3 lightStrength = light.strength * ndotl;
 
     // 거리에 따라 빛을 감쇠한다.
-    float att = CalcAttenuation(d, light.mFalloffStart, light.mFalloffEnd);
+    float att = CalcAttenuation(d, light.falloffStart, light.falloffEnd);
     lightStrength *= att;
 
-	float minCos = cos(radians(light.mSpotAngle));
+	float minCos = cos(radians(light.spotAngle));
 	float maxCos = lerp(minCos, 1.0f, 0.5f);
-	float cosAngle = max(dot(-lightVec, light.mDirection), 0.0f);
+	float cosAngle = max(dot(-lightVec, light.direction), 0.0f);
 
 	// Angle에 따라 빛을 감쇠한다.
 	float spotIntensity = smoothstep(minCos, maxCos, cosAngle);
@@ -138,16 +132,19 @@ float3 ComputeSpotLight(Light light, Material mat, float3 pos, float3 normal, fl
     return BlinnPhong(lightStrength, lightVec, normal, toEye, mat);
 }
 
+/*
+픽셀 정점에 대하여 라이팅을 계산한다.
+*/
 float4 ComputeLighting(StructuredBuffer<Light> lights, Material mat, float3 pos, float3 normal, float3 toEye)
 {
 	float3 result = 0.0f;
 
 	for (uint i = 0; i < LIGHT_NUM; ++i)
 	{
-		if (lights[i].mEnabled == 0)
+		if (lights[i].enabled == 0)
 			continue;
 
-		switch (lights[i].mType)
+		switch (lights[i].type)
 		{
 		case DIRECTIONAL_LIGHT:
 			result += ComputeDirectionalLight(lights[i], mat, normal, toEye);
@@ -164,16 +161,19 @@ float4 ComputeLighting(StructuredBuffer<Light> lights, Material mat, float3 pos,
 	return float4(result, 0.0f);
 }
 
+/*
+모든 라이트 중 방향성 라이트만 사용하여 계산한다.
+*/
 float4 ComputeOnlyDirectionalLight(StructuredBuffer<Light> lights, Material mat, float3 normal, float3 toEye)
 {
 	float3 result = 0.0f;
 
 	for (uint i = 0; i < LIGHT_NUM; ++i)
 	{
-		if (lights[i].mEnabled == 0)
+		if (lights[i].enabled == 0)
 			continue;
 
-		switch (lights[i].mType)
+		switch (lights[i].type)
 		{
 		case DIRECTIONAL_LIGHT:
 			result += ComputeDirectionalLight(lights[i], mat, normal, toEye);

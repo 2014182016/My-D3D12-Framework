@@ -1,100 +1,101 @@
-#include "pch.h"
-#include "Mesh.h"
-#include "D3DUtil.h"
-#include "Enumeration.h"
-
-using namespace DirectX;
+#include <Component/Mesh.h>
+#include <iostream>
 
 Mesh::Mesh(std::string&& name) : Component(std::move(name)) { }
 
-Mesh::~Mesh() 
-{
-	DisposeUploaders();
-}
+Mesh::~Mesh() { }
 
 void Mesh::BuildVertices(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
-	void* vertices, UINT vertexCount, UINT vertexStride)
+	void* vertices, const UINT32 vertexCount, const UINT32 vertexStride)
 {
-	const UINT vbByteSize = vertexCount * vertexStride;
+	// 복사할 데이터 크기를 계산한다.
+	const UINT32 vbByteSize = vertexCount * vertexStride;
 
-	ThrowIfFailed(D3DCreateBlob(vbByteSize, &mVertexBufferCPU));
-	CopyMemory(mVertexBufferCPU->GetBufferPointer(), vertices, vbByteSize);
+	// 정점들을 데이터 크기만큼 복사한다.
+	ThrowIfFailed(D3DCreateBlob(vbByteSize, &vertexBufferCPU));
+	CopyMemory(vertexBufferCPU->GetBufferPointer(), vertices, vbByteSize);
 
-	mVertexBufferGPU = D3DUtil::CreateDefaultBuffer(device, commandList,
-		vertices, vbByteSize, mVertexBufferUploader);
+	// 업로드 버퍼를 통하여 정점 버퍼에 데이터를 복사한다.
+	vertexBufferGPU = D3DUtil::CreateDefaultBuffer(device, commandList, vertices, vbByteSize, vertexBufferUploader);
 
-	mVertexBufferView.BufferLocation = mVertexBufferGPU->GetGPUVirtualAddress();
-	mVertexBufferView.StrideInBytes = vertexStride;
-	mVertexBufferView.SizeInBytes = vbByteSize;
-	mVertexCount = vertexCount;
+	// 서술자 뷰를 정의한다.
+	vertexBufferView.BufferLocation = vertexBufferGPU->GetGPUVirtualAddress();
+	vertexBufferView.StrideInBytes = vertexStride;
+	vertexBufferView.SizeInBytes = vbByteSize;
+	this->vertexCount = vertexCount;
 }
 
 void Mesh::BuildIndices(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
-	std::uint16_t* indices, UINT indexCount, UINT indexStride)
+	 UINT16* indices, const UINT32 indexCount, const UINT32 indexStride)
 {
-	const UINT ibByteSize = indexCount * indexStride;
+	// 복사할 데이터 크기를 계산한다.
+	const UINT32 ibByteSize = indexCount * indexStride;
 
-	ThrowIfFailed(D3DCreateBlob(ibByteSize, &mIndexBufferCPU));
-	CopyMemory(mIndexBufferCPU->GetBufferPointer(), indices, ibByteSize);
+	// 인덱스들을 데이터 크기만큼 복사한다.
+	ThrowIfFailed(D3DCreateBlob(ibByteSize, &indexBufferCPU));
+	CopyMemory(indexBufferCPU->GetBufferPointer(), indices, ibByteSize);
 
-	mIndexBufferGPU = D3DUtil::CreateDefaultBuffer(device, commandList,
-		indices, ibByteSize, mIndexBufferUploader);
+	// 업로드 버퍼를 통하여 인덱스 버퍼에 데이터를 복사한다.
+	indexBufferGPU = D3DUtil::CreateDefaultBuffer(device, commandList, indices, ibByteSize, indexBufferUploader);
 
-	mIndexBufferView.BufferLocation = mIndexBufferGPU->GetGPUVirtualAddress();
-	mIndexBufferView.Format = DXGI_FORMAT_R16_UINT;
-	mIndexBufferView.SizeInBytes = ibByteSize;
-	mIndexCount = indexCount;
+	// 서술자 뷰를 정의한다.
+	indexBufferView.BufferLocation = indexBufferGPU->GetGPUVirtualAddress();
+	indexBufferView.Format = DXGI_FORMAT_R16_UINT;
+	indexBufferView.SizeInBytes = ibByteSize;
+	this->indexCount = indexCount;
 }
 
-void Mesh::BuildCollisionBound(XMFLOAT3* points, size_t vertexCount, size_t stride, CollisionType type)
+void Mesh::BuildCollisionBound(XMFLOAT3* points, const UINT32 vertexCount, const UINT32 stride, const CollisionType type)
 {
-	// 충돌 타입에 따라 충돌 Bound를 생성한다.
-	mCollisionType = type;
-	switch (mCollisionType)
+	// 충돌 타입에 따라 충돌 바운드를 생성한다.
+	collisionType = type;
+	switch (collisionType)
 	{
 	case CollisionType::AABB:
 	{
 		BoundingBox aabb;
 		BoundingBox::CreateFromPoints(aabb, vertexCount, points, stride);
-		mCollisionBounding = std::move(aabb);
+		collisionBounding = std::move(aabb);
 		break;
 	}
 	case CollisionType::OBB:
 	{
 		BoundingOrientedBox obb;
 		BoundingOrientedBox::CreateFromPoints(obb, vertexCount, points, stride);
-		mCollisionBounding = std::move(obb);
+		collisionBounding = std::move(obb);
 		break;
 	}
 	case CollisionType::Sphere:
 	{
 		BoundingSphere sphere;
 		BoundingSphere::CreateFromPoints(sphere, vertexCount, points, stride);
-		mCollisionBounding = std::move(sphere);
+		collisionBounding = std::move(sphere);
 		break;
 	}
 	}
 }
 
-void Mesh::SetDynamicVertexBuffer(ID3D12Resource* vb, UINT vertexCount, UINT vertexStride)
+void Mesh::SetDynamicVertexBuffer(ID3D12Resource* vb, const UINT32 vertexCount, const UINT32 vertexStride)
 {
-	const UINT vbByteSize = vertexCount * vertexStride;
+	const UINT32 vbByteSize = vertexCount * vertexStride;
 
-	mVertexBufferGPU = vb;
-	mVertexBufferView.BufferLocation = mVertexBufferGPU->GetGPUVirtualAddress();
-	mVertexBufferView.StrideInBytes = vertexStride;
-	mVertexBufferView.SizeInBytes = vbByteSize;
-	mVertexCount = vertexCount;
+	// 동적 정점 버퍼로서 사용할 서술자 뷰를 정의한다.
+	// 실제 정점 버퍼는 프레임 자원에 존재한다.
+	vertexBufferGPU = vb;
+	vertexBufferView.BufferLocation = vertexBufferGPU->GetGPUVirtualAddress();
+	vertexBufferView.StrideInBytes = vertexStride;
+	vertexBufferView.SizeInBytes = vbByteSize;
+	this->vertexCount = vertexCount;
 }
 
-void Mesh::Render(ID3D12GraphicsCommandList* commandList, UINT instanceCount, bool isIndexed) const
+void Mesh::Render(ID3D12GraphicsCommandList* commandList, const UINT32 instanceCount, const bool isIndexed) const
 {
-	commandList->IASetPrimitiveTopology(mPrimitiveType);
-	commandList->IASetVertexBuffers(0, 1, &mVertexBufferView);
+	commandList->IASetPrimitiveTopology(primitiveType);
+	commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 
 	if (isIndexed)
 	{
-		if (mVertexCount == 0 || mIndexCount == 0)
+		if (vertexCount == 0 || indexCount == 0)
 		{
 #if defined(DEBUG) || defined(_DEBUG)
 			std::cout << ToString() << " Mesh wasn't Initialize" << std::endl;
@@ -102,13 +103,12 @@ void Mesh::Render(ID3D12GraphicsCommandList* commandList, UINT instanceCount, bo
 			return;
 		}
 
-
-		commandList->IASetIndexBuffer(&mIndexBufferView);
-		commandList->DrawIndexedInstanced(mIndexCount, instanceCount, 0, 0, 0);
+		commandList->IASetIndexBuffer(&indexBufferView);
+		commandList->DrawIndexedInstanced(indexCount, instanceCount, 0, 0, 0);
 	}
 	else
 	{
-		if (mVertexCount == 0)
+		if (vertexCount == 0)
 		{
 #if defined(DEBUG) || defined(_DEBUG)
 			std::cout << ToString() << " Mesh wasn't Initialize" << std::endl;
@@ -116,40 +116,53 @@ void Mesh::Render(ID3D12GraphicsCommandList* commandList, UINT instanceCount, bo
 			return;
 		}
 
-
-		commandList->DrawInstanced(mVertexCount, instanceCount, 0, 0);
+		commandList->DrawInstanced(vertexCount, instanceCount, 0, 0);
 	}
 }
 
 void Mesh::DisposeUploaders()
 {
-	mVertexBufferUploader = nullptr;
-	mIndexBufferUploader = nullptr;
+	// 업로드 버퍼의 메모리를 해제한다.
+	vertexBufferUploader = nullptr;
+	indexBufferUploader = nullptr;
 }
 
 void Mesh::SetCollisionBoundingAsAABB(const XMFLOAT3& extents)
 {
-	mCollisionType = CollisionType::AABB;
+	collisionType = CollisionType::AABB;
 
 	BoundingBox aabb;
 	aabb.Extents = extents;
-	mCollisionBounding = std::move(aabb);
+	collisionBounding = std::move(aabb);
 }
 
 void Mesh::SetCollisionBoundingAsOBB(const XMFLOAT3& extents)
 {
-	mCollisionType = CollisionType::OBB;
+	collisionType = CollisionType::OBB;
 
 	BoundingOrientedBox obb;
 	obb.Extents = extents;
-	mCollisionBounding = std::move(obb);
+	collisionBounding = std::move(obb);
 }
 
-void Mesh::SetCollisionBoundingAsSphere(float radius)
+void Mesh::SetCollisionBoundingAsSphere(const float radius)
 {
-	mCollisionType = CollisionType::Sphere;
+	collisionType = CollisionType::Sphere;
 
 	BoundingSphere sphere;
 	sphere.Radius = radius;
-	mCollisionBounding = std::move(sphere);
+	collisionBounding = std::move(sphere);
+}
+
+void Mesh::SetPrimitiveType(const D3D12_PRIMITIVE_TOPOLOGY primitiveType)
+{
+	this->primitiveType = primitiveType; 
+}
+CollisionType Mesh::GetCollisionType() const
+{
+	return collisionType; 
+}
+std::any Mesh::GetCollisionBounding() const
+{
+	return collisionBounding; 
 }

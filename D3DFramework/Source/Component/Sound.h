@@ -1,8 +1,12 @@
 #pragma once
 
-#include "pch.h"
-#include "Component.h"
+#include <Component/Component.h>
 
+struct WaveHeaderType;
+
+/*
+소리에 관한 정보를 관리하는 클래스
+*/
 class Sound : public Component
 {
 public:
@@ -10,34 +14,29 @@ public:
 	virtual ~Sound();
 
 public:
-	void CreateSoundBuffer2D(IDirectSound8* d3dSound, FILE* waveFile, const struct WaveHeaderType& waveFileHeader);
-	void CreateSoundBuffer3D(IDirectSound8* d3dSound, FILE* waveFile, const struct WaveHeaderType& waveFileHeader);
+	// 2D 전용 사운드에 대한 버퍼를 생성한다.
+	void CreateSoundBuffer2D(IDirectSound8* d3dSound, FILE* waveFile, const WaveHeaderType& waveFileHeader);
+	// 3D 전용 사운드에 대한 버퍼를 생성한다.
+	void CreateSoundBuffer3D(IDirectSound8* d3dSound, FILE* waveFile, const WaveHeaderType& waveFileHeader);
 
-	void Play(bool loop);
-	void Stop(bool toFirst);
+	void Play(const bool loop);
+	void Stop(const bool toFirst);
 	
-public:
-	inline DirectX::XMFLOAT3 GetPosition() const { return mPosition; }
-	inline bool GetIsPlay() const { return mIsPlay; }
-	inline UINT GetVolume() const { return mVolume; }
-	inline float GetPan() const { return mPan; }
-	inline float GetSpeed() const { return mSpeed; }
+	void SetPosition(const float x, const float y, const float z); // Only 3D
+	void SetPosition(const XMFLOAT3& pos); // Only 3D
+	void SetBound(const float min, const float max); // Only 3D
 
-	void SetPosition(float x, float y, float z); // Only 3D
-	void SetPosition(const DirectX::XMFLOAT3& pos); // Only 3D
-	void SetBound(float min, float max); // Only 3D
-
-	void SetVolume(UINT volume);
-	void SetPan(float pan); // Only 2D
-	void SetSpeed(float speed);
+	void SetVolume(const UINT32 volume);
+	void SetPan(const float pan); // Only 2D
+	void SetSpeed(const float speed);
 
 protected:
-	Microsoft::WRL::ComPtr<IDirectSoundBuffer8> mSoundBuffer;
-	Microsoft::WRL::ComPtr<IDirectSound3DBuffer8> mSound3dBuffer;
+	Microsoft::WRL::ComPtr<IDirectSoundBuffer8> soundBuffer;
+	Microsoft::WRL::ComPtr<IDirectSound3DBuffer8> sound3dBuffer;
 
-	DirectX::XMFLOAT3 mPosition;
-	bool mIsPlay = false;
-	UINT mVolume = 100; // volume의 범위는 [0, 100]이다.
-	float mPan = 0.0f; // -1 일수록 왼쪽, 1 일수록 오른쪽, 0은 센터이다.
-	float mSpeed = 1.0f; // 기본 속도 1.0f에서 0에 가까울수록 느리게, 그 이상은 빠르게 한다.
+	XMFLOAT3 position;
+	UINT32 volume = 100; // volume의 범위는 [0, 100]이다.
+	float pan = 0.0f; // -1 일수록 왼쪽, 1 일수록 오른쪽, 0은 센터이다.
+	float speed = 1.0f; // 기본 속도 1.0f에서 0에 가까울수록 느리게, 그 이상은 빠르게 한다.
+	bool isPlay = false;
 };

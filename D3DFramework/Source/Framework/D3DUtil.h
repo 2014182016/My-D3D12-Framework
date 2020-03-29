@@ -1,6 +1,30 @@
 #pragma once
 
-#include "pch.h"
+#define DIRECTINPUT_VERSION 0x0800
+
+#pragma comment(lib, "d3dcompiler.lib")
+#pragma comment(lib, "D3D12.lib")
+#pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "winmm.lib")
+#pragma comment(lib, "dxguid.lib")
+#pragma comment(lib, "dsound.lib")
+#pragma comment(lib, "dinput8.lib")
+
+#include <dxgi1_4.h>
+#include <d3d12.h>
+#include <D3Dcompiler.h>
+#include <DirectXPackedVector.h>
+#include <DirectXColors.h>
+#include <DirectXCollision.h>
+#include <dsound.h>
+#include <dinput.h>
+#include <Framework/d3dx12.h>
+#include <Framework/Vector.h>
+
+#include <string>
+#include <wrl.h>
+
+using namespace DirectX;
 
 inline std::wstring AnsiToWString(const std::string& str)
 {
@@ -9,23 +33,10 @@ inline std::wstring AnsiToWString(const std::string& str)
 	return std::wstring(buffer);
 }
 
-
-/*
-void PrintDebugString(const char* format, ...)
-{
-	char buffer[512];
-	va_list vaList;
-	va_start(vaList, format);
-	_vsnprintf(buffer, 512, format, vaList);
-	va_end(vaList);
-	OutputDebugStringA(buffer);
-}
-*/
-
 class D3DUtil
 {
 public:
-	static UINT CalcConstantBufferByteSize(UINT byteSize)
+	static UINT32 CalcConstantBufferByteSize(UINT32 byteSize)
 	{
 		// 상수 버퍼의 크기는 반드시 최소 하드웨어 할당 크기(흔히 256바이트)의 배수이어야 한다.
 		// 이 메서드는 주어진 크기에 가장 가까운 256의 배수를 구해서 돌려준다.
@@ -52,14 +63,14 @@ class DxException
 {
 public:
 	DxException() = default;
-	DxException(HRESULT hr, const std::wstring& functionName, const std::wstring& filename, int lineNumber);
+	DxException(HRESULT hr, const std::wstring& functionName, const std::wstring& filename, INT32 lineNumber);
 
 	std::wstring ToString()const;
 
 	HRESULT ErrorCode = S_OK;
 	std::wstring FunctionName;
 	std::wstring Filename;
-	int LineNumber = -1;
+	INT32 LineNumber = -1;
 };
 
 #ifndef ThrowIfFailed
@@ -74,3 +85,9 @@ public:
 #ifndef ReleaseCom
 #define ReleaseCom(x) { if(x){ x->Release(); x = 0; } }
 #endif
+
+namespace DirectX
+{
+	std::ostream& operator<<(std::ostream& os, const XMFLOAT3& xmf);
+	std::ostream& operator<<(std::ostream& os, const XMFLOAT4X4& xmf4x4f);
+}

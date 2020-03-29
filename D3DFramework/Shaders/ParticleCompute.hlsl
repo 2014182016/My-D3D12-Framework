@@ -1,4 +1,4 @@
-#include "ParticleRS.hlsl"
+#include "Particle.hlsl"
 
 #define GA 9.8f
 
@@ -22,30 +22,41 @@ void CS_Emit(uint3 gropuThreadID : SV_GroupThreadID, uint3 groupID : SV_GroupID)
 	{
 		ParticleData p = (ParticleData)0.0f;
 
+		// 현재 생성할 파티클 인덱스를 계산한다.
 		uint index = gCounter[1] + myID;
 		if (gMaxParticleNum <= index)
 		{
 			index -= gMaxParticleNum;
 		}
 
+		// 파티클의 방향은 랜덤하게 조정한다.
 		float3 randVec = float3(rand(float2(myID, index)), rand(float2(index, myID)), rand(float2(myID - index, index - myID)));
-		p.mDirection = normalize(reflect(direction[gropuThreadID.x], randVec));
-		p.mPosition = gEmitterLocation;
-		p.mLifeTime = gStart.mLifeTime;
-		p.mColor = gStart.mColor;
-		p.mSpeed = gStart.mSpeed;
-		p.mSize = gStart.mSize;
-		p.mIsActive = true;
+		p.direction = normalize(reflect(direction[gropuThreadID.x], randVec));
 
+		// 파티클의 스폰 위치는 파티클 객체의 중심 위치이다.
+		p.position = gEmitterLocation;
+
+		// start 데이터를 이용하여 파티클 데이터를 설정한다.
+		p.lifeTime = gStart.lifeTime;
+		p.color = gStart.color;
+		p.speed = gStart.speed;
+		p.size = gStart.size;
+
+		// 해당 파티클 데이터를 활성화한다.
+		p.isActive = true;
+
+		// 동기화 함수를 사용하여 카운터를 증가시킨다.
 		InterlockedAdd(gCounter[0], 1);
 
 		gParticles[index] = p;
 	}
 
+	// 그룹 스레드가 여기에 도달할 때까지 기다린다.
 	GroupMemoryBarrierWithGroupSync();
 
 	if (myID == 0)
 	{
+		// 새로 갱신할 파티클 인덱스를 계산한다.
 		if (gMaxParticleNum <= gCounter[1] + gEmitNum)
 		{
 			gCounter[1] += gEmitNum - gMaxParticleNum;
@@ -65,26 +76,30 @@ void CS_Update(uint3 dispatchThreadID : SV_DispatchThreadID)
 
 	if (myID < gMaxParticleNum)
 	{
-		if (gParticles[myID].mIsActive == true)
+		if (gParticles[myID].isActive == true)
 		{
-			if (gParticles[myID].mLifeTime < 0.0f)
+			if (gParticles[myID].lifeTime < 0.0f)
 			{
-				gParticles[myID].mIsActive = false;
+				// 수명이 다 된 파티클은 비활성화한다.
+				gParticles[myID].isActive = false;
 				InterlockedAdd(gCounter[0], -1);
 			}
 			else
 			{
-				gParticles[myID].mLifeTime -= gDeltaTime;
+				// 지난 시간만큼 수명을 줄인다.
+				gParticles[myID].lifeTime -= gDeltaTime;
 
-				float period = saturate(gParticles[myID].mLifeTime / gStart.mLifeTime);
-				gParticles[myID].mColor = lerp(gEnd.mColor, gStart.mColor, period);
-				gParticles[myID].mSpeed = lerp(gEnd.mSpeed, gStart.mSpeed, period);
-				gParticles[myID].mSize = lerp(gEnd.mSize, gStart.mSize, period);
-				gParticles[myID].mPosition += gParticles[myID].mDirection * gParticles[myID].mSpeed * gDeltaTime;
+				// 파티클 데이터를 시간에 따라 업데이트한다.
+				float period = saturate(gParticles[myID].lifeTime / gStart.lifeTime);
+				gParticles[myID].color = lerp(gEnd.color, gStart.color, period);
+				gParticles[myID].speed = lerp(gEnd.speed, gStart.speed, period);
+				gParticles[myID].size = lerp(gEnd.size, gStart.size, period);
+				gParticles[myID].position += gParticles[myID].direction * gParticles[myID].speed * gDeltaTime;
 
 				if (gEnabledGravity == 1)
 				{
-					gParticles[myID].mPosition.y -= GA * gDeltaTime;
+					// 파티클 데이터에 중력을 적용한다.
+					gParticles[myID].position.y -= GA * gDeltaTime;
 				}
 			}
 		}

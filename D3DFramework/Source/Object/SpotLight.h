@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Light.h"
+#include <Object/Light.h>
 
 class SpotLight : public Light
 {
@@ -9,6 +9,6 @@ public:
 	virtual ~SpotLight();
 
 public:
-	virtual void SetLightData(struct LightData& lightData) override;
+	virtual void SetLightData(LightData& lightData) override;
 
 };

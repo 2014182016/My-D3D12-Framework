@@ -1,17 +1,20 @@
-#include "pch.h"
-#include "AssetManager.h"
-#include "Material.h"
-#include "Mesh.h"
-#include "D3DUtil.h"
-#include "Sound.h"
-#include "AssetLoader.h"
 #include "DDSTextureLoader.h"
+#include <Framework/AssetManager.h>
+#include <Framework/DDSTextureLoader.h>
+#include <Component/Material.h>
+#include <Component/Mesh.h>
+#include <Component/Sound.h>
+#include <iostream>
 
-using namespace DirectX;
 using namespace std::literals;
+
+static const std::wstring texturePath = L"../Assets/Textures/";
+static const std::wstring modelPath = L"../Assets/Models/";
+static const std::string soundPath = "../Assets/Sounds/";
 
 AssetManager* AssetManager::GetInstance()
 {
+	static AssetManager* instance = nullptr;
 	if (instance == nullptr)
 		instance = new AssetManager();
 	return instance;
@@ -21,16 +24,16 @@ AssetManager::AssetManager() { }
 
 AssetManager::~AssetManager() 
 {
-	mMeshes.clear();
-	mMaterials.clear();
-	mTextures.clear();
-	mSounds.clear();
-
-	delete this;
+	meshes.clear();
+	materials.clear();
+	textures.clear();
+	sounds.clear();
 }
 
 void AssetManager::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, IDirectSound8* d3dSound)
 {
+	// 애셋 매니저는 싱글턴 패턴이기 때문에
+	// 단 한번만 초기화가 가능한다.
 	if (isInitialized)
 		return;
 
@@ -47,80 +50,88 @@ void AssetManager::BuildMaterial()
 	std::unique_ptr<Material> mat;
 
 	mat = std::make_unique<Material>("Default"s);
-	mat->SetDiffuseMapIndex(DISABLED);
-	mat->SetNormalMapIndex(DISABLED);
-	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
-	mat->SetSpecular(0.1f, 0.1f, 0.1f);
-	mat->SetRoughness(0.25f);
-	mMaterials[mat->GetName()] = std::move(mat);
+	mat->diffuseMapIndex = DISABLED;
+	mat->normalMapIndex = DISABLED;
+	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
+	mat->specular = { 0.1f, 0.1f, 0.1f };
+	mat->roughness = 0.25f;
+	materials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Brick0"s);
-	mat->SetDiffuseMapIndex(FindTexture("Bricks2"s)->mTextureIndex);
-	mat->SetNormalMapIndex(FindTexture("Bricks2_nmap"s)->mTextureIndex);
-	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
-	mat->SetSpecular(0.1f, 0.1f, 0.1f);
-	mat->SetRoughness(0.9f);
-	mMaterials[mat->GetName()] = std::move(mat);
+	mat->diffuseMapIndex = FindTexture("Bricks2"s)->textureIndex;
+	mat->normalMapIndex = FindTexture("Bricks2_nmap"s)->textureIndex;
+	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
+	mat->specular = { 0.1f, 0.1f, 0.1f };
+	mat->roughness = 0.9f;
+	materials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Tile0"s);
-	mat->SetDiffuseMapIndex(FindTexture("Tile"s)->mTextureIndex);
-	mat->SetNormalMapIndex(FindTexture("Tile_nmap"s)->mTextureIndex);
-	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
-	mat->SetSpecular(0.2f, 0.2f, 0.2f);
-	mat->SetRoughness(0.1f);
+	mat->diffuseMapIndex = FindTexture("Tile"s)->textureIndex;
+	mat->normalMapIndex = FindTexture("Tile_nmap"s)->textureIndex;
+	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
+	mat->specular = { 0.2f, 0.2f, 0.2f };
+	mat->roughness = 0.1f;
 	mat->SetScale(5.0f, 5.0f);
-	mMaterials[mat->GetName()] = std::move(mat);
+	materials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Mirror0"s);
-	mat->SetDiffuseMapIndex(FindTexture("Ice"s)->mTextureIndex);
-	mat->SetNormalMapIndex(FindTexture("Default_nmap"s)->mTextureIndex);
-	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
-	mat->SetSpecular(0.98f, 0.97f, 0.95f);
-	mat->SetRoughness(0.1f);
+	mat->diffuseMapIndex = FindTexture("Ice"s)->textureIndex;
+	mat->normalMapIndex = FindTexture("Default_nmap"s)->textureIndex;
+	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
+	mat->specular = { 0.98f, 0.97f, 0.95f };
+	mat->roughness = 0.1f;
 	mat->SetOpacity(0.5f);
-	mMaterials[mat->GetName()] = std::move(mat);
+	materials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Wirefence"s);
-	mat->SetDiffuseMapIndex(FindTexture("WireFence"s)->mTextureIndex);
-	mat->SetNormalMapIndex(DISABLED);
-	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
-	mat->SetSpecular(0.1f, 0.1f, 0.1f);
-	mat->SetRoughness(0.25f);
-	mMaterials[mat->GetName()] = std::move(mat);
+	mat->diffuseMapIndex = FindTexture("WireFence"s)->textureIndex;
+	mat->normalMapIndex = DISABLED;
+	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
+	mat->specular = { 0.1f, 0.1f, 0.1f };
+	mat->roughness = 0.25f;
+	materials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Tree0"s);
-	mat->SetDiffuseMapIndex(FindTexture("Tree01S"s)->mTextureIndex);
-	mat->SetNormalMapIndex(DISABLED);
-	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
-	mat->SetSpecular(0.01f, 0.01f, 0.01f);
-	mat->SetRoughness(0.125f);
-	mMaterials[mat->GetName()] = std::move(mat);
+	mat->diffuseMapIndex = FindTexture("Tree01S"s)->textureIndex;
+	mat->normalMapIndex = DISABLED;
+	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
+	mat->specular = { 0.1f, 0.1f, 0.1f };
+	mat->roughness = 0.125f;
+	materials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Sky"s);
-	mat->SetDiffuseMapIndex(FindTexture("Clouds"s)->mTextureIndex);
-	mat->SetNormalMapIndex(DISABLED);
-	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
-	mat->SetSpecular(0.1f, 0.1f, 0.1f);
-	mat->SetRoughness(1.0f);
+	mat->diffuseMapIndex = FindTexture("Clouds"s)->textureIndex;
+	mat->normalMapIndex = DISABLED;
+	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
+	mat->specular = { 0.1f, 0.1f, 0.1f };
+	mat->roughness = 1.0f;
 	mat->SetScale(2.0f, 2.0f);
-	mMaterials[mat->GetName()] = std::move(mat);
+	materials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Radial_Gradient"s);
-	mat->SetDiffuseMapIndex(FindTexture("Radial_Gradient"s)->mTextureIndex);
-	mat->SetNormalMapIndex(DISABLED);
-	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
-	mat->SetSpecular(0.1f, 0.1f, 0.1f);
-	mat->SetRoughness(1.0f);
-	mMaterials[mat->GetName()] = std::move(mat);
+	mat->diffuseMapIndex = FindTexture("Radial_Gradient"s)->textureIndex;
+	mat->normalMapIndex = DISABLED;
+	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
+	mat->specular = { 0.1f, 0.1f, 0.1f };
+	mat->roughness = 1.0f;
+	materials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Terrain"s);
-	mat->SetDiffuseMapIndex(FindTexture("Grass"s)->mTextureIndex);
-	mat->SetNormalMapIndex(DISABLED);
-	mat->SetHeightMapIndex(FindTexture("HeightMap"s)->mTextureIndex);
-	mat->SetDiffuse(1.0f, 1.0f, 1.0f);
-	mat->SetSpecular(0.1f, 0.1f, 0.1f);
-	mat->SetRoughness(0.9f);
-	mMaterials[mat->GetName()] = std::move(mat);
+	mat->diffuseMapIndex = FindTexture("Grass"s)->textureIndex;
+	mat->normalMapIndex = DISABLED;
+	mat->heightMapIndex = FindTexture("HeightMap"s)->textureIndex;
+	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
+	mat->specular = { 0.1f, 0.1f, 0.1f };
+	mat->roughness = 0.9f;
+	materials[mat->GetName()] = std::move(mat);
+
+	mat = std::make_unique<Material>("Skull"s);
+	mat->diffuseMapIndex = DISABLED;
+	mat->normalMapIndex = DISABLED;
+	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
+	mat->specular = { 0.1f, 0.1f, 0.1f };
+	mat->roughness = 0.99f;
+	materials[mat->GetName()] = std::move(mat);
 }
 
 void AssetManager::LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList)
@@ -128,18 +139,21 @@ void AssetManager::LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList*
 	for (size_t i = 0; i < mTexInfos.size(); ++i)
 	{
 		auto[texName, fileName] = mTexInfos[i];
+		const std::wstring filePath = texturePath + fileName;
 
 		auto texMap = std::make_unique<Texture>();
-		texMap->mName = texName;
-		texMap->mFilename = fileName;
-		texMap->mTextureIndex = (std::uint32_t)i;
+		texMap->name = texName;
+		texMap->filename = fileName;
+		texMap->textureIndex = (std::uint32_t)i;
+		// 텍스처를 로드한다.
 		ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(device, commandList,
-			texMap->mFilename.c_str(), texMap->mResource, texMap->mUploadHeap));
+			filePath.c_str(), texMap->resource, texMap->uploadHeap));
 
-		mTextures[texName] = std::move(texMap);
+		textures[texName] = std::move(texMap);
 	}
 
-	if ((UINT)mTextures.size() != TEX_NUM)
+	// 텍스처의 수와 쉐이더에 정의된 수가 일치하는 지 확인한다.
+	if ((UINT)textures.size() != TEX_NUM)
 	{
 #if defined(DEBUG) || defined(_DEBUG)
 		std::cout << "Max Tex Num Difference Error" << std::endl;
@@ -151,16 +165,20 @@ void AssetManager::LoadSounds(ID3D12Device* device, ID3D12GraphicsCommandList* c
 {
 	for (const auto& soundInfo : mSoundInfos)
 	{
+		const std::string filePath = soundPath + soundInfo.fileName;
 		WaveHeaderType header;
 
-		FILE* filePtr = AssetLoader::LoadWave(d3dSound, soundInfo.mFileName, header);
+		// wav파일을 로드한다.
+		FILE* filePtr = AssetLoader::LoadWave(filePath, header);
 		if (filePtr == nullptr)
 			continue;
 
-		auto soundName = soundInfo.mName;
+		// 사운드 객체를 생성한다.
+		auto soundName = soundInfo.name;
 		std::unique_ptr<Sound> sound = std::make_unique<Sound>(std::move(soundName));
 
-		switch (soundInfo.mSoundType)
+		// 사운드 타입에 따라 사운드 버퍼를 생성한다.
+		switch (soundInfo.soundType)
 		{
 		case SoundType::Sound2D:
 			sound->CreateSoundBuffer2D(d3dSound, filePtr, header);
@@ -170,7 +188,7 @@ void AssetManager::LoadSounds(ID3D12Device* device, ID3D12GraphicsCommandList* c
 			break;
 		}
 
-		mSounds[soundInfo.mName] = std::move(sound);
+		sounds[soundInfo.name] = std::move(sound);
 	}
 }
 
@@ -178,29 +196,33 @@ void AssetManager::LoadMeshes(ID3D12Device* device, ID3D12GraphicsCommandList* c
 {
 	for (const auto& h3dInfo : mH3dModels)
 	{
+		const std::wstring filePath = modelPath + h3dInfo.fileName;
 		std::vector<Vertex> vertices;
 		std::vector<std::uint16_t> indices;
 
-		bool result = AssetLoader::LoadH3d(device, commandList, h3dInfo.mFileName, vertices, indices);
+		// h3d파일을 로드한다.
+		bool result = AssetLoader::LoadH3d(device, commandList, filePath, vertices, indices);
 		if (!result)
 			continue;
 
-		auto meshName = h3dInfo.mName;
+		// 메쉬 객체를 생성한다.
+		auto meshName = h3dInfo.name;
 		std::unique_ptr<Mesh> mesh = std::make_unique<Mesh>(std::move(meshName));
 
+		// 정점 및 인덱스를 gpu에 옮기고, 충돌 바운드를 생성한다.
 		mesh->BuildVertices(device, commandList, (void*)vertices.data(), (UINT)vertices.size(), (UINT)sizeof(Vertex));
 		mesh->BuildIndices(device, commandList, indices.data(), (UINT)indices.size(), (UINT)sizeof(std::uint16_t));
-		mesh->BuildCollisionBound(&vertices[0].mPos, vertices.size(), (size_t)sizeof(Vertex), h3dInfo.mCollisionType);
+		mesh->BuildCollisionBound(&vertices[0].pos, (UINT32)vertices.size(), (UINT32)sizeof(Vertex), h3dInfo.collisionType);
 
-		mMeshes[h3dInfo.mName] = std::move(mesh);
+		meshes[h3dInfo.name] = std::move(mesh);
 	}
 }
 
 Mesh* AssetManager::FindMesh(std::string&& name) const
 {
-	auto iter = mMeshes.find(name);
+	auto iter = meshes.find(name);
 
-	if (iter == mMeshes.end())
+	if (iter == meshes.end())
 	{
 #if defined(DEBUG) | defined(_DEBUG)
 		std::cout << "Geometry " << name << "이 발견되지 않음." << std::endl;
@@ -213,9 +235,9 @@ Mesh* AssetManager::FindMesh(std::string&& name) const
 
 Material* AssetManager::FindMaterial(std::string&& name) const
 {
-	auto iter = mMaterials.find(name);
+	auto iter = materials.find(name);
 
-	if (iter == mMaterials.end())
+	if (iter == materials.end())
 	{
 #if defined(DEBUG) | defined(_DEBUG)
 		std::cout << "Material " << name << "이 발견되지 않음." << std::endl;
@@ -228,9 +250,9 @@ Material* AssetManager::FindMaterial(std::string&& name) const
 
 Sound* AssetManager::FindSound(std::string&& name) const
 {
-	auto iter = mSounds.find(name);
+	auto iter = sounds.find(name);
 
-	if (iter == mSounds.end())
+	if (iter == sounds.end())
 	{
 #if defined(DEBUG) | defined(_DEBUG)
 		std::cout << "Sound " << name << "이 발견되지 않음." << std::endl;
@@ -243,9 +265,9 @@ Sound* AssetManager::FindSound(std::string&& name) const
 
 Texture* AssetManager::FindTexture(std::string&& name) const
 {
-	auto iter = mTextures.find(name);
+	auto iter = textures.find(name);
 
-	if (iter == mTextures.end())
+	if (iter == textures.end())
 	{
 #if defined(DEBUG) | defined(_DEBUG)
 		std::cout << "Texture " << name << "이 발견되지 않음." << std::endl;
@@ -257,10 +279,25 @@ Texture* AssetManager::FindTexture(std::string&& name) const
 }
 
 
-ID3D12Resource* AssetManager::GetTextureResource(UINT index) const
+ID3D12Resource* AssetManager::GetTextureResource(const UINT32 index) const
 {
-	std::string texName = mTexInfos[index].mName;
-	auto tex = mTextures.find(texName);
+	if (mTexInfos.size() <= index)
+	{
+#if defined(DEBUG) | defined(_DEBUG)
+		std::cout << "TextureResource " << index << "가 초과됨" << std::endl;
+#endif
+	}
 
-	return tex->second->mResource.Get();
+	std::string texName = mTexInfos[index].name;
+	auto tex = textures.find(texName);
+
+	return tex->second->resource.Get();
+}
+
+void AssetManager::DisposeUploaders()
+{
+	for (auto& mesh : meshes)
+	{
+		mesh.second->DisposeUploaders();
+	}
 }

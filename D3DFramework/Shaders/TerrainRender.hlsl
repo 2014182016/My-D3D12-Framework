@@ -1,4 +1,5 @@
 #include "LightingUtil.hlsl"
+#include "Pass.hlsl"
 
 Texture2D gTextureMaps[TEX_NUM] : register(t0, space0);
 Texture2D gLODLookupMap : register(t0, space1);
@@ -23,72 +24,45 @@ cbuffer cbTerrain : register(b0)
 	float gTPadding0;
 }
 
-cbuffer cbPass : register(b1)
-{
-	float4x4 gView;
-	float4x4 gInvView;
-	float4x4 gProj;
-	float4x4 gInvProj;
-	float4x4 gViewProj;
-	float4x4 gInvViewProj;
-	float4x4 gProjTex;
-	float4x4 gViewProjTex;
-	float4x4 gIdentity;
-	float4 gAmbientLight;
-	float2 gRenderTargetSize;
-	float2 gInvRenderTargetSize;
-	float3 gEyePosW;
-	float gNearZ;
-	float gFarZ;
-	float gTotalTime;
-	float gDeltaTime;
-	bool gFogEnabled;
-	float4 gFogColor;
-	float gFogStart;
-	float gFogRange;
-	float gFogDensity;
-	uint gFogType;
-};
-
 struct VertexIn
 {
-	float3 mPosL : POSITION;
-	float2 mTexC : TEXCOORD;
+	float3 posL : POSITION;
+	float2 texC : TEXCOORD;
 };
 
 struct VertexOut
 {
-	float3 mPosW : POSITION;
-	float2 mTexC : TEXCOORD;
+	float3 posW : POSITION;
+	float2 texC : TEXCOORD;
 };
 
 struct HullOut
 {
-	float3 mPosW : POSITION;
-	float2 mTexC : TEXCOORD;
+	float3 posW : POSITION;
+	float2 texC : TEXCOORD;
 };
 
 struct PatchTess
 {
-	float mEdgeTess[4]   : SV_TessFactor;
-	float mInsideTess[2] : SV_InsideTessFactor;
+	float edgeTess[4]   : SV_TessFactor;
+	float insideTess[2] : SV_InsideTessFactor;
 };
 
 struct DomainOut
 {
-	float4 mPosH   : SV_POSITION;
-	float3 mPosW   : POSITION;
-	float2 mTexC   : TEXCOORD;
-	float  mHeight : HEIGHT;
+	float4 posH   : SV_POSITION;
+	float3 posW   : POSITION;
+	float2 texC   : TEXCOORD;
+	float  height : HEIGHT;
 };
 
 struct PixelOut
 {
-	float4 mDiffuse  : SV_TARGET0;
-	float4 mSpecularRoughness : SV_TARGET1;
-	float4 mPosition : SV_TARGET2;
-	float4 mNormal   : SV_TARGET3;
-	float4 mNormalx  : SV_TARGET4;
+	float4 diffuse  : SV_TARGET0;
+	float4 specularRoughness : SV_TARGET1;
+	float4 position : SV_TARGET2;
+	float4 normal   : SV_TARGET3;
+	float4 normalx  : SV_TARGET4;
 };
 
 float3 ComputePatchMidPoint(float3 p0, float3 p1, float3 p2, float3 p3)
@@ -116,7 +90,7 @@ float ComputePatchLOD(float3 midPoint)
 
 float GetHeightMapSample(float2 uv)
 {
-	uint heightMapIndex = gMaterialData[gMaterialIndex].mHeightMapIndex;
+	uint heightMapIndex = gMaterialData[gMaterialIndex].heightMapIndex;
 	return gTextureMaps[heightMapIndex].SampleLevel(gsamLinearClamp, uv, 0.0f).r;
 }
 
@@ -169,10 +143,10 @@ VertexOut VS(VertexIn vin)
 	VertexOut vout = (VertexOut)0.0f;
 
 	// 세계 공간으로 변환한다.
-	vout.mPosW = mul(float4(vin.mPosL, 1.0f), gTerrainWorld).xyz;
+	vout.posW = mul(float4(vin.posL, 1.0f), gTerrainWorld).xyz;
 
 	// 자료를 그대로 덮개 셰이더에 넘겨준다.
-	vout.mTexC = vin.mTexC;
+	vout.texC = vin.texC;
 
 	return vout;
 }
@@ -186,8 +160,8 @@ HullOut HS(InputPatch<VertexOut, 12> p, uint i : SV_OutputControlPointID)
 {
 	HullOut hout = (HullOut)0.0f;
 
-	hout.mPosW = p[i].mPosW;
-	hout.mTexC = p[i].mTexC;
+	hout.posW = p[i].posW;
+	hout.texC = p[i].texC;
 
 	return hout;
 }
@@ -218,19 +192,19 @@ PatchTess HsPerPatch(InputPatch<VertexOut, 12> patch, uint patchID : SV_Primitiv
 	float3 midPoints[] =
 	{
 		// 주 사각형
-		ComputePatchMidPoint(patch[0].mPosW, patch[1].mPosW, patch[2].mPosW, patch[3].mPosW),
+		ComputePatchMidPoint(patch[0].posW, patch[1].posW, patch[2].posW, patch[3].posW),
 
 		// +X 방향 이웃
-		ComputePatchMidPoint(patch[2].mPosW, patch[3].mPosW, patch[4].mPosW, patch[5].mPosW),
+		ComputePatchMidPoint(patch[2].posW, patch[3].posW, patch[4].posW, patch[5].posW),
 
 		// +Z 방향 이웃
-		ComputePatchMidPoint(patch[1].mPosW, patch[3].mPosW, patch[6].mPosW, patch[7].mPosW),
+		ComputePatchMidPoint(patch[1].posW, patch[3].posW, patch[6].posW, patch[7].posW),
 
 		// -X 방향 이웃
-		ComputePatchMidPoint(patch[0].mPosW, patch[1].mPosW, patch[8].mPosW, patch[9].mPosW),
+		ComputePatchMidPoint(patch[0].posW, patch[1].posW, patch[8].posW, patch[9].posW),
 
 		// -Z 방향 이웃
-		ComputePatchMidPoint(patch[0].mPosW, patch[2].mPosW, patch[10].mPosW, patch[11].mPosW)
+		ComputePatchMidPoint(patch[0].posW, patch[2].posW, patch[10].posW, patch[11].posW)
 	};
 
 	/*
@@ -274,15 +248,15 @@ PatchTess HsPerPatch(InputPatch<VertexOut, 12> patch, uint patchID : SV_Primitiv
 	};
 
 	// 현재 타일 내부 조각의 LOD는 항상 타일 자체의 LOD와 같다.
-	pt.mInsideTess[0] = pt.mInsideTess[1] = detail[0];
+	pt.insideTess[0] = pt.insideTess[1] = detail[0];
 
 	// 이웃 타일의 LOD가 더 낮다면 그 LOD를 가장자리 조각의 LOD로 설정한다.
 	// 이웃 타일의 LOD가 더 높다면 가장자리 조각에 그대로 사용한다.
 	// (그 이웃 타일이 현재 타일에 맞게 자신의 가장자리 LOD를 낮춘다.)
-	pt.mEdgeTess[0] = min(detail[0], detail[4]);
-	pt.mEdgeTess[1] = min(detail[0], detail[3]);
-	pt.mEdgeTess[2] = min(detail[0], detail[2]);
-	pt.mEdgeTess[3] = min(detail[0], detail[1]);
+	pt.edgeTess[0] = min(detail[0], detail[4]);
+	pt.edgeTess[1] = min(detail[0], detail[3]);
+	pt.edgeTess[2] = min(detail[0], detail[2]);
+	pt.edgeTess[3] = min(detail[0], detail[1]);
 
 	return pt;
 }
@@ -303,25 +277,32 @@ DomainOut DS(PatchTess patchTess,
 	// 0,1 : patchTess[2].mPos;
 	// 1,1 : patchTess[3].mPos;
 
-	float3 finalVertexCoord = quad[0].mPosW * (1.0f - uv.x) * (1.0f - uv.y) +
-		quad[1].mPosW * uv.x * (1.0f - uv.y) +
-		quad[2].mPosW * (1.0f - uv.x) * uv.y +
-		quad[3].mPosW * uv.x * uv.y;
+	float3 finalVertexCoord = quad[0].posW * (1.0f - uv.x) * (1.0f - uv.y) +
+		quad[1].posW * uv.x * (1.0f - uv.y) +
+		quad[2].posW * (1.0f - uv.x) * uv.y +
+		quad[3].posW * uv.x * uv.y;
 
-	float2 texCoord = quad[0].mTexC * (1.0f - uv.x) * (1.0f - uv.y) +
-		quad[1].mTexC * uv.x * (1.0f - uv.y) +
-		quad[2].mTexC * (1.0f - uv.x) * uv.y +
-		quad[3].mTexC * uv.x * uv.y;
+	float2 texCoord = quad[0].texC * (1.0f - uv.x) * (1.0f - uv.y) +
+		quad[1].texC * uv.x * (1.0f - uv.y) +
+		quad[2].texC * (1.0f - uv.x) * uv.y +
+		quad[3].texC * uv.x * uv.y;
 
-	dout.mHeight = GetHeightMapSample(texCoord);
-	finalVertexCoord.y += dout.mHeight * gHeightScale;
+	dout.height = GetHeightMapSample(texCoord);
+	finalVertexCoord.y += dout.height * gHeightScale;
 
 	// 세계 공간에서의 좌표를 전달한다.
-	dout.mPosW = finalVertexCoord;
+	dout.posW = finalVertexCoord;
 	// 동차 절단 공간으로 변환한다.
-	dout.mPosH = mul(float4(finalVertexCoord, 1.0f), gViewProj);
+	dout.posH = mul(float4(finalVertexCoord, 1.0f), gViewProj);
+
+	float4x4 matTransform;
+	if (gMaterialIndex == DISABLED)
+		matTransform = gIdentity;
+	else
+		matTransform = gMaterialData[gMaterialIndex].matTransform;
+
 	// 출력 정점 특성들은 이후 삼각형을 따라 보간된다.
-	dout.mTexC = mul(float4(texCoord, 0.0f, 1.0f), gMaterialData[gMaterialIndex].mMatTransform).xy;
+	dout.texC = mul(float4(texCoord, 0.0f, 1.0f), matTransform).xy;
 
 	return dout;
 }
@@ -330,37 +311,39 @@ PixelOut PS(DomainOut pin)
 {
 	PixelOut pout = (PixelOut)0.0f;
 
+	// 이 픽셀에 사용할 머터리얼 데이터를 가져온다.
 	MaterialData materialData = gMaterialData[gMaterialIndex];
-	float4 diffuse = materialData.mDiffuseAlbedo;
-	float3 specular = materialData.mSpecular;
-	float roughness = materialData.mRoughness;
-	uint diffuseMapIndex = materialData.mDiffuseMapIndex;
+
+	float4 diffuse = materialData.diffuseAlbedo;
+	float3 specular = materialData.specular;
+	float roughness = materialData.roughness;
+	uint diffuseMapIndex = materialData.diffuseMapIndex;
 
 	if (diffuseMapIndex != DISABLED)
 	{
-		diffuse *= gTextureMaps[diffuseMapIndex].Sample(gsamAnisotropicWrap, pin.mTexC * gTexScale);
+		diffuse *= gTextureMaps[diffuseMapIndex].Sample(gsamAnisotropicWrap, pin.texC * gTexScale);
 	}
 
 	// 미리 계산된 노멀맵에서 해당 픽셀 위치의 노멀을 가져온다.
-	float3 normal = normalize(gNormalMap.SampleLevel(gsamAnisotropicWrap, pin.mTexC, 0.0f).xyz);
+	float3 normal = normalize(gNormalMap.SampleLevel(gsamAnisotropicWrap, pin.texC, 0.0f).xyz);
 
 	// Terrain의 절반이상부터는 꼭대기에 눈이 쌓인듯한 효과를 준다.
-	if (pin.mHeight > 0.5f)
+	if (pin.height > 0.5f)
 	{
-		float snowAmount = smoothstep(0.5f, 1.0f, pin.mHeight);
+		float snowAmount = smoothstep(0.5f, 1.0f, pin.height);
 		diffuse = lerp(diffuse, 1.0f, snowAmount);
 	}
 
-	pout.mDiffuse = float4(diffuse.rgb, 1.0f);
-	pout.mSpecularRoughness = float4(specular, roughness);
-	pout.mPosition = float4(pin.mPosW, 0.0f);
-	pout.mNormal = float4(normal, 1.0f);
+	// 다중 멀티 렌더링으로 G버퍼를 채운다.
+	pout.diffuse = float4(diffuse.rgb, 1.0f);
+	pout.specularRoughness = float4(specular, roughness);
+	pout.position = float4(pin.posW, 0.0f);
+	pout.normal = float4(normal, 1.0f);
 
 	return pout;
 }
 
 float4 PS_Wireframe(DomainOut pin) : SV_Target
 {
-	MaterialData materialData = gMaterialData[gMaterialIndex];
-	return materialData.mDiffuseAlbedo;
+	return gMaterialData[gMaterialIndex].diffuseAlbedo;
 }

@@ -1,13 +1,13 @@
-#include "pch.h"
-#include "Random.h"
-
-using namespace DirectX;
+#include <Framework/Random.h>
+#include <random>
 
 float Random::GetRandomFloat(float min, float max)
 {
 	static std::random_device rd;
 	static std::mt19937_64 mt(rd());
 
+	// min과 max의 차이가 거의 같거나 더 작다면
+	// 최소값을 그냥 반환한다.
 	if (max - min < FLT_EPSILON)
 		return min;
 
@@ -57,9 +57,5 @@ XMFLOAT3 Random::GetRandomNormal()
 	result.y = GetRandomFloat(0.0f, 1.0f);
 	result.z = GetRandomFloat(0.0f, 1.0f);
 
-	DirectX::XMVECTOR vecResult = DirectX::XMLoadFloat3(&result);
-	vecResult = DirectX::XMVector3Normalize(vecResult);
-	DirectX::XMStoreFloat3(&result, vecResult);
-
-	return result;
+	return Vector3::Normalize(result);;
 }

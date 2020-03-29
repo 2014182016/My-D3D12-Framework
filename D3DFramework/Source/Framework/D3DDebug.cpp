@@ -1,28 +1,24 @@
-#include "pch.h"
-#include "D3DDebug.h"
-#include "D3DUtil.h"
-#include "Structure.h"
-#include "Mesh.h"
+#include <Framework/D3DDebug.h>
+#include <Framework/D3DStructure.h>
+#include <Component/Mesh.h>
 
-using namespace DirectX;
 using namespace std::literals;
 
 D3DDebug::D3DDebug() { }
 
 D3DDebug::~D3DDebug() 
 {
-	mMeshBuildCmdList = nullptr;
-	mMeshBuildCmdAlloc = nullptr;
-	mCmdQueue = nullptr;
-	mFence = nullptr;
+	meshBuildCmdList = nullptr;
+	meshBuildCmdAlloc = nullptr;
+	cmdQueue = nullptr;
+	fence = nullptr;
 
-	mDebugDatas.clear();
-
-	delete this;
+	debugDatas.clear();
 }
 
 D3DDebug* D3DDebug::GetInstance()
 {
+	static D3DDebug* instance = nullptr;
 	if (instance == nullptr)
 		instance = new D3DDebug();
 	return instance;
@@ -31,25 +27,29 @@ D3DDebug* D3DDebug::GetInstance()
 
 void D3DDebug::CreateCommandObjects(ID3D12Device* device)
 {
-	mDevice = device;
+	d3dDevice = device;
 
+	// 명령어 큐를 생성한다.
 	D3D12_COMMAND_QUEUE_DESC queueDesc = {};
 	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 	queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-	ThrowIfFailed(mDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&mCmdQueue)));
+	ThrowIfFailed(d3dDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&cmdQueue)));
 
-	ThrowIfFailed(mDevice->CreateCommandAllocator(
+	// 명령어 할당자를 생성한다.
+	ThrowIfFailed(d3dDevice->CreateCommandAllocator(
 		D3D12_COMMAND_LIST_TYPE_DIRECT,
-		IID_PPV_ARGS(mMeshBuildCmdAlloc.GetAddressOf())));
+		IID_PPV_ARGS(meshBuildCmdAlloc.GetAddressOf())));
 
-	ThrowIfFailed(mDevice->CreateCommandList(
+	// 명령어 리스트를 생성한다.
+	ThrowIfFailed(d3dDevice->CreateCommandList(
 		0,
 		D3D12_COMMAND_LIST_TYPE_DIRECT,
-		mMeshBuildCmdAlloc.Get(),
+		meshBuildCmdAlloc.Get(),
 		nullptr,
-		IID_PPV_ARGS(mMeshBuildCmdList.GetAddressOf())));
+		IID_PPV_ARGS(meshBuildCmdList.GetAddressOf())));
 
-	ThrowIfFailed(mDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mFence)));
+	// 펜스를 생성한다.
+	ThrowIfFailed(d3dDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
 }
 
 void D3DDebug::DrawLine(const XMFLOAT3& p1, const XMFLOAT3& p2, const float time, const XMFLOAT4& color)
@@ -57,7 +57,7 @@ void D3DDebug::DrawLine(const XMFLOAT3& p1, const XMFLOAT3& p2, const float time
 	DebugData data;
 	std::vector<LineVertex> vertices(2);
 
-	data.mDebugMesh = new Mesh("DebugLine"s);
+	data.debugMesh = new Mesh("DebugLine"s);
 
 	vertices.emplace_back(p1, color);
 	vertices.emplace_back(p2, color);
@@ -67,12 +67,7 @@ void D3DDebug::DrawLine(const XMFLOAT3& p1, const XMFLOAT3& p2, const float time
 
 void D3DDebug::DrawRay(const XMVECTOR& p1, const XMVECTOR& p2, const float time, const XMFLOAT4& color)
 {
-	XMFLOAT3 xmf3P1, xmf3P2;
-
-	XMStoreFloat3(&xmf3P1, p1);
-	XMStoreFloat3(&xmf3P2, p2);
-
-	DrawLine(xmf3P1, xmf3P2, time, color);
+	DrawLine(Vector3::XMVectorToFloat3(p1), Vector3::XMVectorToFloat3(p2), time, color);
 }
 
 void D3DDebug::DrawBox(const XMFLOAT3& center, const XMFLOAT3& extents, const float time, const XMFLOAT4& color)
@@ -80,7 +75,7 @@ void D3DDebug::DrawBox(const XMFLOAT3& center, const XMFLOAT3& extents, const fl
 	DebugData data;
 	std::vector<LineVertex> vertices(24);
 
-	data.mDebugMesh = new Mesh("DebugBox"s);
+	data.debugMesh = new Mesh("DebugBox"s);
 
 	XMFLOAT3 p[] = 
 	{ 
@@ -132,8 +127,9 @@ void D3DDebug::DrawRing(const XMVECTOR& center, const XMVECTOR& majorAxis, const
 	DebugData data;
 	std::vector<LineVertex> vertices(ringSegments + 1);
 
-	data.mDebugMesh = new Mesh("DebugRing"s);
+	data.debugMesh = new Mesh("DebugRing"s);
 
+	// 증가량을 계산한다.
 	XMVECTOR cosDelta = XMVectorReplicate(cosf(angleDelta));
 	XMVECTOR sinDelta = XMVectorReplicate(sinf(angleDelta));
 	XMVECTOR incrementalSin = XMVectorReplicate(0.0f);
@@ -141,12 +137,15 @@ void D3DDebug::DrawRing(const XMVECTOR& center, const XMVECTOR& majorAxis, const
 
 	for (int i = 0; i < ringSegments + 1; ++i)
 	{
+		// 새로운 위치를 계산한다.
 		XMVECTOR pos = XMVectorMultiplyAdd(majorAxis, incrementalCos, center);
 		pos = XMVectorMultiplyAdd(minorAxis, incrementalSin, pos);
 
-		XMStoreFloat3(&vertices[i].mPosition, pos);
-		vertices[i].mColor = color;
+		// 위치와 색을 저장한다.
+		XMStoreFloat3(&vertices[i].pos, pos);
+		vertices[i].color = color;
 
+		// 새로운 증가량을 계산한다.
 		XMVECTOR newCos = incrementalCos * cosDelta - incrementalSin * sinDelta;
 		XMVECTOR newSin = incrementalCos * sinDelta + incrementalSin * cosDelta;
 		incrementalCos = newCos;
@@ -161,41 +160,41 @@ void D3DDebug::Draw(const BoundingFrustum& frustum, const float time, const XMFL
 	DebugData data;
 	std::vector<LineVertex> vertices(24);
 
-	data.mDebugMesh = new Mesh("DebugFrstum"s);
+	data.debugMesh = new Mesh("DebugFrstum"s);
 
 	XMFLOAT3 corners[BoundingFrustum::CORNER_COUNT];
 	frustum.GetCorners(corners);
 
-	vertices[0].mPosition = corners[0];
-	vertices[1].mPosition = corners[1];
-	vertices[2].mPosition = corners[1];
-	vertices[3].mPosition = corners[2];
-	vertices[4].mPosition = corners[2];
-	vertices[5].mPosition = corners[3];
-	vertices[6].mPosition = corners[3];
-	vertices[7].mPosition = corners[0];
+	vertices[0].pos = corners[0];
+	vertices[1].pos = corners[1];
+	vertices[2].pos = corners[1];
+	vertices[3].pos = corners[2];
+	vertices[4].pos = corners[2];
+	vertices[5].pos = corners[3];
+	vertices[6].pos = corners[3];
+	vertices[7].pos = corners[0];
 
-	vertices[8].mPosition = corners[0];
-	vertices[9].mPosition = corners[4];
-	vertices[10].mPosition = corners[1];
-	vertices[11].mPosition = corners[5];
-	vertices[12].mPosition = corners[2];
-	vertices[13].mPosition = corners[6];
-	vertices[14].mPosition = corners[3];
-	vertices[15].mPosition = corners[7];
+	vertices[8].pos = corners[0];
+	vertices[9].pos = corners[4];
+	vertices[10].pos = corners[1];
+	vertices[11].pos = corners[5];
+	vertices[12].pos = corners[2];
+	vertices[13].pos = corners[6];
+	vertices[14].pos = corners[3];
+	vertices[15].pos = corners[7];
 
-	vertices[16].mPosition = corners[4];
-	vertices[17].mPosition = corners[5];
-	vertices[18].mPosition = corners[5];
-	vertices[19].mPosition = corners[6];
-	vertices[20].mPosition = corners[6];
-	vertices[21].mPosition = corners[7];
-	vertices[22].mPosition = corners[7];
-	vertices[23].mPosition = corners[4];
+	vertices[16].pos = corners[4];
+	vertices[17].pos = corners[5];
+	vertices[18].pos = corners[5];
+	vertices[19].pos = corners[6];
+	vertices[20].pos = corners[6];
+	vertices[21].pos = corners[7];
+	vertices[22].pos = corners[7];
+	vertices[23].pos = corners[4];
 
 	for (size_t i = 0; i < vertices.size(); ++i)
 	{
-		vertices[i].mColor = color;
+		vertices[i].color = color;
 	}
 
 	BuildDebugMesh(data, vertices, time);
@@ -206,7 +205,7 @@ void D3DDebug::Draw(const DirectX::BoundingOrientedBox& obb, const float time, c
 	DebugData data;
 	std::vector<LineVertex> vertices(24);
 
-	data.mDebugMesh = new Mesh("DebugBox"s);
+	data.debugMesh = new Mesh("DebugBox"s);
 
 	XMFLOAT3 corners[BoundingOrientedBox::CORNER_COUNT];
 	obb.GetCorners(corners);
@@ -239,36 +238,38 @@ void D3DDebug::Draw(const DirectX::BoundingSphere& sphere, const float time, con
 
 void D3DDebug::Update(float deltaTime)
 {
-	if (mIsMeshBuild)
+	if (isMeshBuild)
 	{
+		// 해당 명령어가 수행될 때까지 기다린다.
 		FlushCommandQueue();
-		mIsMeshBuild = false;
+		isMeshBuild = false;
 
-		Reset(mMeshBuildCmdList.Get(), mMeshBuildCmdAlloc.Get());
+		// 다음 명령어를 위해서 리셋한다.
+		Reset(meshBuildCmdList.Get(), meshBuildCmdAlloc.Get());
 	}
 
-	if (!mDebugDatas.empty())
+	if (!debugDatas.empty())
 	{
-		for (auto iter = mDebugDatas.begin(); iter != mDebugDatas.end();)
+		for (auto iter = debugDatas.begin(); iter != debugDatas.end();)
 		{
-			if (iter->mTime < 0.0f)
+			if (iter->time < 0.0f)
 			{
 				// 수명 시간이 0이하기 되면 프레임을 줄인다.
 				// 이전 프레임에서 해당 객체를 그리는데에 사용하고 있으므로
 				// 해당 객체를 그리지 않는 GPU 타임라인에 도달해야 한다.
-				--iter->mFrame;
+				--iter->frame;
 
 				// 수명이 다 되면 해당 객체를 리스트에서 삭제한다.
-				if (iter->mFrame == 0)
+				if (iter->frame == 0)
 				{
-					delete iter->mDebugMesh;
-					iter->mDebugMesh = nullptr;
-					iter = mDebugDatas.erase(iter);
+					delete iter->debugMesh;
+					iter->debugMesh = nullptr;
+					iter = debugDatas.erase(iter);
 					continue;
 				}
 			}
 
-			iter->mTime -= deltaTime;
+			iter->time -= deltaTime;
 			++iter;
 		}
 	}
@@ -276,30 +277,33 @@ void D3DDebug::Update(float deltaTime)
 
 void D3DDebug::Render(ID3D12GraphicsCommandList* cmdList)
 {
-	for (const auto& data : mDebugDatas)
+	for (const auto& data : debugDatas)
 	{
 		// 디버그 메쉬는 수명이 0이상일 때 그릴 수 있다.
 		// frame이 3이 아니면 수명이 0이하로 frame 값이 감소되었을 때 이다.
-		if (data.mFrame == NUM_FRAME_RESOURCES)
+		if (data.frame == NUM_FRAME_RESOURCES)
 		{
-			data.mDebugMesh->Render(cmdList, 1, false);
+			data.debugMesh->Render(cmdList, 1, false);
 		}
 	}
 }
 
 void D3DDebug::Clear()
 {
-	for (auto& data : mDebugDatas)
+	for (auto& data : debugDatas)
 	{
-		data.mTime = 0.0f;
+		// 수명을 없애면 다음 업데이트에서
+		// 모든 데이터를 삭제하게 된다.
+		data.time = 0.0f;
 	}
 }
 
 void D3DDebug::ExcuteBuild()
 {
-	ThrowIfFailed(mMeshBuildCmdList->Close());
-	ID3D12CommandList* cmdLists[] = { mMeshBuildCmdList.Get() };
-	mCmdQueue->ExecuteCommandLists(_countof(cmdLists), cmdLists);
+	// 디버그 메쉬를 생성하는 명령어를 수행한다.
+	ThrowIfFailed(meshBuildCmdList->Close());
+	ID3D12CommandList* cmdLists[] = { meshBuildCmdList.Get() };
+	cmdQueue->ExecuteCommandLists(_countof(cmdLists), cmdLists);
 }
 
 
@@ -319,20 +323,20 @@ void D3DDebug::FlushCommandQueue()
 	ExcuteBuild();
 
 	// 현재 울타리 지점까지의 명령들을 표시하도록 울타리 값을 전진시킨다.
-	mCurrentFence++;
+	currentFence++;
 
 	// 이 울타리 지점을 설정하는 명령(Signal)을 명령 대기열에 추가한다.
 	// 새 울타리 지점은 GPU가 Signal() 명령까지의 모든 명령을 처리하기
 	// 전까지는 설정되지 않는다.
-	ThrowIfFailed(mCmdQueue->Signal(mFence.Get(), mCurrentFence));
+	ThrowIfFailed(cmdQueue->Signal(fence.Get(), currentFence));
 
 	// GPU가 이 울타리 지점까지의 명령들을 완료할 때까지 기다린다.
-	if (mFence->GetCompletedValue() < mCurrentFence)
+	if (fence->GetCompletedValue() < currentFence)
 	{
 		HANDLE eventHandle = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
 
 		// GPU가 현재 울타리 지점에 도달했으면 이벤트를 발동한다.
-		ThrowIfFailed(mFence->SetEventOnCompletion(mCurrentFence, eventHandle));
+		ThrowIfFailed(fence->SetEventOnCompletion(currentFence, eventHandle));
 
 		// GPU가 현재 울타리 지점에 도달했음을 뜻하는 이벤트를 기다린다.
 		WaitForSingleObject(eventHandle, INFINITE);
@@ -343,15 +347,18 @@ void D3DDebug::FlushCommandQueue()
 void D3DDebug::BuildDebugMeshWithTopology(DebugData& data, const std::vector<LineVertex>& vertices, const float time,
 	D3D_PRIMITIVE_TOPOLOGY topology)
 {
-	data.mDebugMesh->BuildVertices(mDevice, mMeshBuildCmdList.Get(),
-		(void*)vertices.data(), (UINT)vertices.size(), (UINT)sizeof(LineVertex));
+	// 정점 버퍼를 생성한다.
+	data.debugMesh->BuildVertices(d3dDevice, meshBuildCmdList.Get(),
+	(void*)vertices.data(), (UINT32)vertices.size(), (UINT32)sizeof(LineVertex));
 
-	data.mDebugMesh->SetPrimitiveType(topology);
-	data.mTime = time;
+	// 프리미티브와 시간을 설정한다.
+	data.debugMesh->SetPrimitiveType(topology);
+	data.time = time;
 
-	mDebugDatas.push_back(data);
+	// 디버그 메쉬를 저장한다.
+	debugDatas.push_back(data);
 
-	mIsMeshBuild = true;
+	isMeshBuild = true;
 }
 
 void D3DDebug::BuildDebugMesh(DebugData& data, const std::vector<LineVertex>& vertices, const float time)

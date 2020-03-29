@@ -1,13 +1,18 @@
 #pragma once
 
-#include "Object.h"
-#include "Structure.h"
-#include "Interface.h"
+#include <Object/Object.h>
+#include <Framework/Renderable.h>
 
-// #define BUFFER_COPY
+class Material;
+
+// #define BUFFER_COPY // 파티클 데이터에 관한 정보를 복사하려면 주석을 해제한다.
 #define NUM_EMIT_THREAD 8.0f
 #define NUM_UPDATE_THREAD 512.0f
 
+/*
+여러 이펙트를 구현하기 위해 다수의 파티클을
+시뮬레이션하고 렌더링한다.
+*/
 class Particle : public Object, public Renderable
 {
 public:
@@ -16,79 +21,69 @@ public:
 
 public:
 	virtual void Tick(float deltaTime) override;
-	virtual void Render(ID3D12GraphicsCommandList* cmdList, DirectX::BoundingFrustum* frustum = nullptr) const override;
+	virtual void Render(ID3D12GraphicsCommandList* cmdList, BoundingFrustum* frustum = nullptr) const override;
 	virtual void SetConstantBuffer(ID3D12GraphicsCommandList* cmdList, D3D12_GPU_VIRTUAL_ADDRESS startAddress) const override;
 
 public:
+	// 파티클에서 사용할 데이터 버퍼 및 카운터 버퍼를 생성한다.
 	void CreateBuffers(ID3D12Device* device, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv);
+	// 파티클 데이터를 업데이트한다.
 	void Update(ID3D12GraphicsCommandList* cmdList);
+	// 발생 시간이 되었다면 파티클을 생성한다.
 	void Emit(ID3D12GraphicsCommandList* cmdList);
-	void SetBufferSrv(ID3D12GraphicsCommandList* cmdList);
-	void SetBufferUav(ID3D12GraphicsCommandList* cmdList);
+	// gpu에서부터 데이터를 cpu로 복사한다.
 	void CopyData(ID3D12GraphicsCommandList* cmdList);
-
+	// 버퍼를 SRV로서 파이프라인에 바인딩한다.
+	void SetBufferSrv(ID3D12GraphicsCommandList* cmdList);
+	// 버퍼를 UAV로서 파이프라인에 바인딩한다.
+	void SetBufferUav(ID3D12GraphicsCommandList* cmdList);
+	// 파티클의 상수 버퍼를 채울 데이터를 반환한다.
 	void SetParticleConstants(ParticleConstants& constants);
 
+	// 현재 파티클 상태를 확인하고 스폰 가능한지 여부를 반환한다.
+	bool IsSpawnable() const;
+
+	void SetMaterial(Material* material);
+	Material* GetMaterial() const;
+
 public:
-	inline void SetParticleDataStart(const ParticleData& data) { mStart = data; }
-	inline void SetParticleDataEnd(const ParticleData& data) { mEnd = data; }
+	// 파티클의 데이터는 lifeTime에 따라
+	// start에서 end로 변화한다.
+	ParticleData start;
+	ParticleData end;
 
-	inline void SetSpawnTimeRange(float min, float max) { mSpawnTimeRange.first = min; mSpawnTimeRange.second = max; }
-	inline void SetSpawnTimeRange(float time) { mSpawnTimeRange.first = time; mSpawnTimeRange.second = time; }
-	inline float GetSpawnTime() const { return mSpawnTime; }
+	// 파티클에 관한 정보이다.
+	float lifeTime = 0.0f;
+	UINT32 emitNum = 1;
 
-	inline void SetLifeTime(float time) { mLifeTime = time; }
-	inline float GetLifeTime() const { return mLifeTime; }
+	// pair의 first는 최소 스폰 시간, second는 최대 스폰 시간이다.
+	std::pair<float, float> spawnTimeRange;
 
-	inline void SetActive(bool value) { mIsActive = value; }
-	inline bool GetIsActive() const { return mIsActive; }
+	bool isActive = true;
+	bool enabledGravity = false;
+	bool isInfinite = false;
 
-	inline void SetEmitNum(UINT num) { mEmitNum = num; }
-	inline UINT GetEmitNum() const { return mEmitNum; }
-
-	inline void SetEnabledGravity(bool value) { mEnabledGravity = value; }
-	inline void SetEnabledInfinite(bool value) { mIsInfinite = value; }
-	inline void SetInfinite(bool value) { mIsInfinite = value; }
-
-	inline int GetMaxParticleNum() const { return mMaxParticleNum; }
-	inline int GetCurrentParticleNum() const { return mCurrentParticleNum; }
-
-	inline class Material* GetMaterial() { return mMaterial; }
-	inline void SetMaterial(class Material* material) { mMaterial = material; }
-
-	inline void SetVisible(bool value) { mIsVisible = value; }
-	inline bool GetIsVisible() const { return mIsVisible; }
-
-	inline void SetCBIndex(UINT index) { mCBIndex = index; }
-	inline UINT GetCBIndex() const { return mCBIndex; }
+	UINT32 cbIndex = 0;
 
 protected:
-	int mMaxParticleNum = 0;
-	int mCurrentParticleNum = 0;
-
-	ParticleData mStart;
-	ParticleData mEnd;
-
-	std::pair<float, float> mSpawnTimeRange;
-	float mSpawnTime = 0.0f;
-	float mLifeTime = 0.0f;
-	UINT mEmitNum = 1;
+	INT32 maxParticleNum = 0;
+	INT32 currentParticleNum = 0;
+	bool isVisible = true;
 
 private:
-	bool mIsActive = true;
-	bool mEnabledGravity = false;
-	bool mIsInfinite = false;
+	Material* material = nullptr;
 
-	class Material* mMaterial = nullptr;
-	UINT mCBIndex = 0;
-	bool mIsVisible = true;
+	float remainingSpawnTime = 0.0f;
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> mBuffer;
+	// 파티클 데이터들을 담는 버퍼
+	Microsoft::WRL::ComPtr<ID3D12Resource> particleBuffer;
 #ifdef BUFFER_COPY
-	Microsoft::WRL::ComPtr<ID3D12Resource> mReadBackBuffer;
+	// 파티클 데이터들을 gpu에서 읽어들일 버퍼
+	Microsoft::WRL::ComPtr<ID3D12Resource> readBackBuffer;
 #endif
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> mReadBackCounter;
+	// 현재 활성화되어 있는 파티클 개수를 셀 수 있는 카운터 버퍼
+	Microsoft::WRL::ComPtr<ID3D12Resource> readBackCounter;
 	// 0번쨰 값은 현재 존재하는 파티클의 수, 1번쨰 값은 할당할 인덱스의 값
-	Microsoft::WRL::ComPtr<ID3D12Resource> mBufferCounter;
+	Microsoft::WRL::ComPtr<ID3D12Resource> bufferCounter;
 };

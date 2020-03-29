@@ -1,12 +1,27 @@
 #pragma once
 
-#include "pch.h"
-#include "Enumeration.h"
-#include "Structure.h"
+#include <Framework/AssetLoader.h>
+#include <Framework/D3DUtil.h>
+#include <Framework/Enumeration.h>
+#include <unordered_map>
 
-#define DISABLED -1
-#define TEX_NUM 12
+class Mesh;
+class Material;
+class Sound;
 
+struct Texture
+{
+	std::string name;
+	std::wstring filename;
+	std::uint32_t textureIndex;
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> uploadHeap = nullptr;
+};
+
+/*
+프레임워크에 사용되는 리소스들을 관리한다.
+*/
 class AssetManager
 {
 public:
@@ -18,22 +33,26 @@ public:
 	static AssetManager* GetInstance();
 
 public:
+	// 각종 텍스처, 메쉬, 사운드, 머터리얼 등을 로드한다.
 	void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, IDirectSound8* d3dSound);
 
 	// 해당 value를 찾기 위한 함수
-	class Mesh* FindMesh(std::string&& name) const;
-	class Material* FindMaterial(std::string&& name) const;
-	class Sound* FindSound(std::string&& name) const;
-	struct Texture* FindTexture(std::string&& name) const;
+	Mesh* FindMesh(std::string&& name) const;
+	Material* FindMaterial(std::string&& name) const;
+	Sound* FindSound(std::string&& name) const;
+	Texture* FindTexture(std::string&& name) const;
 
 	// Shader Resource View를 만들기 위한 texNames의 인덱스에 따라 텍스처의 리소스를 돌려주는 함수
-	ID3D12Resource* GetTextureResource(UINT index) const;
+	ID3D12Resource* GetTextureResource(const UINT32 index) const;
+
+	// 메쉬에서 사용된 업로드 버퍼들을 해제한다.
+	void DisposeUploaders();
 
 public:
-	std::unordered_map<std::string, std::unique_ptr<class Mesh>> mMeshes;
-	std::unordered_map<std::string, std::unique_ptr<class Material>> mMaterials;
-	std::unordered_map<std::string, std::unique_ptr<struct Texture>> mTextures;
-	std::unordered_map<std::string, std::unique_ptr<class Sound>> mSounds;
+	std::unordered_map<std::string, std::unique_ptr<Mesh>> meshes;
+	std::unordered_map<std::string, std::unique_ptr<Material>> materials;
+	std::unordered_map<std::string, std::unique_ptr<Texture>> textures;
+	std::unordered_map<std::string, std::unique_ptr<Sound>> sounds;
 
 private:
 	void LoadTextures(ID3D12Device* device, ID3D12GraphicsCommandList* commandList);
@@ -42,37 +61,40 @@ private:
 	void BuildMaterial();
 
 private:
-	static inline AssetManager* instance = nullptr;
 	static inline bool isInitialized = false;
 
+	// 텍스처 이름, 파일 이름 순으로 정의된다.
 	const std::vector<TextureInfo> mTexInfos =
 	{
-		{"Bricks2", L"Textures/Bricks2.dds" },
-		{"Bricks2_nmap", L"Textures/Bricks2_nmap.dds" },
-		{"Tile", L"Textures/Tile.dds" },
-		{"Tile_nmap", L"Textures/Tile_nmap.dds"},
-		{"Ice", L"Textures/Ice.dds"},
-		{"Default_nmap", L"Textures/Default_nmap.dds"},
-		{"WireFence", L"Textures/WireFence.dds"},
-		{"Tree01S", L"Textures/Tree01S.dds"},
-		{"Clouds", L"Textures/Clouds.dds"},
-		{"Radial_Gradient", L"Textures/Radial_Gradient.dds"},
-		{"HeightMap", L"Textures/HeightMap.dds"},
-		{"Grass", L"Textures/Grass.dds"},
+		{"Bricks2", L"Bricks2.dds" },
+		{"Bricks2_nmap", L"Bricks2_nmap.dds" },
+		{"Tile", L"Tile.dds" },
+		{"Tile_nmap", L"Tile_nmap.dds"},
+		{"Ice", L"Ice.dds"},
+		{"Default_nmap", L"Default_nmap.dds"},
+		{"WireFence", L"WireFence.dds"},
+		{"Tree01S", L"Tree01S.dds"},
+		{"Clouds", L"Clouds.dds"},
+		{"Radial_Gradient", L"Radial_Gradient.dds"},
+		{"HeightMap", L"HeightMap.dds"},
+		{"Grass", L"Grass.dds"},
 	};
 
+	// 메쉬 이름, 파일 이름, 충돌 타입 순으로 정의된다.
 	const std::vector<MeshInfo> mH3dModels =
 	{
-		{ "Cube_AABB",  L"Models/Cube.h3d", CollisionType::AABB },
-		{ "Cube_OBB",  L"Models/Cube.h3d", CollisionType::OBB },
-		{ "Sphere",  L"Models/Sphere.h3d", CollisionType::Sphere },
-		{ "SkySphere",  L"Models/Sphere.h3d", CollisionType::None },
-		{ "Cylinder",  L"Models/Cylinder.h3d", CollisionType::AABB },
+		{ "Cube_AABB",  L"Cube.h3d", CollisionType::AABB },
+		{ "Cube_OBB",  L"Cube.h3d", CollisionType::OBB },
+		{ "Sphere",  L"Sphere.h3d", CollisionType::Sphere },
+		{ "SkySphere",  L"Sphere.h3d", CollisionType::None },
+		{ "Cylinder",  L"Cylinder.h3d", CollisionType::AABB },
+		{ "Skull",  L"Skull.h3d", CollisionType::Sphere },
 	};
 
+	// 사운드 이름, 파일 이름, 사운드 타입 순으로 정의된다.
 	const std::vector<SoundInfo> mSoundInfos =
 	{
-		{"Sound01", "Sounds/sound01.wav", SoundType::Sound2D},
-		{"Sound02", "Sounds/sound02.wav", SoundType::Sound3D},
+		{"Sound01", "sound01.wav", SoundType::Sound2D},
+		{"Sound02", "sound02.wav", SoundType::Sound3D},
 	};
 };

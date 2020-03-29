@@ -1,7 +1,11 @@
 #pragma once
 
-#include "pch.h"
+#include <Windows.h>
+#include <basetsd.h>
 
+/*
+플레이어의 입력에 관한 행동들을 관리한다.
+*/
 class InputManager
 {
 public:
@@ -19,13 +23,15 @@ public:
 	virtual void Tick(float deltaTime);
 
 public:
-	inline bool GetIsKeyDown(unsigned int input) const { return mKeys[input]; }
-	inline POINT GetMoustPos() const { return mLastMousePos; }
+	static InputManager* GetInstance();
 
 private:
-	bool mKeys[256];
-	POINT mLastMousePos;
+	// 눌린 키를 아스키 코드의 수만큼 보관한다.
+	// 따라서 키의 모든 값을 가지고 있을 수 있다.
+	bool keys[256];
+	// 마지막에 위치한 마우스 위치 값
+	POINT lastMousePos;
 
-	float mCameraWalkSpeed = 50.0f;
-	float mCameraRotateSpeed = 0.25f;
+	float cameraWalkSpeed = 50.0f;
+	float cameraRotateSpeed = 0.25f;
 };

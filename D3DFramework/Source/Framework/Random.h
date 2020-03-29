@@ -1,7 +1,10 @@
 #pragma once
 
-#include "pch.h"
+#include <Framework/Vector.h>
 
+/*
+랜덤한 수를 반환하는 클래스
+*/
 class Random
 {
 public:
@@ -10,8 +13,8 @@ public:
 
 public:
 	static float GetRandomFloat(float min, float max);
-	static DirectX::XMFLOAT2 GetRandomFloat2(const DirectX::XMFLOAT2& min, const DirectX::XMFLOAT2& max);
-	static DirectX::XMFLOAT3 GetRandomFloat3(const DirectX::XMFLOAT3& min, const DirectX::XMFLOAT3& max);
-	static DirectX::XMFLOAT4 GetRandomFloat4(const DirectX::XMFLOAT4& min, const DirectX::XMFLOAT4& max);
-	static DirectX::XMFLOAT3 GetRandomNormal();
+	static XMFLOAT2 GetRandomFloat2(const XMFLOAT2& min, const XMFLOAT2& max);
+	static XMFLOAT3 GetRandomFloat3(const XMFLOAT3& min, const XMFLOAT3& max);
+	static XMFLOAT4 GetRandomFloat4(const XMFLOAT4& min, const XMFLOAT4& max);
+	static XMFLOAT3 GetRandomNormal();
 };

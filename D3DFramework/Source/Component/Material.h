@@ -1,7 +1,10 @@
 #pragma once
 
-#include "Component.h"
+#include <Component/Component.h>
 
+/*
+물체의 재질을 표현하는 클래스
+*/
 class Material : public Component
 {
 public:
@@ -9,55 +12,41 @@ public:
 	virtual ~Material();
 	
 public:
+	// UV를 해당 값으로 설정한다.
 	void SetUV(float u, float v);
+	// UV를 해당 값만큼 이동시킨다.
 	void Move(float u, float v);
+	// 머터리얼을 반시계방향으로 degree만큼 회전시킨다.
 	void Rotate(float degree);
+	// 머터리얼의 크기를 줄이거나 키운다.
 	void SetScale(float scaleU, float scaleV);
 
+	XMMATRIX GetMaterialTransform() const;
+	XMFLOAT4X4 GetMaterialTransform4x4f() const;
+	UINT32 GetMaterialIndex() const;
+	void SetOpacity(float opacity);
+
 public:
-	DirectX::XMMATRIX GetMaterialTransform() const;
-	inline DirectX::XMFLOAT4X4 GetMaterialTransform4x4f() const { return mMatTransform; }
+	// 디퓨즈맵 텍스처를 위한 SRV 힙에서의 인덱스
+	INT32 diffuseMapIndex = -1;
+	// 노말맵 텍스처를 위한 SRV 힙에서의 인덱스
+	INT32 normalMapIndex = -1;
+	// 하이트맵 텍스처를 위한 SRV 힙에서의 인덱스
+	INT32 heightMapIndex = -1;
 
-	inline DirectX::XMFLOAT4 GetDiffuse() const { return mDiffuseAlbedo; }
-	inline void SetDiffuse(const DirectX::XMFLOAT3& diffuse) { mDiffuseAlbedo = DirectX::XMFLOAT4(diffuse.x, diffuse.y, diffuse.z, 1.0f); }
-	void SetDiffuse(float r, float g, float b);
-
-	inline DirectX::XMFLOAT3 GetSpecular() const { return mSpecular; }
-	inline void SetSpecular(DirectX::XMFLOAT3 specular) { mSpecular = specular; }
-	void SetSpecular(float r, float g, float b);
-
-	inline float GetRoughness() const { return mRoughness; }
-	inline void SetRoughness(float roughness) { mRoughness = roughness; }
-
-	inline float GetOpacity() const { return mDiffuseAlbedo.w; }
-	inline void SetOpacity(float opacity) { mDiffuseAlbedo.w = opacity; }
-
-	inline int GetDiffuseMapIndex() const { return mDiffuseMapIndex; }
-	inline void SetDiffuseMapIndex(int index) { mDiffuseMapIndex = index; }
-	inline int GetNormalMapIndex() const { return mNormalMapIndex; }
-	inline void SetNormalMapIndex(int index) { mNormalMapIndex = index; }
-	inline int GetHeightMapIndex() const { return mHeightMapIndex; }
-	inline void SetHeightMapIndex(int index) { mHeightMapIndex = index; }
-
-	inline UINT GetMaterialIndex() const { return mMaterialIndex; }
+	// 셰이딩에 사용되는 재질 상수 버퍼 자료
+	XMFLOAT4 diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
+	XMFLOAT3 specular = { 0.01f, 0.01f, 0.01f };
+	float roughness = 0.25f;
 
 protected:
-	DirectX::XMFLOAT4X4 mMatTransform = DirectX::Identity4x4f();
-
-	DirectX::XMFLOAT4 mDiffuseAlbedo = { 1.0f, 1.0f, 1.0f, 1.0f };
-	DirectX::XMFLOAT3 mSpecular = { 0.01f, 0.01f, 0.01f };
-	float mRoughness = 0.25f;
+	XMFLOAT4X4 matTransform = Matrix4x4::Identity();
 
 private:
-	// 디퓨즈맵 텍스처를 위한 SRV 힙에서의 인덱스
-	int mDiffuseMapIndex = -1;
-	// 노말맵 텍스처를 위한 SRV 힙에서의 인덱스
-	int mNormalMapIndex = -1;
-	// 하이트맵 텍스처를 위한 SRV 힙에서의 인덱스
-	int mHeightMapIndex = -1;
-
 	// 머터리얼을 생성할 때마다 삽입할 상수 버퍼에서의 인덱스
-	static inline UINT currentMaterialIndex = 0;
+	static inline UINT32 currentMaterialIndex = 0;
+
+private:
 	// 이 머터리얼에 일치하는 상수 버퍼에서의 인덱스
-	UINT mMaterialIndex = -1;
+	UINT32 materialIndex = -1;
 };

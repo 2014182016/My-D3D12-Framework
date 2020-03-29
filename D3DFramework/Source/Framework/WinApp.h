@@ -1,12 +1,27 @@
 #pragma once
 
-#include "pch.h"
-#include "Enumeration.h"
+#pragma comment(lib, "pdh.lib")
 
+#include <string>
+#include <Pdh.h>
+
+// 거의 사용되지 않는 내용은 Windows 헤더에서 제외합니다.
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+
+class GameTimer;
+class InputManager;
+
+/*
+WinApi를 사용하기 위한 클래스
+윈도우 상태를 정의하고, 게임 루프를 수행한다.
+*/
 class WinApp
 {
 public:
-	WinApp(HINSTANCE hInstance, int screenWidth, int screenHeight, std::wstring applicationName);
+	WinApp(HINSTANCE hInstance, const INT32 screenWidth, const INT32 screenHeight, 
+		const std::wstring applicationName, const bool useWinApi = true);
 	WinApp(const WinApp& rhs) = delete;
 	WinApp& operator=(const WinApp& rhs) = delete;
 	virtual ~WinApp();
@@ -18,28 +33,26 @@ public:
 	virtual LRESULT MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 public:
+	static WinApp* GetInstance();
 	int Run();
 
 protected:
-	virtual void OnResize(int screenWidth, int screenHeight);
-	virtual void Tick(float deltaTime) { };
+	virtual void OnResize(const INT32 screenWidth, const INT32 screenHeight);
+	virtual void Tick(float deltaTime);
 	virtual void Render() { };
-	virtual void ApplyOption(Option option) { };
 
 public:
-	static WinApp* GetApp() { return app; }
+	void Update();
+	
+	float GetAspectRatio() const;
+	HINSTANCE GetAppInst() const;
+	INT32 GetScreenWidth() const;
+	INT32 GetScreenHeight() const;
 
-	inline float GetAspectRatio() const { return static_cast<float>(mScreenWidth) / mScreenHeight; }
-	inline HINSTANCE GetAppInst() const { return mhAppInst; }
-	inline HWND GetMainWnd() const { return mhMainWnd; }
+	void SetMainWnd(HWND hwnd);
+	HWND GetMainWnd() const;
 
-	inline bool GetOptionEnabled(Option option) const { return mOptions.test((int)option); }
-	void SwitchOptionEnabled(Option option);
-	void SetOptionEnabled(Option option, bool value);
-
-	inline int GetScreenWidth() const { return mScreenWidth; }
-	inline int GetScreenHeight() const { return mScreenHeight; }
-
+	GameTimer* GetGameTimer();
 
 private:
 	bool InitMainWindow();
@@ -47,30 +60,27 @@ private:
 
 protected:
 	// 응용 프로그램 상태
-	bool mAppPaused = false;
-	bool mMinimized = false;
-	bool mMaximized = false;
+	bool appPaused = false;
+	bool minimized = false;
+	bool maximized = false;
+	bool useWinApi = true;
 
-	HINSTANCE mhAppInst = nullptr; 
-	HWND mhMainWnd = nullptr; 
+	HINSTANCE hAppInst = nullptr; 
+	HWND hMainWnd = nullptr; 
 
 	// cpu 사용량을 계산하기 위해 PDH(Performance Data Helper)를 이용한다.
-	HQUERY mQueryHandle;
-	HCOUNTER mCounterHandle;
+	HQUERY queryHandle;
+	HCOUNTER counterHandle;
 
 	// 윈도우 속성
-	std::wstring mApplicationName = L"D3DFramework";
-	int mScreenWidth = 800;
-	int mScreenHeight = 600;
+	std::wstring applicationName = L"D3DFramework";
+	INT32 screenWidth = 800;
+	INT32 screenHeight = 600;
 
-	// option들의 bool값을 관리하는 컨테이너
-	std::bitset<(int)Option::Count> mOptions;
-
-	std::unique_ptr<class GameTimer> mGameTimer;
-	std::unique_ptr<class InputManager> mInputManager;
+	std::unique_ptr<GameTimer> gameTimer = nullptr;
 
 private:
-	static inline WinApp* app = nullptr;
+	static inline WinApp* instance = nullptr;
 };
 
 static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);

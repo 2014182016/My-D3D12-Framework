@@ -4,33 +4,41 @@
 
 #include "Common.hlsl"
 
+static const float2 gTexC[4] =
+{
+	float2(0.0f, 1.0f),
+	float2(0.0f, 0.0f),
+	float2(1.0f, 1.0f),
+	float2(1.0f, 0.0f)
+};
+
 struct VertexIn
 {
-	float3 mPosW  : POSITION;
-	float2 mSizeW : SIZE;
+	float3 posW  : POSITION;
+	float2 sizeW : SIZE;
 };
 
 struct VertexOut
 {
-	float3 mCenterW : POSITION;
-	float2 mSizeW   : SIZE;
+	float3 centerW : POSITION;
+	float2 sizeW   : SIZE;
 };
 
 struct GeoOut
 {
-	float4 mPosH      : SV_POSITION;
-	float3 mPosW      : POSITION0;
-	float3 mNormal    : NORMAL;
-	float2 mTexC      : TEXCOORD;
+	float4 posH      : SV_POSITION;
+	float3 posW      : POSITION0;
+	float3 normal    : NORMAL;
+	float2 texC      : TEXCOORD;
 };
 
 struct PixelOut
 {
-	float4 mDiffuse  : SV_TARGET0;
-	float4 mSpecularRoughness : SV_TARGET1;
-	float4 mPosition : SV_TARGET2;
-	float4 mNormal   : SV_TARGET3;
-	float4 mNormalx  : SV_TARGET4;
+	float4 diffuse  : SV_TARGET0;
+	float4 specularRoughness : SV_TARGET1;
+	float4 position : SV_TARGET2;
+	float4 normal   : SV_TARGET3;
+	float4 normalx  : SV_TARGET4;
 };
 
 VertexOut VS(VertexIn vin)
@@ -38,8 +46,8 @@ VertexOut VS(VertexIn vin)
 	VertexOut vout;
 
 	// 자료를 그대로 기하 셰이더에 넘겨준다.
-	vout.mCenterW = vin.mPosW;
-	vout.mSizeW = vin.mSizeW;
+	vout.centerW = vin.posW;
+	vout.sizeW = vin.sizeW;
 
 	return vout;
 }
@@ -53,39 +61,30 @@ void GS(point VertexOut gin[1], // Primitive는 Point이므로 들어오는 정점은 하나�
 	// 빌보드가 xz 평면에 붙어서 y 방향으로 세워진 상태에서 카메라를
 	// 향하게 만드는 세계 공간 기준 빌보드 지역 좌표계를 계산한다.
 	float3 up = float3(0.0f, 1.0f, 0.0f);
-	float3 look = gEyePosW - gin[0].mCenterW;
+	float3 look = gEyePosW - gin[0].centerW;
 	look.y = 0.0f; // y 축 정렬이므로 sz평면에 투영
 	look = normalize(look);
 	float3 right = cross(up, look); 
 
 	// 세계 공간 기준의 삼각형 띠 정점들(사각형을 구성하는)을 계산한다.
-	float halfWidth = 0.5f*gin[0].mSizeW.x;
-	float halfHeight = 0.5f*gin[0].mSizeW.y;
+	float halfWidth = 0.5f*gin[0].sizeW.x;
+	float halfHeight = 0.5f*gin[0].sizeW.y;
 
+	// 각 정점의 월드 좌표를 계산한다.
 	float4 v[4];
-	v[0] = float4(gin[0].mCenterW + halfWidth * right - halfHeight * up, 1.0f);
-	v[1] = float4(gin[0].mCenterW + halfWidth * right + halfHeight * up, 1.0f);
-	v[2] = float4(gin[0].mCenterW - halfWidth * right - halfHeight * up, 1.0f);
-	v[3] = float4(gin[0].mCenterW - halfWidth * right + halfHeight * up, 1.0f);
-
-	// 사각형 정점들을 세계  공간으로 변환하고, 
-	// 그것들을 하나의 삼각형 띠로 출력한다.
-	float2 texC[4] =
-	{
-		float2(0.0f, 1.0f),
-		float2(0.0f, 0.0f),
-		float2(1.0f, 1.0f),
-		float2(1.0f, 0.0f)
-	};
+	v[0] = float4(gin[0].centerW + halfWidth * right - halfHeight * up, 1.0f);
+	v[1] = float4(gin[0].centerW + halfWidth * right + halfHeight * up, 1.0f);
+	v[2] = float4(gin[0].centerW - halfWidth * right - halfHeight * up, 1.0f);
+	v[3] = float4(gin[0].centerW - halfWidth * right + halfHeight * up, 1.0f);
 
 	GeoOut gout;
 	[unroll]
 	for (int i = 0; i < 4; ++i)
 	{
-		gout.mPosH = mul(v[i], gViewProj);
-		gout.mPosW = v[i].xyz;
-		gout.mNormal = look;
-		gout.mTexC = texC[i];
+		gout.posH = mul(v[i], gViewProj);
+		gout.posW = v[i].xyz;
+		gout.normal = look;
+		gout.texC = mul(float4(gTexC[i], 0.0f, 1.0f), GetMaterialTransform(gObjMaterialIndex)).xy;
 
 		triStream.Append(gout);
 	}
@@ -95,21 +94,29 @@ PixelOut PS(GeoOut pin)
 {
 	PixelOut pout = (PixelOut)0.0f;
 
-	float4 diffuse = 0.0f; float3 specular = 0.0f; float roughness = 0.0f;
-	GetMaterialAttibute(gObjMaterialIndex, diffuse, specular, roughness);
-	diffuse *= GetDiffuseMapSample(gObjMaterialIndex, pin.mTexC);
+	// 이 픽셀에 사용할 머터리얼 데이터를 가져온다.
+	MaterialData materialData = gMaterialData[gObjMaterialIndex];
+
+	float4 diffuse = materialData.diffuseAlbedo;
+	float3 specular = materialData.specular;
+	float roughness = materialData.roughness;
+	uint diffuseMapIndex = materialData.diffuseMapIndex;
+
+	if(diffuseMapIndex != DISABLED)
+		diffuse *= gTextureMaps[diffuseMapIndex].Sample(gsamAnisotropicWrap, pin.texC);
 
 	// 텍스처 알파가 0.1보다 작으면 픽셀을 폐기한다. 
 	clip(diffuse.a - 0.1f);
 
 	// 법선을 보간하면 단위 길이가 아니게 될 수 있으므로 다시 정규화한다.
-	pin.mNormal = normalize(pin.mNormal);
+	pin.normal = normalize(pin.normal);
 
-	pout.mDiffuse = float4(diffuse.rgb, 1.0f);
-	pout.mSpecularRoughness = float4(specular, roughness);
-	pout.mNormal = float4(pin.mNormal, 1.0f);
-	pout.mNormalx = float4(pin.mNormal, 1.0f);
-	pout.mPosition = float4(pin.mPosW, 1.0f);
+	// 다중 멀티 렌더링으로 G버퍼를 채운다.
+	pout.diffuse = float4(diffuse.rgb, 1.0f);
+	pout.specularRoughness = float4(specular, roughness);
+	pout.normal = float4(pin.normal, 1.0f);
+	pout.normalx = float4(pin.normal, 1.0f);
+	pout.position = float4(pin.posW, 1.0f);
 
 	return pout;
 }

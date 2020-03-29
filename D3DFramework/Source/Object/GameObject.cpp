@@ -1,11 +1,7 @@
-#include "pch.h"
-#include "GameObject.h"
-#include "Mesh.h"
-#include "Global.h"
-#include "Structure.h"
-#include "Physics.h"
-
-using namespace DirectX;
+#include <Object/GameObject.h>
+#include <Component/Mesh.h>
+#include <Framework/Physics.h>
+#include <Framework/D3DInfo.h>
 
 GameObject::GameObject(std::string&& name) : Object(std::move(name)) { }
 
@@ -24,27 +20,26 @@ void GameObject::CalculateWorld()
 	{
 		case CollisionType::AABB:
 		{
-			const BoundingBox& aabb = std::any_cast<BoundingBox>(mMesh->GetCollisionBounding());
+			const BoundingBox& aabb = std::any_cast<BoundingBox>(mesh->GetCollisionBounding());
 			BoundingBox outAABB;
-
 			aabb.Transform(outAABB, GetWorld());
-			mCollisionBounding = std::move(outAABB);
+			collisionBounding = std::move(outAABB);
 			break;
 		}
 		case CollisionType::OBB:
 		{
-			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(mMesh->GetCollisionBounding());
+			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(mesh->GetCollisionBounding());
 			BoundingOrientedBox outOBB;
 			obb.Transform(outOBB, GetWorld());
-			mCollisionBounding = std::move(outOBB);
+			collisionBounding = std::move(outOBB);
 			break;
 		}
 		case CollisionType::Sphere:
 		{
-			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(mMesh->GetCollisionBounding());
+			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(mesh->GetCollisionBounding());
 			BoundingSphere outSphere;
 			sphere.Transform(outSphere, GetWorld());
-			mCollisionBounding = std::move(outSphere);
+			collisionBounding = std::move(outSphere);
 			break;
 		}
 	}
@@ -54,72 +49,72 @@ void GameObject::Tick(float deltaTime)
 {
 	__super::Tick(deltaTime);
 
-	if (mIsPhysics)
+	if (isPhysics)
 	{
-		AddForce(Physics::gravity * mMass);
+		AddForce(Vector3::Multiply(Physics::gravity, mass));
 
 		// 물리법칙에 따라 위치 및 속도를 업데이트한다.
 		PhysicsUpdate(deltaTime);
-		SetPosition(mPosition);
+		SetPosition(position);
 	}
 }
 
 void GameObject::PhysicsUpdate(float deltaTime)
 {
-	if (mInvMass <= FLT_EPSILON)
+	if (invMass <= FLT_EPSILON)
 		return;
 
-	XMVECTOR position = XMLoadFloat3(&mPosition);
-	XMVECTOR rotation = XMLoadFloat3(&mRotation);
+	XMVECTOR pos = XMLoadFloat3(&position);
+	XMVECTOR rot = XMLoadFloat3(&rotation);
 
-	XMVECTOR velocity = XMLoadFloat3(&mVelocity);
-	XMVECTOR angularVelocity = XMLoadFloat3(&mAngularVelocity);
+	XMVECTOR vel = XMLoadFloat3(&velocity);
+	XMVECTOR angVel = XMLoadFloat3(&angularVelocity);
 
-	XMVECTOR acceleration = XMLoadFloat3(&mAcceleration);
-	XMVECTOR angularAcceleration = XMLoadFloat3(&mAngularAcceleration);
+	XMVECTOR acc = XMLoadFloat3(&acceleration);
+	XMVECTOR angAcc = XMLoadFloat3(&angularAcceleration);
 
-	XMVECTOR forceAccum = XMLoadFloat3(&mForceAccum);
-	XMVECTOR torqueAccum = XMLoadFloat3(&mTorqueAccum);
+	XMVECTOR force = XMLoadFloat3(&forceAccum);
+	XMVECTOR torque = XMLoadFloat3(&torqueAccum);
 	
 	// 가속도에 힘을 적용한다.
-	acceleration += forceAccum * mInvMass;
+	acc += force * invMass;
 	// 토크에 의해 각가속도를 계산한다.
-	angularAcceleration += XMVector3Transform(torqueAccum, XMLoadFloat4x4(&mInvInertiaTensor));
+	angVel += XMVector3Transform(torque, XMLoadFloat4x4(&invInertiaTensor));
 
 	// 속도를 업데이트한다.
-	velocity += acceleration * deltaTime;
+	vel += acc * deltaTime;
 	// 각속도를 업데이트한다.
-	angularVelocity += angularAcceleration * deltaTime;
+	angVel += angAcc * deltaTime;
 
 	// 드래그(마찰저항)을 적용한다.
-	velocity *= pow(mLinearDamping, deltaTime);
-	angularVelocity *= pow(mAngularDamping, deltaTime);
+	vel *= pow(linearDamping, deltaTime);
+	angVel *= pow(angularDamping, deltaTime);
 
 	// 위치를 업데이트한다.
-	position += velocity * deltaTime;
-	rotation += angularVelocity * deltaTime;
+	pos += vel * deltaTime;
+	rot += angVel * deltaTime;
 
-	XMStoreFloat3(&mPosition, position);
-	XMStoreFloat3(&mRotation, rotation);
+	position = Vector3::XMVectorToFloat3(pos);
+	rotation = Vector3::XMVectorToFloat3(rot);
 
-	XMStoreFloat3(&mVelocity, velocity);
-	XMStoreFloat3(&mAngularVelocity, angularVelocity);
+	velocity = Vector3::XMVectorToFloat3(vel);
+	angularVelocity = Vector3::XMVectorToFloat3(angVel);
 
 	// 한 프레임동안 누적한 힘을 초기화한다.
-	mForceAccum = XMFLOAT3(0.0f, 0.0f, 0.0f);
-	mTorqueAccum = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	forceAccum = { 0.0f, 0.0f, 0.0f };
+	torqueAccum = { 0.0f, 0.0f, 0.0f };
 }
 
 std::optional<XMMATRIX> GameObject::GetBoundingWorld() const
 {
-	if (!mCollisionBounding.has_value())
+	if (!collisionBounding.has_value())
 		return {};
 
 	switch (GetMeshCollisionType())
 	{
 		case CollisionType::AABB:
 		{
-			const BoundingBox& aabb = std::any_cast<BoundingBox>(mCollisionBounding);
+			const BoundingBox& aabb = std::any_cast<BoundingBox>(collisionBounding);
 			XMMATRIX translation = XMMatrixTranslation(aabb.Center.x, aabb.Center.y, aabb.Center.z);
 			XMMATRIX scailing = XMMatrixScaling(aabb.Extents.x, aabb.Extents.y, aabb.Extents.z);
 			XMMATRIX world = XMMatrixMultiply(scailing, translation);
@@ -127,7 +122,7 @@ std::optional<XMMATRIX> GameObject::GetBoundingWorld() const
 		}
 		case CollisionType::OBB:
 		{
-			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(mCollisionBounding);
+			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(collisionBounding);
 			XMMATRIX translation = XMMatrixTranslation(obb.Center.x, obb.Center.y, obb.Center.z);
 			XMMATRIX rotation = XMMatrixRotationQuaternion(XMLoadFloat4(&obb.Orientation));
 			XMMATRIX scailing = XMMatrixScaling(obb.Extents.x, obb.Extents.y, obb.Extents.z);
@@ -136,7 +131,7 @@ std::optional<XMMATRIX> GameObject::GetBoundingWorld() const
 		}
 		case CollisionType::Sphere:
 		{
-			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(mCollisionBounding);
+			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(collisionBounding);
 			XMMATRIX translation = XMMatrixTranslation(sphere.Center.x, sphere.Center.y, sphere.Center.z);
 			XMMATRIX scailing = XMMatrixScaling(sphere.Radius, sphere.Radius, sphere.Radius);
 			XMMATRIX world = XMMatrixMultiply(scailing, translation);
@@ -156,21 +151,21 @@ bool GameObject::IsInFrustum(DirectX::BoundingFrustum* frustum) const
 	{
 		case CollisionType::AABB:
 		{
-			const BoundingBox& aabb = std::any_cast<BoundingBox>(mCollisionBounding);
+			const BoundingBox& aabb = std::any_cast<BoundingBox>(collisionBounding);
 			if ((*frustum).Contains(aabb) != DirectX::DISJOINT)
 				return true;
 			break;
 		}
 		case CollisionType::OBB:
 		{
-			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(mCollisionBounding);
+			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(collisionBounding);
 			if ((*frustum).Contains(obb) != DirectX::DISJOINT)
 				return true;
 			break;
 		}
 		case CollisionType::Sphere:
 		{
-			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(mCollisionBounding);
+			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(collisionBounding);
 			if ((*frustum).Contains(sphere) != DirectX::DISJOINT)
 				return true;
 			break;
@@ -189,51 +184,51 @@ bool GameObject::IsInFrustum(DirectX::BoundingFrustum* frustum) const
 }
 
 
-void GameObject::SetMass(float mass)
+void GameObject::SetMass(const float mass)
 {
 	if (mass >= FLT_MAX - 1.0f || mass <= 0.0f)
 	{
-		mass = 0.0f;
+		this->mass = 0.0f;
 		return;
 	}
 
-	mMass = mass;
-	mInvMass = 1.0f / mass;
+	this->mass = mass;
+	invMass = 1.0f / mass;
 }
 
-void GameObject::SetCollisionEnabled(bool value)
+void GameObject::SetCollisionEnabled(const bool value)
 {
 	if (value)
 	{
-		mCollisionType = GetMeshCollisionType();
+		collisionType = GetMeshCollisionType();
 	}
 	else
 	{
-		mCollisionType = CollisionType::None;
+		collisionType = CollisionType::None;
 	}
 }
 
 CollisionType GameObject::GetMeshCollisionType() const
 {
-	if (mMesh)
-		return mMesh->GetCollisionType();
+	if (mesh)
+		return mesh->GetCollisionType();
 	return CollisionType::None;
 }
 
 void GameObject::Render(ID3D12GraphicsCommandList* commandList, BoundingFrustum* frustum) const
 {
-	if (!mIsVisible || !mMesh)
+	if (!isVisible || !mesh)
 		return;
 
 	if (!IsInFrustum(frustum))
 		return;
 
-	mMesh->Render(commandList);
+	mesh->Render(commandList);
 }
 
 void GameObject::SetConstantBuffer(ID3D12GraphicsCommandList* cmdList, D3D12_GPU_VIRTUAL_ADDRESS startAddress) const
 {
-	D3D12_GPU_VIRTUAL_ADDRESS cbAddress = startAddress + mCBIndex * ConstantsSize::objectCBByteSize;
+	D3D12_GPU_VIRTUAL_ADDRESS cbAddress = startAddress + cbIndex * ConstantsSize::objectCBByteSize;
 	cmdList->SetGraphicsRootConstantBufferView((UINT)RpCommon::Object, cbAddress);
 }
 
@@ -242,14 +237,14 @@ void GameObject::AddForce(const XMFLOAT3& force)
 	AddForce(force.x, force.y, force.z);
 }
 
-void GameObject::AddForce(float forceX, float forceY, float forceZ)
+void GameObject::AddForce(const float forceX, const float forceY, const float forceZ)
 {
-	if (mInvMass <= FLT_EPSILON)
+	if (invMass <= FLT_EPSILON)
 		return;
 
-	mForceAccum.x += forceX * mInvMass;
-	mForceAccum.y += forceY * mInvMass;
-	mForceAccum.z += forceZ * mInvMass;
+	forceAccum.x += forceX * invMass;
+	forceAccum.y += forceY * invMass;
+	forceAccum.z += forceZ * invMass;
 }
 
 void GameObject::Impulse(const XMFLOAT3& impulse)
@@ -257,86 +252,123 @@ void GameObject::Impulse(const XMFLOAT3& impulse)
 	Impulse(impulse.x, impulse.y, impulse.z);
 }
 
-void GameObject::Impulse(float impulseX, float impulseY, float impulseZ)
+void GameObject::Impulse(const float impulseX, const float impulseY, const float impulseZ)
 {
-	if (mInvMass <= FLT_EPSILON)
+	if (invMass <= FLT_EPSILON)
 		return;
 
-	mVelocity.x += impulseX * mInvMass;
-	mVelocity.y += impulseY * mInvMass;
-	mVelocity.z += impulseZ * mInvMass;
+	velocity.x += impulseX * invMass;
+	velocity.y += impulseY * invMass;
+	velocity.z += impulseZ * invMass;
 }
 
 void GameObject::SetInverseInertiaTensor()
 {
-	XMFLOAT4X4 inertiaTensor = Identity4x4f();
+	XMFLOAT4X4 inertiaTensor = Matrix4x4::Identity();
 
-	switch (mCollisionType)
+	switch (collisionType)
 	{
 		case CollisionType::AABB:
 		{
-			const BoundingBox& aabb = std::any_cast<BoundingBox>(mCollisionBounding);
+			const BoundingBox& aabb = std::any_cast<BoundingBox>(collisionBounding);
 			XMFLOAT3 extents = aabb.Extents;
 
-			inertiaTensor._11 = (mMass * (extents.y * extents.y + extents.z * extents.z)) / 12.0f;
-			inertiaTensor._22 = (mMass * (extents.x * extents.x + extents.z * extents.z)) / 12.0f;
-			inertiaTensor._33 = (mMass * (extents.x * extents.x + extents.y * extents.y)) / 12.0f;
+			inertiaTensor._11 = (mass * (extents.y * extents.y + extents.z * extents.z)) / 12.0f;
+			inertiaTensor._22 = (mass * (extents.x * extents.x + extents.z * extents.z)) / 12.0f;
+			inertiaTensor._33 = (mass * (extents.x * extents.x + extents.y * extents.y)) / 12.0f;
 			break;
 		}
 		case CollisionType::OBB:
 		{
-			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(mCollisionBounding);
+			const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(collisionBounding);
 			XMFLOAT3 extents = obb.Extents;
 
-			inertiaTensor._11 = (mMass * (extents.y * extents.y + extents.z * extents.z)) / 12.0f;
-			inertiaTensor._22 = (mMass * (extents.x * extents.x + extents.z * extents.z)) / 12.0f;
-			inertiaTensor._33 = (mMass * (extents.x * extents.x + extents.y * extents.y)) / 12.0f;
+			inertiaTensor._11 = (mass * (extents.y * extents.y + extents.z * extents.z)) / 12.0f;
+			inertiaTensor._22 = (mass * (extents.x * extents.x + extents.z * extents.z)) / 12.0f;
+			inertiaTensor._33 = (mass * (extents.x * extents.x + extents.y * extents.y)) / 12.0f;
 			break;
 		}
 		case CollisionType::Sphere:
 		{
-			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(mCollisionBounding);
+			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(collisionBounding);
 			float radiusSquare = sphere.Radius * sphere.Radius;
-			float tensor = (2.0f * mMass * radiusSquare) / 5.0f;
+			float tensor = (2.0f * mass * radiusSquare) / 5.0f;
 
 			inertiaTensor._11 = inertiaTensor._22 = inertiaTensor._33 = tensor;
 			break;
 		}
 	}
 
-	XMMATRIX matInertiaTensor = XMLoadFloat4x4(&inertiaTensor);
-	XMMATRIX matInvInertiaTensor = XMMatrixInverse(&XMMatrixDeterminant(matInertiaTensor), matInertiaTensor);
-
-	XMStoreFloat4x4(&mInvInertiaTensor, matInvInertiaTensor);
+	invInertiaTensor = Matrix4x4::Inverse(inertiaTensor);
 }
 
 void GameObject::TransformInverseInertiaTensorToWorld()
 {
-	XMMATRIX invInertiaTensor = XMLoadFloat4x4(&mInvInertiaTensor);
-	XMMATRIX world = XMLoadFloat4x4(&mWorld);
-
-	invInertiaTensor = invInertiaTensor * world;
-	XMStoreFloat4x4(&mInvInertiaTensor, invInertiaTensor);
+	invInertiaTensor = Matrix4x4::Multiply(invInertiaTensor, world);
 }
 
 void GameObject::AddForceAtLocalPoint(const XMFLOAT3& force, const XMFLOAT3& point)
 {
-	XMVECTOR worldPoint = XMVector3Transform(XMLoadFloat3(&point), XMLoadFloat4x4(&mWorld));
-	XMFLOAT3 pt;
-	XMStoreFloat3(&pt, worldPoint);
+	XMFLOAT3 pt = Vector3::TransformNormal(point, XMLoadFloat4x4(&world));
 
 	AddForceAtWorldPoint(force, pt);
 }
 
 void GameObject::AddForceAtWorldPoint(const XMFLOAT3& force, const XMFLOAT3& point)
 {
-	XMVECTOR position = XMLoadFloat3(&mPosition);
-	XMVECTOR pt = XMLoadFloat3(&point);
-	XMVECTOR fr = XMLoadFloat3(&force);
+	XMFLOAT3 pt = Vector3::Subtract(point, position);
+	XMFLOAT3 addForce = Vector3::CrossProduct(pt, force);
 
-	pt = pt - position;
-	fr = XMVector3Cross(pt, fr);
+	forceAccum = Vector3::Add(forceAccum, addForce);
+	torqueAccum = Vector3::Add(torqueAccum, addForce);
+}
 
-	mForceAccum = mForceAccum + force;
-	XMStoreFloat3(&mTorqueAccum, fr);
+CollisionType GameObject::GetCollisionType() const
+{
+	return collisionType;
+}
+
+const std::any GameObject::GetCollisionBounding() const
+{
+	return collisionBounding;
+}
+
+XMFLOAT3 GameObject::GetVelocity() const
+{
+	return velocity;
+}
+
+XMFLOAT3 GameObject::GetAcceleration() const
+{
+	return acceleration;
+}
+
+float GameObject::GetMass() const
+{
+	return mass;
+}
+
+float GameObject::GetInvMass() const
+{
+	return invMass;
+}
+
+void GameObject::SetMesh(Mesh* mesh)
+{
+	this->mesh = mesh;
+}
+
+Mesh* GameObject::GetMesh() const
+{
+	return mesh;
+}
+
+void GameObject::SetMaterial(Material* material)
+{
+	this->material = material;
+}
+
+Material* GameObject::GetMaterial() const
+{
+	return material;
 }

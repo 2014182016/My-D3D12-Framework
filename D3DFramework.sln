@@ -5,10 +5,9 @@ VisualStudioVersion = 15.0.28307.489
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "D3DFramework", "D3DFramework\D3DFramework.vcxproj", "{61AE951D-7E5F-4AD7-AE62-1E8822E82136}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MeshConverter", "MeshConverter\MeshConverter.vcxproj", "{06F83B5E-7CDA-4F24-9A57-9B18255276FA}"
+EndProject
 Global
-	GlobalSection(Performance) = preSolution
-		HasPerformanceSessions = true
-	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
 		Debug|x86 = Debug|x86
@@ -24,11 +23,22 @@ Global
 		{61AE951D-7E5F-4AD7-AE62-1E8822E82136}.Release|x64.Build.0 = Release|x64
 		{61AE951D-7E5F-4AD7-AE62-1E8822E82136}.Release|x86.ActiveCfg = Release|Win32
 		{61AE951D-7E5F-4AD7-AE62-1E8822E82136}.Release|x86.Build.0 = Release|Win32
+		{06F83B5E-7CDA-4F24-9A57-9B18255276FA}.Debug|x64.ActiveCfg = Debug|x64
+		{06F83B5E-7CDA-4F24-9A57-9B18255276FA}.Debug|x64.Build.0 = Debug|x64
+		{06F83B5E-7CDA-4F24-9A57-9B18255276FA}.Debug|x86.ActiveCfg = Debug|Win32
+		{06F83B5E-7CDA-4F24-9A57-9B18255276FA}.Debug|x86.Build.0 = Debug|Win32
+		{06F83B5E-7CDA-4F24-9A57-9B18255276FA}.Release|x64.ActiveCfg = Release|x64
+		{06F83B5E-7CDA-4F24-9A57-9B18255276FA}.Release|x64.Build.0 = Release|x64
+		{06F83B5E-7CDA-4F24-9A57-9B18255276FA}.Release|x86.ActiveCfg = Release|Win32
+		{06F83B5E-7CDA-4F24-9A57-9B18255276FA}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {BCCD6B94-F00B-47B1-A46E-B013193D8164}
+	EndGlobalSection
+	GlobalSection(Performance) = preSolution
+		HasPerformanceSessions = true
 	EndGlobalSection
 EndGlobal

@@ -13,26 +13,26 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="소스 파일\Framework">
-      <UniqueIdentifier>{d2845a98-c6da-4519-be1f-803a6158a3b5}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Shaders">
       <UniqueIdentifier>{78bfe099-0c88-4904-8b12-5c52b9a3ca27}</UniqueIdentifier>
     </Filter>
     <Filter Include="소스 파일\Object">
-      <UniqueIdentifier>{5e2d942f-0659-4c3a-a567-175dce3e525a}</UniqueIdentifier>
+      <UniqueIdentifier>{9829f999-6e64-488c-98b1-745031e9d04e}</UniqueIdentifier>
     </Filter>
-    <Filter Include="헤더 파일\Component">
-      <UniqueIdentifier>{fc42d09a-0fec-408a-a64e-e64103c9fd78}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="헤더 파일\Object">
-      <UniqueIdentifier>{f3d930f9-7a9a-4dfa-b8ba-73be3d6633a2}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="헤더 파일\Framework">
-      <UniqueIdentifier>{0d3e5b11-fb74-4cde-a96e-2ff8e165deba}</UniqueIdentifier>
+    <Filter Include="소스 파일\Framework">
+      <UniqueIdentifier>{39fd5e1c-0541-4f44-8341-44aa4c97d9fc}</UniqueIdentifier>
     </Filter>
     <Filter Include="소스 파일\Component">
-      <UniqueIdentifier>{028f6e74-0384-47b9-89fb-08ac4c036025}</UniqueIdentifier>
+      <UniqueIdentifier>{d7d00fc2-b4f7-49ef-b94a-631fbdf7bf9a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Component">
+      <UniqueIdentifier>{68dafb47-87b2-4109-a171-c8a6749429d7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Framework">
+      <UniqueIdentifier>{f3b6e7e5-fa41-4635-8b71-544483933e44}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Object">
+      <UniqueIdentifier>{9d0ac9ac-53db-464a-85f6-1b6ed3d5b996}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -69,25 +69,13 @@
     <FxCompile Include="Shaders\Opaque.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="Shaders\Ssao.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
     <FxCompile Include="Shaders\SsaoBlur.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Shaders\SsaoRS.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
     <FxCompile Include="Shaders\ParticleRender.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="Shaders\ParticleRS.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
     <FxCompile Include="Shaders\ParticleCompute.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Shaders\Global.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
     <FxCompile Include="Shaders\TerrainCompute.hlsl">
@@ -108,61 +96,34 @@
     <FxCompile Include="Shaders\Debug.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
+    <FxCompile Include="Material.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\Defines.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Pass.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\Particle.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\SsaoCompute.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\Ssao.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Fullscreen.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Source\Component\Component.cpp">
-      <Filter>소스 파일\Component</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Component\Material.cpp">
-      <Filter>소스 파일\Component</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Component\Sound.cpp">
-      <Filter>소스 파일\Component</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Component\Widget.cpp">
-      <Filter>소스 파일\Component</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\AssetManager.cpp">
-      <Filter>소스 파일\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\Camera.cpp">
-      <Filter>소스 파일\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\CubeRenderTarget.cpp">
-      <Filter>소스 파일\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\D3DApp.cpp">
-      <Filter>소스 파일\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\D3DFramework.cpp">
-      <Filter>소스 파일\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\D3DUtil.cpp">
-      <Filter>소스 파일\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\DDSTextureLoader.cpp">
-      <Filter>소스 파일\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\GameTimer.cpp">
-      <Filter>소스 파일\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\GeometryGenerator.cpp">
-      <Filter>소스 파일\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\InputManager.cpp">
-      <Filter>소스 파일\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\Main.cpp">
-      <Filter>소스 파일\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\Octree.cpp">
-      <Filter>소스 파일\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\pch.cpp">
-      <Filter>소스 파일\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\WinApp.cpp">
-      <Filter>소스 파일\Framework</Filter>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Source\Object\Billboard.cpp">
+      <Filter>소스 파일\Object</Filter>
     </ClCompile>
     <ClCompile Include="Source\Object\DirectionalLight.cpp">
       <Filter>소스 파일\Object</Filter>
@@ -182,14 +143,68 @@
     <ClCompile Include="Source\Object\PointLight.cpp">
       <Filter>소스 파일\Object</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Object\SkySphere.cpp">
+      <Filter>소스 파일\Object</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Object\SpotLight.cpp">
       <Filter>소스 파일\Object</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Component\Mesh.cpp">
-      <Filter>소스 파일\Component</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Object\Billboard.cpp">
+    <ClCompile Include="Source\Object\Terrain.cpp">
       <Filter>소스 파일\Object</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\Animation.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\AssetLoader.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\AssetManager.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\BlurFilter.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\Camera.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\D3DApp.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\D3DDebug.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\D3DFramework.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\D3DUtil.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\DDSTextureLoader.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\FrameResource.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\GameTimer.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\GeometryGenerator.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\InputManager.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\Main.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\Octree.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\Physics.cpp">
+      <Filter>소스 파일\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\Random.cpp">
+      <Filter>소스 파일\Framework</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\SimpleShadowMap.cpp">
       <Filter>소스 파일\Framework</Filter>
@@ -197,35 +212,26 @@
     <ClCompile Include="Source\Framework\Ssao.cpp">
       <Filter>소스 파일\Framework</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Framework\Animation.cpp">
-      <Filter>소스 파일\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\FrameResource.cpp">
-      <Filter>소스 파일\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Object\SkySphere.cpp">
-      <Filter>소스 파일\Object</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\Random.cpp">
-      <Filter>소스 파일\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Object\Terrain.cpp">
-      <Filter>소스 파일\Object</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Framework\Ssr.cpp">
       <Filter>소스 파일\Framework</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Framework\BlurFilter.cpp">
+    <ClCompile Include="Source\Framework\WinApp.cpp">
       <Filter>소스 파일\Framework</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Framework\D3DDebug.cpp">
-      <Filter>소스 파일\Framework</Filter>
+    <ClCompile Include="Source\Component\Component.cpp">
+      <Filter>소스 파일\Component</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Framework\AssetLoader.cpp">
-      <Filter>소스 파일\Framework</Filter>
+    <ClCompile Include="Source\Component\Material.cpp">
+      <Filter>소스 파일\Component</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Framework\Physics.cpp">
-      <Filter>소스 파일\Framework</Filter>
+    <ClCompile Include="Source\Component\Mesh.cpp">
+      <Filter>소스 파일\Component</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Component\Sound.cpp">
+      <Filter>소스 파일\Component</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Component\Widget.cpp">
+      <Filter>소스 파일\Component</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -235,13 +241,25 @@
     <ClInclude Include="Source\Component\Material.h">
       <Filter>헤더 파일\Component</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Component\Mesh.h">
+      <Filter>헤더 파일\Component</Filter>
+    </ClInclude>
     <ClInclude Include="Source\Component\Sound.h">
       <Filter>헤더 파일\Component</Filter>
     </ClInclude>
     <ClInclude Include="Source\Component\Widget.h">
       <Filter>헤더 파일\Component</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Framework\Animation.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\AssetLoader.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
     <ClInclude Include="Source\Framework\AssetManager.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\BlurFilter.h">
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\BufferMemoryPool.hpp">
@@ -250,10 +268,10 @@
     <ClInclude Include="Source\Framework\Camera.h">
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\CubeRenderTarget.h">
+    <ClInclude Include="Source\Framework\D3DApp.h">
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\D3DApp.h">
+    <ClInclude Include="Source\Framework\D3DDebug.h">
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\D3DFramework.h">
@@ -266,6 +284,9 @@
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\DDSTextureLoader.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Enumeration.h">
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\FrameResource.h">
@@ -283,7 +304,19 @@
     <ClInclude Include="Source\Framework\Octree.h">
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\pch.h">
+    <ClInclude Include="Source\Framework\Physics.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\SimpleShadowMap.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Ssao.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Ssr.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\StopWatch.h">
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\Timer.hpp">
@@ -294,6 +327,9 @@
     </ClInclude>
     <ClInclude Include="Source\Framework\WinApp.h">
       <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Object\Billboard.h">
+      <Filter>헤더 파일\Object</Filter>
     </ClInclude>
     <ClInclude Include="Source\Object\DirectionalLight.h">
       <Filter>헤더 파일\Object</Filter>
@@ -313,68 +349,35 @@
     <ClInclude Include="Source\Object\PointLight.h">
       <Filter>헤더 파일\Object</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Object\SpotLight.h">
-      <Filter>헤더 파일\Object</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\ObjectPool.hpp">
-      <Filter>헤더 파일\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Component\Mesh.h">
-      <Filter>헤더 파일\Component</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Object\Billboard.h">
-      <Filter>헤더 파일\Object</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\StopWatch.h">
-      <Filter>헤더 파일\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\SimpleShadowMap.h">
-      <Filter>헤더 파일\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\Ssao.h">
-      <Filter>헤더 파일\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\Animation.h">
-      <Filter>헤더 파일\Framework</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Object\SkySphere.h">
       <Filter>헤더 파일\Object</Filter>
     </ClInclude>
-    <ClInclude Include="Random.h">
-      <Filter>헤더 파일\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\Global.h">
-      <Filter>헤더 파일\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\Enumeration.h">
-      <Filter>헤더 파일\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\Structure.h">
-      <Filter>헤더 파일\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\Interface.h">
-      <Filter>헤더 파일\Framework</Filter>
+    <ClInclude Include="Source\Object\SpotLight.h">
+      <Filter>헤더 파일\Object</Filter>
     </ClInclude>
     <ClInclude Include="Source\Object\Terrain.h">
       <Filter>헤더 파일\Object</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\Ssr.h">
+    <ClInclude Include="Source\Framework\D3DInfo.h">
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\BlurFilter.h">
+    <ClInclude Include="Source\Framework\Defines.h">
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\D3DDebug.h">
+    <ClInclude Include="Source\Framework\Vector.h">
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\AssetLoader.h">
+    <ClInclude Include="Source\Framework\D3DStructure.h">
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\Physics.h">
+    <ClInclude Include="Source\Framework\Renderable.h">
       <Filter>헤더 파일\Framework</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
+    <ClInclude Include="Source\Framework\ShadowMap.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Random.h">
+      <Filter>헤더 파일\Framework</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

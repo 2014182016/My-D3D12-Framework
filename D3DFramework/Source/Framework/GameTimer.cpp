@@ -2,8 +2,7 @@
 // GameTimer.cpp by Frank Luna (C) 2011 All Rights Reserved.
 //***************************************************************************************
 
-#include "pch.h"
-#include "GameTimer.h"
+#include <Framework/GameTimer.h>
 #include <Windows.h>
 
 GameTimer::GameTimer()
@@ -53,7 +52,7 @@ float GameTimer::GetDeltaTime()const
 
 void GameTimer::Reset()
 {
-	__int64 currTime;
+	INT64 currTime;
 	QueryPerformanceCounter((LARGE_INTEGER*)&currTime);
 
 	mBaseTime = currTime;
@@ -115,7 +114,7 @@ void GameTimer::Tick()
 	}
 
 	// 이번 프레임의 시간을 얻는다.
-	__int64 currTime;
+	INT64 currTime;
 	QueryPerformanceCounter((LARGE_INTEGER*)&currTime);
 	mCurrentTime = currTime;
 

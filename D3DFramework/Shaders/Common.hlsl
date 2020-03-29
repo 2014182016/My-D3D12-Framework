@@ -3,6 +3,7 @@
 //***************************************************************************************
 
 #include "LightingUtil.hlsl"
+#include "Pass.hlsl"
 
 Texture2D gTextureMaps[TEX_NUM] : register(t0, space0);
 Texture2D gShadowMaps[LIGHT_NUM]: register(t0, space1);
@@ -35,33 +36,6 @@ cbuffer cbPerObject : register(b0)
 	uint gObjPad0;
 	uint gObjPad1;
 	uint gObjPad2;
-};
-
-cbuffer cbPass : register(b1)
-{
-    float4x4 gView;
-    float4x4 gInvView;
-    float4x4 gProj;
-    float4x4 gInvProj;
-    float4x4 gViewProj;
-    float4x4 gInvViewProj;
-	float4x4 gProjTex;
-	float4x4 gViewProjTex;
-	float4x4 gIdentity;
-	float4 gAmbientLight;
-    float2 gRenderTargetSize;
-    float2 gInvRenderTargetSize;
-	float3 gEyePosW;
-    float gNearZ; 
-    float gFarZ;
-    float gTotalTime;
-    float gDeltaTime;
-	bool gFogEnabled;
-	float4 gFogColor;
-	float gFogStart;
-	float gFogRange;
-	float gFogDensity;
-	uint gFogType;
 };
 
 // 법선 맵 표본을 World Space로 변환한다.
@@ -152,14 +126,14 @@ float4 ComputeShadowLighting(StructuredBuffer<Light> lights, Material mat, float
 
 	for (uint i = 0; i < LIGHT_NUM; ++i)
 	{
-		if (lights[i].mEnabled == 0)
+		if (lights[i].enabled == 0)
 			continue;
 
 		// 다른 물체에 가려진 정도에 따라 shadowFactor로 픽셀을 어둡게 한다.
-		float4 shadowPosH = mul(float4(pos, 1.0f), gLights[i].mShadowTransform);
+		float4 shadowPosH = mul(float4(pos, 1.0f), gLights[i].shadowTransform);
 		float3 shadowFactor = CalcShadowFactor(shadowPosH, i);
 
-		switch (lights[i].mType)
+		switch (lights[i].type)
 		{
 		case DIRECTIONAL_LIGHT:
 			result += shadowFactor * ComputeDirectionalLight(lights[i], mat, normal, toEye);
@@ -176,7 +150,10 @@ float4 ComputeShadowLighting(StructuredBuffer<Light> lights, Material mat, float
 	return float4(result, 0.0f);
 }
 
-float4 GetFogBlend(float4 litColor, float distToEye)
+/*
+안개 속성에 따라 색상을 섞는다.
+*/
+float4 FogBlend(float4 litColor, float distToEye)
 {
 	float4 result = 0.0f;
 
@@ -208,50 +185,9 @@ float4 GetFogBlend(float4 litColor, float distToEye)
 	return result;
 }
 
-float4x4 GetMaterialTransform(in uint materialIndex)
+float4x4 GetMaterialTransform(uint materialIndex)
 {
 	if (materialIndex == DISABLED)
 		return gIdentity;
-	return gMaterialData[materialIndex].mMatTransform;
-}
-
-void GetMaterialAttibute(in uint materialIndex, out float4 diffuse, out float3 specular, out float roughness)
-{
-	diffuse = gMaterialData[materialIndex].mDiffuseAlbedo;
-	specular = gMaterialData[materialIndex].mSpecular;
-	roughness = gMaterialData[materialIndex].mRoughness;
-}
-
-float4 GetDiffuseMapSample(uint materialIndex, float2 tex)
-{
-	if (materialIndex == DISABLED)
-		return 0.0f;
-	return gTextureMaps[gMaterialData[materialIndex].mDiffuseMapIndex].Sample(gsamAnisotropicWrap, tex);
-}
-
-float4 GetNormalMapSample(uint materialIndex, float2 tex)
-{
-	if (materialIndex == DISABLED)
-		return 0.0f;
-	return gTextureMaps[gMaterialData[materialIndex].mNormalMapIndex].Sample(gsamAnisotropicWrap, tex);
-}
-
-void GetGBufferAttribute(in uint3 tex, out float4 diffuse, out float3 specular, out float roughness,
-	out float4 position, out float3 normal, out float depth)
-{
-	diffuse = gDiffuseMap.Load(tex);
-	float4 specularAndroughness = gSpecularRoughnessMap.Load(tex);
-	specular = specularAndroughness.rgb;
-	roughness = specularAndroughness.a;
-	position = gPositonMap.Load(tex);
-	normal = gNormalMap.Load(tex).xyz;
-	depth = gDepthMap.Load(tex).r;
-}
-
-float4 GetAmbientAccess(float3 posW)
-{
-	float4 ssaoPosH = mul(float4(posW, 1.0f), gViewProjTex);
-	ssaoPosH /= ssaoPosH.w;
-	float ambientAccess = gSsaoMap.Sample(gsamLinearClamp, ssaoPosH.xy, 0.0f).r;
-	return ambientAccess;
+	return gMaterialData[materialIndex].matTransform;
 }

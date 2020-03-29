@@ -1,7 +1,11 @@
 #pragma once
 
-#include "Light.h"
+#include <Object/Light.h>
 
+/*
+한 지점에서 원뿔 모양의 빛을 내뿜는다.
+중심 지점에서부터 멀어질수록 빛은 약해진다.
+*/
 class PointLight : public Light
 {
 public:
@@ -9,6 +13,6 @@ public:
 	~PointLight();
 
 public:
-	virtual void SetLightData(struct LightData& lightData) override;
+	virtual void SetLightData(LightData& lightData) override;
 
 };

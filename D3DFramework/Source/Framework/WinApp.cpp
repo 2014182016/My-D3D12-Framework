@@ -1,45 +1,45 @@
-#include "pch.h"
 #include "WinApp.h"
 #include "InputManager.h"
 #include "GameTimer.h"
 #include <WindowsX.h>
+#include <Windows.h>
 
 LRESULT CALLBACK
 MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-	if (WinApp::GetApp() == nullptr)
+	if (WinApp::GetInstance() == nullptr)
 		return 0;
-	return WinApp::GetApp()->MsgProc(hwnd, msg, wParam, lParam);
+	return WinApp::GetInstance()->MsgProc(hwnd, msg, wParam, lParam);
 }
 
-WinApp::WinApp(HINSTANCE hInstance, int screenWidth, int screenHeight, std::wstring applicationName)
-	: mhAppInst(hInstance),
-	  mScreenWidth(screenWidth),
-	  mScreenHeight(screenHeight),
-	  mApplicationName(applicationName)
+WinApp::WinApp(HINSTANCE hInstance, const INT32 screenWidth, const INT32 screenHeight, 
+	const std::wstring applicationName, const bool useWinApi)
+	: hAppInst(hInstance),
+	  screenWidth(screenWidth),
+	  screenHeight(screenHeight),
+	  applicationName(applicationName),
+	  useWinApi(useWinApi)
 {
-	assert(app == nullptr);
-	app = this;
+	instance = this;
 
-	mGameTimer = std::make_unique<GameTimer>();
-	mInputManager = std::make_unique<InputManager>();
-	mOptions.reset();
+	gameTimer = std::make_unique<GameTimer>();
 }
 
 WinApp::~WinApp() 
 { 
-	app = nullptr;
-
-	mGameTimer = nullptr;
-	mInputManager = nullptr;
+	gameTimer = nullptr;
 }
 
+WinApp* WinApp::GetInstance()
+{
+	return instance;
+}
 
 int WinApp::Run()
 {
 	MSG msg = { 0 };
 
-	mGameTimer->Reset();
+	gameTimer->Reset();
 
 	while (msg.message != WM_QUIT)
 	{
@@ -52,20 +52,7 @@ int WinApp::Run()
 		// 아니면 게임을 진행한다.
 		else
 		{
-			mGameTimer->Tick();
-			float deltaTime = mGameTimer->GetDeltaTime();
-
-			if (!mAppPaused)
-			{
-				CalculateFrameStats();
-				mInputManager->Tick(deltaTime);
-				Tick(deltaTime);
-				Render();
-			}
-			else
-			{
-				Sleep(100);
-			}
+			Update();
 		}
 	}
 
@@ -76,13 +63,16 @@ int WinApp::Run()
 
 bool WinApp::Initialize()
 {
-	if (!InitMainWindow())
-		return false;
+	if (useWinApi)
+	{
+		if (!InitMainWindow())
+			return false;
+	}
 
 	// pdh를 초기화한다.
-	PdhOpenQuery(NULL, NULL, &mQueryHandle);
-	PdhAddCounter(mQueryHandle, L"\\Processor(_Total)\\% Processor Time", NULL, &mCounterHandle);
-	PdhCollectQueryData(mQueryHandle);
+	PdhOpenQuery(NULL, NULL, &queryHandle);
+	PdhAddCounter(queryHandle, L"\\Processor(_Total)\\% Processor Time", NULL, &counterHandle);
+	PdhCollectQueryData(queryHandle);
 
 	return true;
 }
@@ -95,42 +85,42 @@ LRESULT WinApp::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	case WM_ACTIVATE:
 		if (LOWORD(wParam) == WA_INACTIVE)
 		{
-			mAppPaused = true;
-			mGameTimer->Stop();
+			appPaused = true;
+			gameTimer->Stop();
 		}
 		else
 		{
-			mAppPaused = false;
-			mGameTimer->Start();
+			appPaused = false;
+			gameTimer->Start();
 		}
 		return 0;
 	case WM_SIZE:
 		if (wParam == SIZE_MINIMIZED)
 		{
-			mAppPaused = true;
-			mMinimized = true;
-			mMaximized = false;
+			appPaused = true;
+			minimized = true;
+			maximized = false;
 		}
 		else if (wParam == SIZE_MAXIMIZED)
 		{
-			mAppPaused = false;
-			mMinimized = false;
-			mMaximized = true;
-			OnResize(mScreenWidth, mScreenHeight);
+			appPaused = false;
+			minimized = false;
+			maximized = true;
+			OnResize(screenWidth, screenHeight);
 		}
 		else if (wParam == SIZE_RESTORED)
 		{
-			if (mMinimized)
+			if (minimized)
 			{
-				mAppPaused = false;
-				mMinimized = false;
-				OnResize(mScreenWidth, mScreenHeight);
+				appPaused = false;
+				minimized = false;
+				OnResize(screenWidth, screenHeight);
 			}
-			else if (mMaximized)
+			else if (maximized)
 			{
-				mAppPaused = false;
-				mMaximized = false;
-				OnResize(mScreenWidth, mScreenHeight);
+				appPaused = false;
+				maximized = false;
+				OnResize(screenWidth, screenHeight);
 			}
 		}
 		return 0;
@@ -143,26 +133,21 @@ LRESULT WinApp::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	case WM_LBUTTONDOWN:
 	case WM_MBUTTONDOWN:
 	case WM_RBUTTONDOWN:
-		if(mInputManager.get())
-			mInputManager->OnMouseDown(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+		InputManager::GetInstance()->OnMouseDown(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
 		return 0;
 	case WM_LBUTTONUP:
 	case WM_MBUTTONUP:
 	case WM_RBUTTONUP:
-		if (mInputManager.get())
-			mInputManager->OnMouseUp(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+		InputManager::GetInstance()->OnMouseUp(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
 		return 0;
 	case WM_MOUSEMOVE:
-		if (mInputManager.get())
-			mInputManager->OnMouseMove(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+		InputManager::GetInstance()->OnMouseMove(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
 		return 0;
 	case WM_KEYUP:
-		if (mInputManager.get())
-			mInputManager->OnKeyUp((unsigned int)wParam);
+		InputManager::GetInstance()->OnKeyUp((unsigned int)wParam);
 		return 0;
 	case WM_KEYDOWN:
-		if (mInputManager.get())
-			mInputManager->OnKeyDown((unsigned int)wParam);
+		InputManager::GetInstance()->OnKeyDown((unsigned int)wParam);
 		return 0;
 	}
 
@@ -176,7 +161,7 @@ bool WinApp::InitMainWindow()
 	wc.lpfnWndProc = MainWndProc;
 	wc.cbClsExtra = 0;
 	wc.cbWndExtra = 0;
-	wc.hInstance = mhAppInst;
+	wc.hInstance = hAppInst;
 	wc.hIcon = LoadIcon(0, IDI_APPLICATION);
 	wc.hCursor = LoadCursor(0, IDC_ARROW);
 	wc.hbrBackground = (HBRUSH)GetStockObject(NULL_BRUSH);
@@ -190,21 +175,21 @@ bool WinApp::InitMainWindow()
 	}
 
 	// 윈도우 창에서 클라이언트 영역을 계산한다.
-	RECT R = { 0, 0, mScreenWidth, mScreenHeight };
+	RECT R = { 0, 0, screenWidth, screenHeight };
 	AdjustWindowRect(&R, WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME ^ WS_MAXIMIZEBOX, false);
 	int width = R.right - R.left;
 	int height = R.bottom - R.top;
 
-	mhMainWnd = CreateWindow(L"MainWnd", mApplicationName.c_str(),
-		WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME ^ WS_MAXIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT, width, height, 0, 0, mhAppInst, 0);
-	if (!mhMainWnd)
+	hMainWnd = CreateWindow(L"MainWnd", applicationName.c_str(),
+		WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME ^ WS_MAXIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT, width, height, 0, 0, hAppInst, 0);
+	if (!hMainWnd)
 	{
 		MessageBox(0, L"CreateWindow Failed.", 0, 0);
 		return false;
 	}
 
-	ShowWindow(mhMainWnd, SW_SHOW);
-	UpdateWindow(mhMainWnd);
+	ShowWindow(hMainWnd, SW_SHOW);
+	UpdateWindow(hMainWnd);
 
 	return true;
 }
@@ -221,26 +206,26 @@ void WinApp::CalculateFrameStats()
 	frameCnt++;
 
 	// 1초가 넘어가면 계산한다.
-	if ((mGameTimer->GetTotalTime() - timeElapsed) >= 1.0f)
+	if ((gameTimer->GetTotalTime() - timeElapsed) >= 1.0f)
 	{
 		float fps = (float)frameCnt; // fps = frameCnt / 1
 		float mspf = 1000.0f / fps;
 
 		// cpu 사용량을 계산한다.
 		PDH_FMT_COUNTERVALUE counterValue;
-		PdhCollectQueryData(mQueryHandle);
-		PdhGetFormattedCounterValue(mCounterHandle, PDH_FMT_LONG, NULL, &counterValue);
+		PdhCollectQueryData(queryHandle);
+		PdhGetFormattedCounterValue(counterHandle, PDH_FMT_LONG, NULL, &counterValue);
 
 		std::wstring fpsStr = std::to_wstring(fps);
 		std::wstring mspfStr = std::to_wstring(mspf);
 		std::wstring cpuStr = std::to_wstring(counterValue.longValue);
 
-		std::wstring windowText = mApplicationName +
+		std::wstring windowText = applicationName +
 			L"    fps: " + fpsStr +
 			L"   mspf: " + mspfStr +
 			L"    cpu: " + cpuStr + L"%";
 
-		SetWindowText(mhMainWnd, windowText.c_str());
+		SetWindowText(hMainWnd, windowText.c_str());
 
 		// 다음 평균을 계산하기 위해 리셋한다.
 		frameCnt = 0;
@@ -248,30 +233,78 @@ void WinApp::CalculateFrameStats()
 	}
 }
 
-void WinApp::OnResize(int screenWidth, int screenHeight)
+void WinApp::OnResize(const INT32 screenWidth, const INT32 screenHeight)
 {
-	mScreenWidth = screenWidth;
-	mScreenHeight = screenHeight;
+	this->screenWidth = screenWidth;
+	this->screenHeight = screenHeight;
 
-	// 윈도우 창에서 클라이언트 영역을 계산한다.
-	RECT R = { 0, 0, mScreenWidth, mScreenHeight };
-	AdjustWindowRect(&R, WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME ^ WS_MAXIMIZEBOX, false);
-	int width = R.right - R.left;
-	int height = R.bottom - R.top;
+	if (useWinApi)
+	{
+		// 윈도우 창에서 클라이언트 영역을 계산한다.
+		RECT R = { 0, 0, screenWidth, screenHeight };
+		AdjustWindowRect(&R, WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME ^ WS_MAXIMIZEBOX, false);
+		int width = R.right - R.left;
+		int height = R.bottom - R.top;
 
-	SetWindowPos(mhMainWnd, HWND_TOP, 0, 0, width, height, SWP_NOMOVE);
+		SetWindowPos(hMainWnd, HWND_TOP, 0, 0, width, height, SWP_NOMOVE);
+	}
 }
 
-void WinApp::SetOptionEnabled(Option option, bool value)
+void WinApp::Tick(float deltaTime)
 {
-	mOptions.set((int)option, value); 
 
-	ApplyOption(option);
 }
 
-void WinApp::SwitchOptionEnabled(Option option)
+float WinApp::GetAspectRatio() const
 {
-	mOptions.flip((int)option);
+	return static_cast<float>(screenWidth) / screenHeight; 
+}
 
-	ApplyOption(option);
+HINSTANCE WinApp::GetAppInst() const
+{
+	return hAppInst; 
+}
+
+void WinApp::SetMainWnd(HWND hwnd)
+{
+	hMainWnd = hwnd;
+}
+
+HWND WinApp::GetMainWnd() const
+{
+	return hMainWnd; 
+}
+
+INT32 WinApp::GetScreenWidth() const
+{
+	return screenWidth; 
+}
+INT32 WinApp::GetScreenHeight() const
+{
+	return screenHeight; 
+}
+
+void WinApp::Update()
+{
+	gameTimer->Tick();
+	float deltaTime = gameTimer->GetDeltaTime();
+
+	if (!appPaused)
+	{
+		if(useWinApi)
+			CalculateFrameStats();
+
+		InputManager::GetInstance()->Tick(deltaTime);
+		Tick(deltaTime);
+		Render();
+	}
+	else
+	{
+		Sleep(100);
+	}
+}
+
+GameTimer* WinApp::GetGameTimer()
+{
+	return gameTimer.get();
 }

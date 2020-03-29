@@ -1,11 +1,8 @@
-#include "pch.h"
-#include "Material.h"
-
-using namespace DirectX;
+#include <Component/Material.h>
 
 Material::Material(std::string&& name) : Component(std::move(name))
 {
-	mMaterialIndex = currentMaterialIndex++;
+	materialIndex = currentMaterialIndex++;
 }
 
 Material::~Material() { }
@@ -13,37 +10,35 @@ Material::~Material() { }
 
 XMMATRIX Material::GetMaterialTransform() const
 {
-	XMMATRIX mMatTransformMatrix = XMLoadFloat4x4(&mMatTransform);
-	return mMatTransformMatrix;
+	return XMLoadFloat4x4(&matTransform);
 }
 
-void Material::SetDiffuse(float r, float g, float b)
+XMFLOAT4X4 Material::GetMaterialTransform4x4f() const
 {
-	mDiffuseAlbedo.x = r;
-	mDiffuseAlbedo.y = g;
-	mDiffuseAlbedo.z = b;
-	mDiffuseAlbedo.w = 1.0f;
+	return matTransform;
+}
+UINT32 Material::GetMaterialIndex() const
+{
+	return materialIndex;
 }
 
-void Material::SetSpecular(float r, float g, float b)
+void Material::SetOpacity(float opacity)
 {
-	mSpecular.x = r;
-	mSpecular.y = g;
-	mSpecular.z = b;
+	diffuse.w = opacity;
 }
 
 void Material::SetUV(float u, float v)
 {
-	mMatTransform(3, 0) = u;
-	mMatTransform(3, 1) = v;
+	matTransform(3, 0) = u;
+	matTransform(3, 1) = v;
 
 	UpdateNumFrames();
 }
 
 void Material::Move(float u, float v)
 {
-	float movedU = mMatTransform(3, 0);
-	float movedV = mMatTransform(3, 1);
+	float movedU = matTransform(3, 0);
+	float movedV = matTransform(3, 1);
 
 	movedU += u;
 	movedV += v;
@@ -57,27 +52,27 @@ void Material::Rotate(float degree)
 	float c = cos(theta);
 	float s = sin(theta);
 
-	if (mMatTransform(0, 0) < FLT_EPSILON)
-		mMatTransform(0, 0) = 1.0f;
-	if (mMatTransform(0, 1) < FLT_EPSILON)
-		mMatTransform(0, 1) = 1.0f;
-	if (mMatTransform(1, 0) < FLT_EPSILON)
-		mMatTransform(1, 0) = 1.0f;
-	if (mMatTransform(1, 1) < FLT_EPSILON)
-		mMatTransform(1, 1) = 1.0f;
+	if (matTransform(0, 0) < FLT_EPSILON)
+		matTransform(0, 0) = 1.0f;
+	if (matTransform(0, 1) < FLT_EPSILON)
+		matTransform(0, 1) = 1.0f;
+	if (matTransform(1, 0) < FLT_EPSILON)
+		matTransform(1, 0) = 1.0f;
+	if (matTransform(1, 1) < FLT_EPSILON)
+		matTransform(1, 1) = 1.0f;
 
-	mMatTransform(0, 0) *= c;
-	mMatTransform(0, 1) *= -s;
-	mMatTransform(1, 0) *= s;
-	mMatTransform(1, 1) *= c;
+	matTransform(0, 0) *= c;
+	matTransform(0, 1) *= -s;
+	matTransform(1, 0) *= s;
+	matTransform(1, 1) *= c;
 
 	UpdateNumFrames();
 }
 
 void Material::SetScale(float scaleU, float scaleV)
 {
-	mMatTransform(0, 0) *= scaleU;
-	mMatTransform(1, 1) *= scaleV;
+	matTransform(0, 0) *= scaleU;
+	matTransform(1, 1) *= scaleV;
 
 	UpdateNumFrames();
 }

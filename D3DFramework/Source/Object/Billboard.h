@@ -1,7 +1,13 @@
 #pragma once
 
-#include "GameObject.h"
+#include <Object/GameObject.h>
 
+class Mesh;
+
+/*
+객체가 렌더링될 때, 2D 평면으로 항상 카메라를
+향하도록 하는 물체
+*/
 class Billboard : public GameObject
 {
 public:
@@ -12,16 +18,12 @@ public:
 	virtual void Render(ID3D12GraphicsCommandList* commandList);
 
 public:
+	// 빌보드 전용 메쉬를 생성한다.
 	void BuildBillboardMesh(ID3D12Device* device, ID3D12GraphicsCommandList* commandList);
 
 public:
-	inline void SetSize(const DirectX::XMFLOAT2& size) { mSize = size; }
-	inline DirectX::XMFLOAT2 GetSize() const { return mSize; }
-
-protected:
-	DirectX::XMFLOAT2 mSize;
+	XMFLOAT2 mSize = { 0.0f, 0.0f };
 
 private:
-	std::unique_ptr<class Mesh> mBillboardMesh;
-
+	std::unique_ptr<Mesh> billboardMesh = nullptr;
 };

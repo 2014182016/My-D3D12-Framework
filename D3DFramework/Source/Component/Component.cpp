@@ -1,13 +1,15 @@
-#include "pch.h"
-#include "Component.h"
+#include <Component/Component.h>
 
-Component::Component(std::string&& name) : mName(std::move(name)) { mUID = currUID++; }
+Component::Component(std::string&& name) : mName(std::move(name)) 
+{
+	uid = currUID++; 
+}
 
 Component::~Component() { }
 
 bool Component::operator==(const Component& rhs)
 {
-	return mUID == rhs.GetUID();
+	return uid == rhs.GetUID();
 }
 
 bool Component::operator==(const std::string& str)
@@ -19,9 +21,7 @@ bool Component::operator==(const std::string& str)
 
 std::string Component::ToString() const
 {
-	std::string blank = " ";
-
-	return std::to_string(mUID) + blank + mName;
+	return std::to_string(uid) + R"( )" + mName;
 }
 
 bool Component::IsUpdate() const
@@ -37,5 +37,15 @@ void Component::UpdateNumFrames()
 void Component::DecreaseNumFrames()
 {
 	--mNumFramesDirty;
-	mNumFramesDirty = std::max<int>(0, mNumFramesDirty);
+	mNumFramesDirty = max(0, mNumFramesDirty);
+}
+
+std::string Component::GetName() const
+{
+	return mName; 
+}
+
+UINT64 Component::GetUID() const
+{
+	return uid; 
 }

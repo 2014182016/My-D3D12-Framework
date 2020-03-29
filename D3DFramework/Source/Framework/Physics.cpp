@@ -1,21 +1,23 @@
-#include "pch.h"
-#include "Physics.h"
-#include "Structure.h"
-#include "GameObject.h"
-#include "Mesh.h"
+#include <Framework/Physics.h>
+#include <Component/Mesh.h>
+#include <Object/GameObject.h>
+#include <algorithm>
 
-using namespace DirectX;
-
+/*
+해당 객체가 AABB 혹은 OBB일 경우 
+바운딩 박스의 Extents를 반환한다.
+*/
 XMFLOAT3 GetBoxExtents(GameObject* obj)
 {
 	CollisionType collisionType = obj->GetCollisionType();
-	XMFLOAT3 extents = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	XMFLOAT3 extents = { 0.0f, 0.0f, 0.0f };
+
 	if (collisionType == CollisionType::AABB)
 	{
 		const BoundingBox& aabb = std::any_cast<BoundingBox>(obj->GetCollisionBounding());
 		extents = aabb.Extents;
 	}
-	else if (collisionType == CollisionType::AABB)
+	else if (collisionType == CollisionType::OBB)
 	{
 		const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(obj->GetCollisionBounding());
 		extents = obb.Extents;
@@ -24,12 +26,18 @@ XMFLOAT3 GetBoxExtents(GameObject* obj)
 	return extents;
 }
 
+/*
+객체의 중심이 박스의 안쪽으로 뚫었다면
+중심과 박스에서 가장 가까운 점을 반환한다.
+*/
 void GetClosestPointInBox(const XMFLOAT3& center, const XMFLOAT3& extents, XMFLOAT3& cloestPoint)
 {
+	// 중심 좌표와 박스의 extents의 차를 구한다.
 	float x = abs(extents.x - abs(center.x));
 	float y = abs(extents.y - abs(center.y));
 	float z = abs(extents.z - abs(center.z));
 
+	// 차이의 값이 가장 작은 곳으로 점을 투영한다.
 	if (x < y && x < z)
 	{
 		cloestPoint.x = center.x < 0.0f ? -extents.x : extents.x;
@@ -45,31 +53,48 @@ void GetClosestPointInBox(const XMFLOAT3& center, const XMFLOAT3& extents, XMFLO
 
 }
 
+/*
+객체에서 해당 축으로 투영하였을 때의 길이를 반환한다.
+*/
 float TransformToAxis(GameObject* obj, const XMVECTOR& axis)
 {
+	// 객체의 축을 구한다.
 	XMFLOAT3 extents = GetBoxExtents(obj);
 	XMVECTOR boxXAxis = obj->GetAxis(0);
 	XMVECTOR boxYAxis = obj->GetAxis(1);
 	XMVECTOR boxZAxis = obj->GetAxis(2);
 
-	float xAmount = XMVectorGetX(XMVector3Dot(axis, boxXAxis));
-	float yAmount = XMVectorGetX(XMVector3Dot(axis, boxYAxis));
-	float zAmount = XMVectorGetX(XMVector3Dot(axis, boxZAxis));
+	// 객체의 각 축과 해당 축과의 내적은 각 축과의 정도를 나타낸다.
+	float xAmount = Vector3::DotProduct(axis, boxXAxis);
+	float yAmount = Vector3::DotProduct(axis, boxYAxis);
+	float zAmount = Vector3::DotProduct(axis, boxZAxis);
 
+	// 투영하여 겹친만큼의 길이을 반환한다.
 	return extents.x * abs(xAmount) + extents.y * abs(yAmount) + extents.z * abs(zAmount);
 }
 
+/*
+두 객체가 해당 축에 겹치는 정도를 반환한다.
+*/
 float OverlapOnAxis(GameObject* obj1, GameObject* obj2, const XMVECTOR& axis, const XMFLOAT3& toCenter)
 {
+	// 객체와 축과의 겹치는 정도를 구한다.
 	float oneProject = TransformToAxis(obj1, axis);
 	float twoProject = TransformToAxis(obj2, axis);
 
-	XMVECTOR center = XMLoadFloat3(&toCenter);
-	float distance = abs(XMVectorGetX(XMVector3Dot(center, axis)));
+	// 중심으로의 벡터와 축과의 겹치는 정도를 구한다.
+	XMVECTOR vecToCenter = XMLoadFloat3(&toCenter);
+	float distance = abs(Vector3::DotProduct(vecToCenter, axis));
 
+	// 0이하이면 겹치지 않는다, 0초과이면 겹친다.
 	return oneProject + twoProject - distance;
 }
 
+/*
+두 객체가 축에 대해 겹치는 지 여부를 반환하고
+앞서 계산했던 관통값과 인덱스 값이 이번 겹치는 것보다
+더 크다면 작은 값으로 대체한다.
+*/
 bool OverlapBoxAxis(GameObject* obj1, GameObject* obj2, const XMVECTOR& axis, const XMFLOAT3& toCenter, const int index,
 	float& smallestPenetration, int& smallestIndex)
 {
@@ -79,6 +104,7 @@ bool OverlapBoxAxis(GameObject* obj1, GameObject* obj2, const XMVECTOR& axis, co
 	if (penetration <= 0.0f)
 		return false;
 
+	// 두 객체의 겹치는 정도가 가장 작은 값들을 저장한다.
 	if (penetration < smallestPenetration)
 	{
 		smallestPenetration = penetration;
@@ -88,6 +114,9 @@ bool OverlapBoxAxis(GameObject* obj1, GameObject* obj2, const XMVECTOR& axis, co
 	return true;
 }
 
+/*
+주어진 두 축을 외적하고 축에 대해 겹치는 지 확인한다.
+*/
 bool OverlapBoxAxis(GameObject* obj1, GameObject* obj2, const XMVECTOR& axis1, const XMVECTOR& axis2,
 	const XMFLOAT3& toCenter, const int index, float& smallestPenetration, int& smallestIndex)
 {
@@ -102,6 +131,10 @@ bool OverlapBoxAxis(GameObject* obj1, GameObject* obj2, const XMVECTOR& axis1, c
 #define CHECK_OVERLAP_CROSS(axis1, axis2, index)\
 	if(!OverlapBoxAxis(obj1, obj2, axis1, axis2, toCenter, index, smallestPenetration, smallestIndex)) return contactInfo;
 
+/*
+두 객체는 박스이고, 박스끼리 부딪혔을 때
+어느 면에 부딪혔는지 판단하고 물리 정보를 반환한다.
+*/
 ContactInfo ContactFaceAxisInBox(GameObject* obj1, GameObject* obj2, const XMFLOAT3& toCenter,
 	float smallestPenetration, int smallestIndex)
 {
@@ -110,17 +143,17 @@ ContactInfo ContactFaceAxisInBox(GameObject* obj1, GameObject* obj2, const XMFLO
 	XMVECTOR vecToCenter = XMLoadFloat3(&toCenter);
 	XMVECTOR normal = obj1->GetAxis(smallestIndex);
 
-	if (XMVectorGetX(XMVector3Dot(vecToCenter, normal)) > 0.0f)
+	if (Vector3::DotProduct(vecToCenter, normal) > 0.0f)
 		normal *=-1.0f;
 
 	XMFLOAT3 vertex = GetBoxExtents(obj2);
-	if (XMVectorGetX(XMVector3Dot(obj2->GetAxis(0), normal)) < 0.0f) vertex.x *= -1.0f;
-	if (XMVectorGetX(XMVector3Dot(obj2->GetAxis(1), normal)) < 0.0f) vertex.y *= -1.0f;
-	if (XMVectorGetX(XMVector3Dot(obj2->GetAxis(2), normal)) < 0.0f) vertex.z *= -1.0f;
+	if (Vector3::DotProduct(obj2->GetAxis(0), normal) < 0.0f) vertex.x *= -1.0f;
+	if (Vector3::DotProduct(obj2->GetAxis(1), normal) < 0.0f) vertex.y *= -1.0f;
+	if (Vector3::DotProduct(obj2->GetAxis(2), normal) < 0.0f) vertex.z *= -1.0f;
 
-	XMStoreFloat3(&contactInfo.mContactNormal, normal);
-	contactInfo.mPenetration = smallestPenetration;
-	contactInfo.mContactPoint = obj2->TransformLocalToWorld(vertex);
+	contactInfo.contactNormal = Vector3::XMVectorToFloat3(normal);
+	contactInfo.penetration = smallestPenetration;
+	contactInfo.contactPoint = obj2->TransformLocalToWorld(vertex);
 
 	return contactInfo;
 }
@@ -292,7 +325,7 @@ ContactInfo Physics::Contact(GameObject* obj1, GameObject* obj2)
 				case CollisionType::AABB:
 				{
 					contactInfo = ContactAabbAndAabb(obj1, obj2);
-					contactInfo.mNormalDirection *= -1.0f;
+					contactInfo.normalDirection *= -1.0f;
 					return contactInfo;
 				}
 				case CollisionType::OBB:
@@ -332,13 +365,13 @@ ContactInfo Physics::Contact(GameObject* obj1, GameObject* obj2)
 				case CollisionType::AABB:
 				{
 					contactInfo = ContactBoxAndSphere(obj2, obj1);
-					contactInfo.mNormalDirection *= -1.0f;
+					contactInfo.normalDirection *= -1.0f;
 					return contactInfo;
 				}
 				case CollisionType::OBB:
 				{
 					contactInfo = ContactBoxAndSphere(obj2, obj1);
-					contactInfo.mNormalDirection *= -1.0f;
+					contactInfo.normalDirection *= -1.0f;
 					return contactInfo;
 				}
 				case CollisionType::Sphere: 
@@ -357,23 +390,23 @@ ContactInfo Physics::ContactSphereAndSphere(GameObject* obj1, GameObject* obj2)
 {
 	ContactInfo contactInfo;
 
-	XMVECTOR pos1 = XMLoadFloat3(&obj1->GetPosition());
-	XMVECTOR pos2 = XMLoadFloat3(&obj2->GetPosition());
+	XMFLOAT3 pos1 = obj1->GetPosition();
+	XMFLOAT3 pos2 = obj2->GetPosition();
 
 	float radius1 = std::any_cast<BoundingSphere>(obj1->GetCollisionBounding()).Radius;
 	float radius2 = std::any_cast<BoundingSphere>(obj2->GetCollisionBounding()).Radius;
 
-	XMVECTOR midLine = pos1 - pos2;
-	float size = XMVectorGetX(XMVector3Length(midLine));
+	// 두 객체 위치 벡터의 차로 중심으로의 벡터를 구한다.
+	XMFLOAT3 midLine = Vector3::Subtract(pos1, pos2);
+	float size = Vector3::Length(midLine);
 
+	// 중심 벡터가 두 객체의 반지름 합보다 작다면 충돌하지 않는다.
 	if (size <= 0.0f || size >= radius1 + radius2)
 		return contactInfo;
 
-	XMVECTOR contactNormal = midLine * (1.0f / size);
-
-	XMStoreFloat3(&contactInfo.mContactNormal, contactNormal);
-	XMStoreFloat3(&contactInfo.mContactPoint, (pos1 + (midLine * 0.5f)));
-	contactInfo.mPenetration = radius1 + radius2 - size;
+	contactInfo.contactNormal = Vector3::Multiply(midLine, 1.0f / size);
+	contactInfo.contactPoint = Vector3::Add(pos1, Vector3::Multiply(midLine, 0.5f));
+	contactInfo.penetration = radius1 + radius2 - size;
 
 	return contactInfo;
 }
@@ -383,20 +416,10 @@ ContactInfo Physics::ContactBoxAndSphere(class GameObject* obj1, class GameObjec
 	ContactInfo contactInfo;
 
 	const BoundingSphere& sphere = std::any_cast<BoundingSphere>(obj2->GetCollisionBounding());
-	CollisionType collisionType = obj1->GetCollisionType();
-	XMFLOAT3 extents;
-	if (collisionType == CollisionType::AABB)
-	{
-		const BoundingBox& aabb = std::any_cast<BoundingBox>(obj1->GetCollisionBounding());
-		extents = aabb.Extents;
-	}
-	else if (collisionType == CollisionType::OBB)
-	{
-		const BoundingOrientedBox& obb = std::any_cast<BoundingOrientedBox>(obj1->GetCollisionBounding());
-		extents = obb.Extents;
-	}
+	XMFLOAT3 extents = GetBoxExtents(obj1);
 
 	// 구의 중심 좌표를 박스의 로컬 좌표계로 변환한다.
+	// 이렇게 함으로써 박스와 구의 충돌을 단순화시킬 수 있다.
 	XMFLOAT3 sphereCenter = obj1->TransformWorldToLocal(obj2->GetPosition());
 	XMFLOAT3 cloestPoint = XMFLOAT3(0.0f, 0.0f, 0.0f);
 
@@ -404,22 +427,25 @@ ContactInfo Physics::ContactBoxAndSphere(class GameObject* obj1, class GameObjec
 	cloestPoint.y = std::clamp(sphereCenter.y, -extents.y, extents.y);
 	cloestPoint.z = std::clamp(sphereCenter.z, -extents.z, extents.z);
 
-	if (cloestPoint == sphereCenter)
+	if (Vector3::Equal(cloestPoint, sphereCenter))
 	{
 		GetClosestPointInBox(sphereCenter, extents, cloestPoint);
-		contactInfo.mNormalDirection *= -1.0f;
+		// 구의 중심이 박스 안에 있다면
+		// 충돌 노멀은 방향이 바뀐다.
+		contactInfo.normalDirection *= -1.0f;
 	}
 
-	float distance = XMVectorGetX(XMVector3LengthSq((XMLoadFloat3(&cloestPoint) - XMLoadFloat3(&sphereCenter))));
+	float distance = Vector3::Length(Vector3::Subtract(cloestPoint, sphereCenter));
+	// 충돌에서 가장 가까운 지점과 구의 중심이 반지름보다 크다면 충돌은 나지 않는다.
 	if (distance > sphere.Radius * sphere.Radius)
 		return contactInfo;
 
+	// 가장 가까운 지점을 월드 좌표계로 변환한다.
 	cloestPoint = obj1->TransformLocalToWorld(cloestPoint);
-	XMVECTOR normal = XMVector3Normalize(XMLoadFloat3(&cloestPoint) - XMLoadFloat3(&obj2->GetPosition()));
 
-	XMStoreFloat3(&contactInfo.mContactNormal, normal);
-	contactInfo.mContactPoint = cloestPoint;
-	contactInfo.mPenetration = sphere.Radius - sqrt(distance);
+	contactInfo.contactNormal = Vector3::Normalize(Vector3::Subtract(cloestPoint, obj2->GetPosition()));
+	contactInfo.contactPoint = cloestPoint;
+	contactInfo.penetration = sphere.Radius - sqrt(distance);
 
 	return contactInfo;
 }
@@ -428,10 +454,11 @@ ContactInfo Physics::ContactAabbAndAabb(GameObject* obj1, GameObject* obj2)
 {
 	ContactInfo contactInfo;
 
-	XMFLOAT3 toCenter = obj1->GetPosition() - obj2->GetPosition();
+	XMFLOAT3 toCenter = Vector3::Subtract(obj1->GetPosition(), obj2->GetPosition());
 	float smallestPenetration = FLT_MAX;
 	int smallestIndex = -1;
 
+	// AABB는 X축, Y축, Z축과의 충돌만 확인하면 된다.
 	CHECK_OVERLAP(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), 0);
 	CHECK_OVERLAP(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), 1);
 	CHECK_OVERLAP(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), 2);
@@ -443,7 +470,7 @@ ContactInfo Physics::ContactBoxAndBox(GameObject* obj1, GameObject* obj2)
 {
 	ContactInfo contactInfo;
 
-	XMFLOAT3 toCenter = obj1->GetPosition() - obj2->GetPosition();
+	XMFLOAT3 toCenter = Vector3::Subtract(obj1->GetPosition(), obj2->GetPosition());
 	float smallestPenetration = FLT_MAX;
 	int smallestIndex = -1;
 
@@ -479,7 +506,7 @@ ContactInfo Physics::ContactBoxAndBox(GameObject* obj1, GameObject* obj2)
 	}
 	else if (smallestIndex < 6)
 	{
-		return ContactFaceAxisInBox(obj2, obj1, toCenter * -1.0f, smallestPenetration, smallestIndex - 3);
+		return ContactFaceAxisInBox(obj2, obj1, Vector3::Multiply(toCenter, -1.0f), smallestPenetration, smallestIndex - 3);
 	}
 	else
 	{
@@ -491,26 +518,25 @@ ContactInfo Physics::ContactBoxAndBox(GameObject* obj1, GameObject* obj2)
 
 void Physics::ResolveVelocity(GameObject* obj1, GameObject* obj2, const float deltaTime, const ContactInfo& contactInfo)
 {
-	XMVECTOR velocity1 = XMLoadFloat3(&obj1->GetVelocity());
-	XMVECTOR velocity2 = XMLoadFloat3(&obj2->GetVelocity());
-	XMVECTOR acceleration1 = XMLoadFloat3(&obj1->GetAcceleration());
-	XMVECTOR acceleration2 = XMLoadFloat3(&obj2->GetAcceleration());
-	XMVECTOR contactNormal = XMVector3Normalize(XMLoadFloat3(&contactInfo.mContactNormal) * contactInfo.mNormalDirection);
+	XMFLOAT3 velDif = Vector3::Subtract(obj1->GetVelocity(), obj2->GetVelocity());
+	XMFLOAT3 contactNormal = Vector3::Normalize(Vector3::Multiply(contactInfo.contactNormal, contactInfo.normalDirection));
 
 	// 두 물체의 접촉 방향에 대한 분리속도를 계산한다.
-	float separatingVelocity = XMVectorGetX(XMVector3Dot((velocity1 - velocity2), contactNormal));
+	float separatingVelocity = Vector3::DotProduct(velDif, contactNormal);
 
 	// 접촉이 일어났으나 물체가 분리되고 있거나
 	// 가만히 잇을 경우 충격량이 필요없다.
 	if (separatingVelocity >= 0.0f)
 		return;
 
-	float restitution = std::min<float>(obj1->GetRestitution(), obj2->GetRestitution());
+	// 충돌 시 반발 계수는 두 객체 중 최소의 반발 계수로 잡는다.
+	float restitution = std::min<float>(obj1->restitution, obj2->restitution);
 
 	// 새롭게 계산한 분리 속도
 	float newSepVel = -separatingVelocity * restitution;
 	// 속도가 가속도에 의한 것인지를 검사한다.
-	float accCausedSepVel = XMVectorGetX(XMVector3Dot((acceleration1 - acceleration2), contactNormal)) * deltaTime;
+	XMFLOAT3 accDif = Vector3::Subtract(obj1->GetAcceleration(), obj2->GetAcceleration());
+	float accCausedSepVel = Vector3::DotProduct(accDif, contactNormal) * deltaTime;
 
 	// 가속도에 의해 접근 속도가 생겼으면
 	// 이를 새로운 분리 속도에서 제거한다.
@@ -535,15 +561,13 @@ void Physics::ResolveVelocity(GameObject* obj1, GameObject* obj2, const float de
 
 	// 적용할 충격략을 계산한다.
 	float impulseScale = deltaVel / totalInvMass;
-	XMVECTOR impulse = contactNormal * impulseScale;
-	XMFLOAT3 xmf3Impulse;
+	XMFLOAT3 impulse = Vector3::Multiply(contactNormal, impulseScale);
+	XMFLOAT3 impulseOpp = Vector3::Multiply(impulse, -1.0f);
 
 	// 충격량을 적용한다.
-	XMStoreFloat3(&xmf3Impulse, impulse);
-	obj1->Impulse(xmf3Impulse);
+	obj1->Impulse(impulse);
 	// 반대방향으로 충격량을 적용한다.
-	XMStoreFloat3(&xmf3Impulse, -impulse);
-	obj2->Impulse(xmf3Impulse);
+	obj2->Impulse(impulseOpp);
 }
 
 void Physics::ResolveInterpenetration(GameObject* obj1, GameObject* obj2, const float deltaTime, const ContactInfo& contactInfo)
@@ -551,7 +575,7 @@ void Physics::ResolveInterpenetration(GameObject* obj1, GameObject* obj2, const 
 	static const float slop = 0.01f;
 
 	// 겹쳐진 부분이 없으면 건너뛴다.
-	if (contactInfo.mPenetration <= 0.0f)
+	if (contactInfo.penetration <= 0.0f)
 		return;
 
 	// 물체를 옮겨주는 거리는 질량에 반비례하므로 질량을 다 더한다.
@@ -561,19 +585,19 @@ void Physics::ResolveInterpenetration(GameObject* obj1, GameObject* obj2, const 
 	if (totalInvMass <= 0.0f)
 		return;
 
-	XMVECTOR contactNormal = XMLoadFloat3(&contactInfo.mContactNormal) * contactInfo.mNormalDirection;
+	XMFLOAT3 contactNormal = Vector3::Normalize(Vector3::Multiply(contactInfo.contactNormal, contactInfo.normalDirection));
 
 	// 물체가 옮겨갈 거리는 질량에 반비례한다.
 	// 물체가 다른 물체에 놓여있을 때, 진동하는 것을 막기 위해 slop을 적용해준다.
-	XMVECTOR movePerInvMass = contactNormal * (std::max<float>(contactInfo.mPenetration - slop, 0.0f) / totalInvMass);
+	float move = std::max<float>(contactInfo.penetration - slop, 0.0f) / totalInvMass;
+	XMFLOAT3 movePerInvMass = Vector3::Multiply(contactNormal, move);
+	XMFLOAT3 movement1 = Vector3::Multiply(movePerInvMass, obj1->GetInvMass());
+	XMFLOAT3 movement2 = Vector3::Multiply(movePerInvMass, obj2->GetInvMass() * -1.0f);
 
-	XMFLOAT3 objMovement;
 	// 물체를 옮긴다.
-	XMStoreFloat3(&objMovement, movePerInvMass * obj1->GetInvMass());
-	obj1->Move(objMovement);
+	obj1->Move(movement1);
 	// 반대방향으로 옮긴다.
-	XMStoreFloat3(&objMovement, -movePerInvMass * obj2->GetInvMass());
-	obj2->Move(objMovement);
+	obj2->Move(movement2);
 }
 
 bool Physics::Contain(GameObject* obj, const BoundingBox& aabb)
@@ -605,40 +629,4 @@ bool Physics::Contain(GameObject* obj, const BoundingBox& aabb)
 	}
 
 	return false;
-}
-
-ContactInfo Physics::Contact(class GameObject* obj, const DirectX::BoundingSphere& sphere)
-{
-	ContactInfo contactInfo;
-
-	auto objBounding = obj->GetCollisionBounding();
-	switch (obj->GetCollisionType())
-	{
-		case CollisionType::Sphere:
-		{
-			const BoundingSphere& sphere = std::any_cast<BoundingSphere>(objBounding);
-
-			XMVECTOR pos1 = XMLoadFloat3(&obj->GetPosition());
-			XMVECTOR pos2 = XMLoadFloat3(&sphere.Center);
-
-			float radius1 = std::any_cast<BoundingSphere>(obj->GetCollisionBounding()).Radius;
-			float radius2 = sphere.Radius;
-
-			XMVECTOR midLine = pos1 - pos2;
-			float size = XMVectorGetX(XMVector3Length(midLine));
-
-			if (size <= 0.0f || size >= radius1 + radius2)
-				return contactInfo;
-
-			XMVECTOR contactNormal = midLine * (1.0f / size);
-
-			XMStoreFloat3(&contactInfo.mContactNormal, contactNormal);
-			XMStoreFloat3(&contactInfo.mContactPoint, (pos1 + (midLine * 0.5f)));
-			contactInfo.mPenetration = radius1 + radius2 - size;
-
-			break;
-		}
-	}
-
-	return contactInfo;
 }

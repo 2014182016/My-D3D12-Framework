@@ -1,12 +1,8 @@
-#include "pch.h"
-#include "PointLight.h"
-#include "Structure.h"
-
-using namespace DirectX;
+#include <Object/PointLight.h>
 
 PointLight::PointLight(std::string&& name, ID3D12Device* device) : Light(std::move(name))
 {
-	mLightType = LightType::PointLight;
+	lightType = LightType::PointLight;
 }
 
 PointLight::~PointLight() { }

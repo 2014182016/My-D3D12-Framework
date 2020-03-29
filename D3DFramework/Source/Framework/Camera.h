@@ -2,10 +2,9 @@
 // Camera.h by Frank Luna (C) 2011 All Rights Reserved.
 //***************************************************************************************
 
-#ifndef CAMERA_H
-#define CAMERA_H
+#pragma once
 
-#include "pch.h"
+#include <Framework/D3DUtil.h>
 
 class Camera
 {
@@ -15,37 +14,38 @@ public:
 
 public:
 	// fovY는 Degree 기준
-	void SetLens(float fovY, float aspect, float zn, float zf);
+	void SetLens(const float fovY, const float aspect, const float zn, const float zf);
 
-	void LookAt(DirectX::FXMVECTOR pos, DirectX::FXMVECTOR target, DirectX::FXMVECTOR worldUp);
+	void LookAt(const DirectX::FXMVECTOR& pos, const DirectX::FXMVECTOR& target, const DirectX::FXMVECTOR& worldUp);
 	void LookAt(const DirectX::XMFLOAT3& pos, const DirectX::XMFLOAT3& target, const DirectX::XMFLOAT3& up);
 
-	void Strafe(float d);
-	void Walk(float d);
+	void Strafe(const float d);
+	void Walk(const float d);
 
-	void Pitch(float angle);
-	void RotateY(float angle);
+	void Pitch(const float angle);
+	void RotateY(const float angle);
 
+	// 카메라가 이동 및 회전을 하였다면 뷰 행렬을 업데이트한다.
 	void UpdateViewMatrix();
 
 public:
-	DirectX::XMVECTOR GetPosition()const;
-	DirectX::XMFLOAT3 GetPosition3f()const;
-	void SetPosition(float x, float y, float z);
+	XMVECTOR GetPosition()const;
+	XMFLOAT3 GetPosition3f()const;
+	void SetPosition(const float x, const float y, const float z);
 	void SetPosition(const DirectX::XMFLOAT3& v);
 	
-	DirectX::XMVECTOR GetRight()const;
-	DirectX::XMFLOAT3 GetRight3f()const;
-	DirectX::XMVECTOR GetUp()const;
-	DirectX::XMFLOAT3 GetUp3f()const;
-	DirectX::XMVECTOR GetLook()const;
-	DirectX::XMFLOAT3 GetLook3f()const;
+	XMVECTOR GetRight()const;
+	XMFLOAT3 GetRight3f()const;
+	XMVECTOR GetUp()const;
+	XMFLOAT3 GetUp3f()const;
+	XMVECTOR GetLook()const;
+	XMFLOAT3 GetLook3f()const;
 
-	DirectX::XMMATRIX GetView()const;
-	DirectX::XMFLOAT4X4 GetView4x4f()const;
+	XMMATRIX GetView()const;
+	XMFLOAT4X4 GetView4x4f()const;
 
-	DirectX::XMMATRIX GetProj()const;
-	DirectX::XMFLOAT4X4 GetProj4x4f()const;
+	XMMATRIX GetProj()const;
+	XMFLOAT4X4 GetProj4x4f()const;
 
 	float GetNearZ()const;
 	float GetFarZ()const;
@@ -58,29 +58,27 @@ public:
 	float GetFarWindowWidth()const;
 	float GetFarWindowHeight()const;
 
-	DirectX::BoundingFrustum GetWorldCameraBounding() const;
-	inline void SetListener(IDirectSound3DListener8* listener) { mListener = listener; }
+	BoundingFrustum GetWorldCameraBounding() const;
+	void SetListener(IDirectSound3DListener8* listener);
 
 private:
-	DirectX::XMFLOAT3 mPosition = { 0.0f, 0.0f, 0.0f };
-	DirectX::XMFLOAT3 mRight = { 1.0f, 0.0f, 0.0f };
-	DirectX::XMFLOAT3 mUp = { 0.0f, 1.0f, 0.0f };
-	DirectX::XMFLOAT3 mLook = { 0.0f, 0.0f, 1.0f };
+	XMFLOAT3 position = { 0.0f, 0.0f, 0.0f };
+	XMFLOAT3 right = { 1.0f, 0.0f, 0.0f };
+	XMFLOAT3 up = { 0.0f, 1.0f, 0.0f };
+	XMFLOAT3 look = { 0.0f, 0.0f, 1.0f };
 
-	DirectX::XMFLOAT4X4 mView = DirectX::Identity4x4f();
-	DirectX::XMFLOAT4X4 mProj = DirectX::Identity4x4f();
+	XMFLOAT4X4 view = Matrix4x4::Identity();
+	XMFLOAT4X4 proj = Matrix4x4::Identity();
 
-	float mNearZ = 0.0f;
-	float mFarZ = 0.0f;
-	float mAspect = 0.0f;
-	float mFovY = 0.0f;
-	float mNearWindowHeight = 0.0f;
-	float mFarWindowHeight = 0.0f;
+	float nearZ = 0.0f;
+	float farZ = 0.0f;
+	float aspect = 0.0f;
+	float fovY = 0.0f;
+	float nearWindowHeight = 0.0f;
+	float farWindowHeight = 0.0f;
 
-	bool mViewDirty = true;
+	bool viewDirty = true;
 
-	DirectX::BoundingFrustum mCamFrustum;
-	IDirectSound3DListener8* mListener = nullptr;
+	BoundingFrustum camFrustum;
+	IDirectSound3DListener8* listener = nullptr;
 };
-
-#endif // CAMERA_H

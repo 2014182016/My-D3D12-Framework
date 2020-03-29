@@ -1,9 +1,7 @@
-#include "pch.h"
-#include "AssetLoader.h"
-#include "Structure.h"
-#include "Mesh.h"
-
-using namespace DirectX;
+#include <Framework/AssetLoader.h>
+#include <Component/Mesh.h>
+#include <fstream>
+#include <iostream>
 
 bool AssetLoader::LoadH3d(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, const std::wstring fileName,
 	std::vector<Vertex>& vertices, std::vector<std::uint16_t>& indices)
@@ -12,6 +10,8 @@ bool AssetLoader::LoadH3d(ID3D12Device* device, ID3D12GraphicsCommandList* comma
 	char input;
 
 	fin.open(fileName);
+
+	// 파일이 없거나 이름이 잘못된 경우 실패한다.
 	if (fin.fail())
 	{
 #if defined(DEBUG) || defined(_DEBUG)
@@ -23,16 +23,17 @@ bool AssetLoader::LoadH3d(ID3D12Device* device, ID3D12GraphicsCommandList* comma
 	UINT vertexCount;
 	fin >> vertexCount;
 	vertices.reserve(vertexCount);
+
 	for (UINT i = 0; i < vertexCount; ++i)
 	{
 		// h3d파일에서 Vertex에 관한 정보를 읽어온다.
 		Vertex v;
-		fin >> v.mPos.x >> v.mPos.y >> v.mPos.z >> input;
-		fin >> v.mNormal.x >> v.mNormal.y >> v.mNormal.z >> input;
-		fin >> v.mTangentU.x >> v.mTangentU.y >> v.mTangentU.z >> input;
-		fin >> v.mBinormalU.x >> v.mBinormalU.y >> v.mBinormalU.z >> input;
-		fin >> v.mTexC.x >> v.mTexC.y >> input;
-		fin >> v.mColor.x >> v.mColor.y >> v.mColor.z >> v.mColor.w;
+		fin >> v.pos.x >> v.pos.y >> v.pos.z >> input;
+		fin >> v.normal.x >> v.normal.y >> v.normal.z >> input;
+		fin >> v.tangentU.x >> v.tangentU.y >> v.tangentU.z >> input;
+		fin >> v.binormalU.x >> v.binormalU.y >> v.binormalU.z >> input;
+		fin >> v.texC.x >> v.texC.y >> input;
+		fin >> v.color.x >> v.color.y >> v.color.z >> v.color.w;
 
 		vertices.emplace_back(v);
 	}
@@ -40,6 +41,7 @@ bool AssetLoader::LoadH3d(ID3D12Device* device, ID3D12GraphicsCommandList* comma
 	UINT indexCount;
 	fin >> indexCount;
 	indices.reserve(indexCount);
+
 	for (UINT i = 0; i < indexCount; ++i)
 	{
 		// 인덱스 정보를 읽어온다.
@@ -53,7 +55,7 @@ bool AssetLoader::LoadH3d(ID3D12Device* device, ID3D12GraphicsCommandList* comma
 	return true;
 }
 
-bool AssetLoader::ConvertObj(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, std::wstring fileName)
+bool AssetLoader::ConvertObj(const std::wstring fileName)
 {
 	std::vector<XMFLOAT3> positions;
 	std::vector<XMFLOAT2> texcoords;
@@ -62,6 +64,8 @@ bool AssetLoader::ConvertObj(ID3D12Device* device, ID3D12GraphicsCommandList* co
 	std::fstream fin;
 
 	fin.open(fileName);
+
+	// 파일이 없거나 이름이 잘못된 경우 실패한다.
 	if (fin.fail())
 	{
 #if defined(DEBUG) || defined(_DEBUG)
@@ -113,15 +117,16 @@ bool AssetLoader::ConvertObj(ID3D12Device* device, ID3D12GraphicsCommandList* co
 			{
 				FaceIndex f[3];
 				// 반시계 방향으로 정의된 평면을 시계 방향으로 바꾸기 위해 거꾸로 읽는다.
-				fin >> f[2].mPosIndex >> input >> f[2].mTexIndex >> input >> f[2].mNormalIndex;
-				fin >> f[1].mPosIndex >> input >> f[1].mTexIndex >> input >> f[1].mNormalIndex;
-				fin >> f[0].mPosIndex >> input >> f[0].mTexIndex >> input >> f[0].mNormalIndex;
+				fin >> f[2].posIndex >> input >> f[2].texIndex >> input >> f[2].normalIndex;
+				fin >> f[1].posIndex >> input >> f[1].texIndex >> input >> f[1].normalIndex;
+				fin >> f[0].posIndex >> input >> f[0].texIndex >> input >> f[0].normalIndex;
 
 				faceIndices.emplace_back(f[0]);
 				faceIndices.emplace_back(f[1]);
 				faceIndices.emplace_back(f[2]);
 			}
 		}
+
 
 		// 나머지 행을 읽는다.
 		while (input != '\n')
@@ -132,11 +137,11 @@ bool AssetLoader::ConvertObj(ID3D12Device* device, ID3D12GraphicsCommandList* co
 	fin.close();
 
 	std::vector<Vertex> vertices;
-	std::vector<std::uint16_t> indices;
+	std::vector<UINT16> indices;
 	std::vector<FaceIndex> overlapFaceIndices;
-	std::vector<std::uint16_t> overlappedVertexNums;
-	UINT vertexIndex = 0;
-	for (UINT i = 0; i < (UINT)faceIndices.size(); i += 3)
+	std::vector<UINT16> overlappedVertexNums;
+	UINT32 vertexIndex = 0;
+	for (UINT32 i = 0; i < (UINT32)faceIndices.size(); i += 3)
 	{
 		VertexBasic v[3];
 		FaceIndex f[3];
@@ -149,9 +154,9 @@ bool AssetLoader::ConvertObj(ID3D12Device* device, ID3D12GraphicsCommandList* co
 		for (UINT j = 0; j < 3; ++j)
 		{
 			// obj파일의 인덱스는 1부터 시작하므로 -1을 더해준다.
-			v[j].mPos = positions.at(f[j].mPosIndex - 1);
-			v[j].mNormal = normals.at(f[j].mNormalIndex - 1);
-			v[j].mTexC = texcoords.at(f[j].mTexIndex - 1);
+			v[j].pos = positions.at(f[j].posIndex - 1);
+			v[j].normal = normals.at(f[j].normalIndex - 1);
+			v[j].texC = texcoords.at(f[j].texIndex - 1);
 		}
 
 		// 노멀 매핑 및 라이팅에 사용항 TBN을 계산한다.
@@ -162,9 +167,9 @@ bool AssetLoader::ConvertObj(ID3D12Device* device, ID3D12GraphicsCommandList* co
 		// 첫 번째 삽입의 경우 중복되는 정점이 존재할 수 없으므로 삽입한다.
 		if (i == 0)
 		{
-			for (UINT j = 0; j < 3; ++j)
+			for (UINT32 j = 0; j < 3; ++j)
 			{
-				vertices.emplace_back(v[j].mPos, v[j].mNormal, tangent, binormal, v[j].mTexC);
+				vertices.emplace_back(v[j].pos, v[j].normal, tangent, binormal, v[j].texC);
 				indices.emplace_back(vertexIndex);
 				overlapFaceIndices.emplace_back(f[j]);
 				overlappedVertexNums.emplace_back(1);
@@ -175,7 +180,7 @@ bool AssetLoader::ConvertObj(ID3D12Device* device, ID3D12GraphicsCommandList* co
 
 		// obj파일에 기록된 Face 인덱스에는 중복되는 정점 인덱스가 존재한다.
 		// 따라서 정점 버퍼를 만들때에는 중복되는 정점을 제거해야 한다.
-		for (UINT j = 0; j < 3; ++j)
+		for (UINT32 j = 0; j < 3; ++j)
 		{
 			auto iter = std::find(overlapFaceIndices.begin(), overlapFaceIndices.end(), f[j]);
 			// 만약 겹치는 FaceIndex가 존재한다면
@@ -185,16 +190,17 @@ bool AssetLoader::ConvertObj(ID3D12Device* device, ID3D12GraphicsCommandList* co
 				UINT index = (UINT)std::distance(overlapFaceIndices.begin(), iter);
 				++overlappedVertexNums[index];
 				indices.emplace_back(index);
+
 				// 중복되는 TBN을 더한다.
-				vertices[index].mNormal = vertices[index].mNormal + v[j].mNormal;
-				vertices[index].mTangentU = vertices[index].mTangentU + tangent;
-				vertices[index].mBinormalU = vertices[index].mBinormalU + binormal;
+				vertices[index].normal = Vector3::Add(vertices[index].normal, v[j].normal);
+				vertices[index].tangentU = Vector3::Add(vertices[index].tangentU, tangent); 
+				vertices[index].binormalU = Vector3::Add(vertices[index].binormalU, binormal);
 			}
 			// 아니라면
 			else
 			{
 				// 새로운 정점과 인덱스를 삽입한다.
-				vertices.emplace_back(v[j].mPos, v[j].mNormal, tangent, binormal, v[j].mTexC);
+				vertices.emplace_back(v[j].pos, v[j].normal, tangent, binormal, v[j].texC);
 				indices.emplace_back(vertexIndex);
 				overlapFaceIndices.emplace_back(f[j]);
 				overlappedVertexNums.emplace_back(1);
@@ -203,25 +209,26 @@ bool AssetLoader::ConvertObj(ID3D12Device* device, ID3D12GraphicsCommandList* co
 		}
 	}
 
-	for (size_t i = 0; i < overlappedVertexNums.size(); ++i)
+	for (UINT32 i = 0; i < (UINT32)overlappedVertexNums.size(); ++i)
 	{
 		// 중복되는 TBN을 나누어 평균을 구한다.
 		auto n = overlappedVertexNums[i];
-		vertices[i].mNormal = vertices[i].mNormal / n;
-		vertices[i].mTangentU = vertices[i].mTangentU / n;
-		vertices[i].mBinormalU = vertices[i].mBinormalU / n;
+		vertices[i].normal = Vector3::Divide(vertices[i].normal, n);
+		vertices[i].tangentU = Vector3::Divide(vertices[i].tangentU, n);
+		vertices[i].binormalU = Vector3::Divide(vertices[i].binormalU, n);
 	}
-
-	fileName.erase(fileName.size() - 4, 4); // fileName에서 obj 포맷 string을 지운다.
-	ObjToH3d(vertices, indices, fileName); // obj파일은 h3d파일로 변환한다.
+	
+	// obj파일은 h3d파일로 변환한다.
+	ObjToH3d(vertices, indices, fileName); 
 
 	return true;
 }
 
-void AssetLoader::ObjToH3d(const std::vector<Vertex>& vertices, const std::vector<std::uint16_t> indices, std::wstring fileName)
+void AssetLoader::ObjToH3d(const std::vector<Vertex>& vertices, const std::vector<std::uint16_t>& indices, std::wstring fileName)
 {
-	std::wstring fileFormat = L".h3d";
-	fileName += fileFormat;
+	static const std::wstring fileFormat = L".h3d";
+	fileName.erase(fileName.size() - 4, 4); // fileName에서 obj 포맷 string을 지운다.
+	fileName += fileFormat; // 파일에 h3d 파일형식을 붙인다.
 
 	std::ofstream fout(fileName);
 
@@ -229,12 +236,12 @@ void AssetLoader::ObjToH3d(const std::vector<Vertex>& vertices, const std::vecto
 	for (const auto& vertex : vertices)
 	{
 		// 파일에 Vertex에 관한 정보를 쓴다.
-		fout << vertex.mPos.x << " " << vertex.mPos.y << " " << vertex.mPos.z << " / ";
-		fout << vertex.mNormal.x << " " << vertex.mNormal.y << " " << vertex.mNormal.z << " / ";
-		fout << vertex.mTangentU.x << " " << vertex.mTangentU.y << " " << vertex.mTangentU.z << " / ";
-		fout << vertex.mBinormalU.x << " " << vertex.mBinormalU.y << " " << vertex.mBinormalU.z << " / ";
-		fout << vertex.mTexC.x << " " << vertex.mTexC.y << " / ";
-		fout << vertex.mColor.x << " " << vertex.mColor.y << " " << vertex.mColor.z << " " << vertex.mColor.w << std::endl;
+		fout << vertex.pos.x << " " << vertex.pos.y << " " << vertex.pos.z << " / ";
+		fout << vertex.normal.x << " " << vertex.normal.y << " " << vertex.normal.z << " / ";
+		fout << vertex.tangentU.x << " " << vertex.tangentU.y << " " << vertex.tangentU.z << " / ";
+		fout << vertex.binormalU.x << " " << vertex.binormalU.y << " " << vertex.binormalU.z << " / ";
+		fout << vertex.texC.x << " " << vertex.texC.y << " / ";
+		fout << vertex.color.x << " " << vertex.color.y << " " << vertex.color.z << " " << vertex.color.w << std::endl;
 	}
 
 	fout << indices.size() << std::endl; // Index Count
@@ -253,12 +260,12 @@ void AssetLoader::CalculateTBN(const VertexBasic& v1, const VertexBasic& v2, con
 	XMVECTOR pv1, pv2;
 	XMVECTOR tu1, tv1;
 
-	XMVECTOR p1 = XMLoadFloat3(&v1.mPos);
-	XMVECTOR p2 = XMLoadFloat3(&v2.mPos);
-	XMVECTOR p3 = XMLoadFloat3(&v3.mPos);
-	XMVECTOR t1 = XMLoadFloat2(&v1.mTexC);
-	XMVECTOR t2 = XMLoadFloat2(&v2.mTexC);
-	XMVECTOR t3 = XMLoadFloat2(&v3.mTexC);
+	XMVECTOR p1 = XMLoadFloat3(&v1.pos);
+	XMVECTOR p2 = XMLoadFloat3(&v2.pos);
+	XMVECTOR p3 = XMLoadFloat3(&v3.pos);
+	XMVECTOR t1 = XMLoadFloat2(&v1.texC);
+	XMVECTOR t2 = XMLoadFloat2(&v2.texC);
+	XMVECTOR t3 = XMLoadFloat2(&v3.texC);
 
 	// 현재 표면의 두 벡터를 계산한다.
 	pv1 = p2 - p1;
@@ -301,7 +308,7 @@ void AssetLoader::CalculateTBN(const VertexBasic& v1, const VertexBasic& v2, con
 }
 
 
-FILE* AssetLoader::LoadWave(IDirectSound8* d3dSound, const std::string fileName, WaveHeaderType& header)
+FILE* AssetLoader::LoadWave(const std::string fileName, WaveHeaderType& header)
 {
 	FILE* filePtr = nullptr;
 	if (fopen_s(&filePtr, fileName.c_str(), "rb") != 0)

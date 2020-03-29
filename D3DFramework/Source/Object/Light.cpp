@@ -1,40 +1,38 @@
-#include "pch.h"
-#include "Light.h"
-#include "Structure.h"
-#include "Interface.h"
-
-using namespace DirectX;
+#include <Object/Light.h>
+#include <Framework/ShadowMap.h>
 
 Light::Light(std::string&& name) : Object(std::move(name)) { }
 
 Light::~Light() { }
 
-void Light::SetStrength(float r, float g, float b)
-{
-	mStrength.x = r;
-	mStrength.y = g;
-	mStrength.z = b;
-}
-
-void Light::SetShadowMapSize(float width, float height)
-{
-	mShadowMapSize.x = width;
-	mShadowMapSize.y = height;
-}
-
 void Light::SetLightData(LightData& lightData)
 {
-	lightData.mPosition = GetPosition();
-	lightData.mDirection = GetLook();
-	lightData.mStrength = mStrength;
-	lightData.mFalloffStart = mFalloffStart;
-	lightData.mFalloffEnd = mFalloffEnd;
-	lightData.mSpotAngle = mSpotAngle;
-	lightData.mType = (std::uint32_t)mLightType;
-	lightData.mEnabled = mEnabled;
+	lightData.position = position;
+	lightData.direction = GetLook();
+	lightData.strength = strength;
+	lightData.falloffStart = falloffStart;
+	lightData.falloffEnd = falloffEnd;
+	lightData.spotAngle = spotAngle;
+	lightData.type = (UINT32)lightType;
+	lightData.enabled = enabled;
 }
 
 void Light::RenderSceneToShadowMap(ID3D12GraphicsCommandList* cmdList)
 {
-	mShadowMap->RenderSceneToShadowMap(cmdList, &mLightFrustum);
+	shadowMap->RenderSceneToShadowMap(cmdList, &lightFrustum);
+}
+
+ShadowMap* Light::GetShadowMap()
+{
+	return shadowMap.get();
+}
+
+XMMATRIX Light::GetView() const
+{
+	return XMLoadFloat4x4(&view);
+}
+
+XMMATRIX  Light::GetProj() const
+{
+	return XMLoadFloat4x4(&proj);
 }
