@@ -1,6 +1,7 @@
-#include <Framework/Ssr.h>
-#include <Framework/D3DUtil.h>
-#include <Framework/Enumeration.h>
+#include "../PrecompiledHeader/pch.h"
+#include "Ssr.h"
+#include "D3DUtil.h"
+#include "Enumeration.h"
 
 Ssr::Ssr(ID3D12Device* device, const UINT32 width, const UINT32 height)
 {

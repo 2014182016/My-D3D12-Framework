@@ -1,8 +1,9 @@
-#include <Framework/InputManager.h>
-#include <Framework/D3DFramework.h>
-#include <Framework/Camera.h>
-#include <Framework/Physics.h>
-#include <Framework/D3DDebug.h>
+#include "../PrecompiledHeader/pch.h"
+#include "InputManager.h"
+#include "D3DFramework.h"
+#include "Camera.h"
+#include "Physics.h"
+#include "D3DDebug.h"
 
 InputManager::InputManager()
 {

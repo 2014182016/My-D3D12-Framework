@@ -2,7 +2,8 @@
 // Camera.h by Frank Luna (C) 2011 All Rights Reserved.
 //***************************************************************************************
 
-#include <Framework/Camera.h>
+#include "../PrecompiledHeader/pch.h"
+#include "Camera.h"
 
 Camera::Camera()
 {

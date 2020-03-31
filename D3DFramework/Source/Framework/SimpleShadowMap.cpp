@@ -2,9 +2,10 @@
 // SimpleShadowMap.cpp by Frank Luna (C) 2011 All Rights Reserved.
 //***************************************************************************************
 
-#include <Framework/SimpleShadowMap.h>
-#include <Framework/D3DFramework.h>
-#include <Object/GameObject.h>
+#include "../PrecompiledHeader/pch.h"
+#include "SimpleShadowMap.h"
+#include "D3DFramework.h"
+#include "../Object/GameObject.h"
 
 SimpleShadowMap::SimpleShadowMap(const UINT32 width, const UINT32 height)
 {

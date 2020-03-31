@@ -1,5 +1,7 @@
-#include <Object/Light.h>
-#include <Framework/ShadowMap.h>
+#include "../PrecompiledHeader/pch.h"
+#include "Light.h"
+#include "../Framework/ShadowMap.h"
+
 
 Light::Light(std::string&& name) : Object(std::move(name)) { }
 

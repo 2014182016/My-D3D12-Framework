@@ -1,8 +1,7 @@
-#include <Object/Terrain.h>
-#include <Framework/D3DInfo.h>
-#include <Component/Mesh.h>
-#include <vector>
-#include <algorithm>
+#include "../PrecompiledHeader/pch.h"
+#include "Terrain.h"
+#include "../Component/Mesh.h"
+#include "../Framework/D3DInfo.h"
 
 Terrain::Terrain(std::string&& name) : Object(std::move(name)) 
 {

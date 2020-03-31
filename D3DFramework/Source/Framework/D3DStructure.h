@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Framework/Vector.h>
+#include "Vector.h"
 #include <basetsd.h>
 
 struct ObjectConstants

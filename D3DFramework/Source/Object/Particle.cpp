@@ -1,8 +1,8 @@
-#include <Object/Particle.h>
-#include <Framework/D3DInfo.h>
-#include <Framework/Random.h>
-#include <Component/Material.h>
-#include <iostream>
+#include "../PrecompiledHeader/pch.h"
+#include "Particle.h"
+#include "../Component/Material.h"
+#include "../Framework/D3DInfo.h"
+#include "../Framework/Random.h"
 
 Particle::Particle(std::string&& name, int maxParticleNum) : Object(std::move(name))
 {
@@ -12,7 +12,7 @@ Particle::Particle(std::string&& name, int maxParticleNum) : Object(std::move(na
 		std::cout << "MaxParticleNum is a negative quantity";
 #endif
 	}
-	maxParticleNum = maxParticleNum;
+	this->maxParticleNum = maxParticleNum;
 }
 
 Particle::~Particle()

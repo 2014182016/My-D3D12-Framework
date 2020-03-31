@@ -1,16 +1,15 @@
+#include "../PrecompiledHeader/pch.h"
+#include "AssetManager.h"
 #include "DDSTextureLoader.h"
-#include <Framework/AssetManager.h>
-#include <Framework/DDSTextureLoader.h>
-#include <Component/Material.h>
-#include <Component/Mesh.h>
-#include <Component/Sound.h>
-#include <iostream>
+#include "../Component/Material.h"
+#include "../Component/Mesh.h"
+#include "../Component/Sound.h"
 
 using namespace std::literals;
 
-static const std::wstring texturePath = L"../Assets/Textures/";
-static const std::wstring modelPath = L"../Assets/Models/";
-static const std::string soundPath = "../Assets/Sounds/";
+static const std::wstring texturePath = L"Assets/Textures/";
+static const std::wstring modelPath = L"Assets/Models/";
+static const std::string soundPath = "Assets/Sounds/";
 
 AssetManager* AssetManager::GetInstance()
 {

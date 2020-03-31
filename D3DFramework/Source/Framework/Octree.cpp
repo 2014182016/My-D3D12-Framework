@@ -1,10 +1,10 @@
-#include <Framework/Octree.h>
-#include <Framework/Enumeration.h>
-#include <Framework/D3DDebug.h>
-#include <Framework/Physics.h>
-#include <Component/Mesh.h>
-#include <Object/GameObject.h>
-#include <iostream>
+#include "../PrecompiledHeader/pch.h"
+#include "Octree.h"
+#include "Enumeration.h"
+#include "D3DDebug.h"
+#include "Physics.h"
+#include "../Component/Mesh.h"
+#include "../Object/GameObject.h"
 
 inline XMFLOAT3 operator+(const XMFLOAT3& lhs, const XMFLOAT3& rhs)
 {

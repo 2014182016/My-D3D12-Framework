@@ -1,4 +1,5 @@
-#include <Component/Component.h>
+#include "../PrecompiledHeader/pch.h"
+#include "Component.h"
 
 Component::Component(std::string&& name) : mName(std::move(name)) 
 {

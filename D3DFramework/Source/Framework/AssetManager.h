@@ -1,19 +1,22 @@
 #pragma once
 
-#include <Framework/AssetLoader.h>
-#include <Framework/D3DUtil.h>
-#include <Framework/Enumeration.h>
+#include "Enumeration.h"
+#include "AssetLoader.h"
+#include <memory>
 #include <unordered_map>
+#include <wrl.h>
 
 class Mesh;
 class Material;
 class Sound;
+struct IDirectSound8;
+struct ID3D12Resource;
 
 struct Texture
 {
 	std::string name;
 	std::wstring filename;
-	std::uint32_t textureIndex;
+	UINT32 textureIndex;
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12Resource> uploadHeap = nullptr;

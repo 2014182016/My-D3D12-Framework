@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Framework/Vector.h>
+#include "Vector.h"
 
 /*
 랜덤한 수를 반환하는 클래스

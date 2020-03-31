@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Object/Light.h>
+#include "Light.h"
 
 /*
 한 지점에서 원뿔 모양의 빛을 내뿜는다.

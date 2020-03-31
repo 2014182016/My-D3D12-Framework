@@ -1,9 +1,13 @@
 #pragma once
 
-#include <Framework/D3DUtil.h>
-#include <Framework/D3DStructure.h>
-#include <Framework/Defines.h>
-#include <Framework/Enumeration.h>
+#include "../Framework/D3DStructure.h"
+#include "../Framework/Defines.h"
+#include "../Framework/Enumeration.h"
+#include "../Framework/d3dx12.h"
+#include <basetsd.h>
+#include <wrl.h>
+#include <memory>
+#include <string>
 
 /*
 프레임워크에 사용되는 객체들의 기반이 되는 클래스

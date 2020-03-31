@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Component/Component.h>
+#include "../Component/Component.h"
 
 /*
 공간 상에서 움직일 수 있는 물체

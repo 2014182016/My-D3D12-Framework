@@ -1,6 +1,8 @@
 #pragma once
 
-#include <Framework/D3DUtil.h>
+#include "d3dx12.h"
+#include <basetsd.h>
+#include <DirectXCollision.h>
 
 /*
 쉐도우 맵 관련 클래스는 이 인터페이스를 상속받는다.

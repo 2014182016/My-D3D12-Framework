@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Object/Light.h>
+#include "Light.h"
 
 /*
 태양과 같이 무한히 먼 거리에서 오는 빛

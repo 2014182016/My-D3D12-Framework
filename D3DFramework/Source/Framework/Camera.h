@@ -4,7 +4,10 @@
 
 #pragma once
 
-#include <Framework/D3DUtil.h>
+#include "Vector.h"
+#include <DirectXCollision.h>
+
+struct IDirectSound3DListener;
 
 class Camera
 {
@@ -16,8 +19,8 @@ public:
 	// fovY´Â Degree ±âÁØ
 	void SetLens(const float fovY, const float aspect, const float zn, const float zf);
 
-	void LookAt(const DirectX::FXMVECTOR& pos, const DirectX::FXMVECTOR& target, const DirectX::FXMVECTOR& worldUp);
-	void LookAt(const DirectX::XMFLOAT3& pos, const DirectX::XMFLOAT3& target, const DirectX::XMFLOAT3& up);
+	void LookAt(const FXMVECTOR& pos, const FXMVECTOR& target, const FXMVECTOR& worldUp);
+	void LookAt(const XMFLOAT3& pos, const XMFLOAT3& target, const XMFLOAT3& up);
 
 	void Strafe(const float d);
 	void Walk(const float d);

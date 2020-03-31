@@ -6,8 +6,8 @@
 // Performs a blur operation on the topmost mip level of an input texture.
 //***************************************************************************************
 
-#include <Framework/D3DUtil.h>
-#include <vector>
+#include "d3dx12.h"
+#include <wrl.h>
 
 #define NUM_THREADS 256.0f
 

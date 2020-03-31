@@ -2,8 +2,11 @@
 
 #pragma comment(lib, "pdh.lib")
 
-#include <string>
 #include <Pdh.h>
+#include <memory>
+#include <basetsd.h>
+#include <string>
+#include <Windows.h>
 
 // 거의 사용되지 않는 내용은 Windows 헤더에서 제외합니다.
 #ifndef WIN32_LEAN_AND_MEAN
@@ -11,7 +14,6 @@
 #endif
 
 class GameTimer;
-class InputManager;
 
 /*
 WinApi를 사용하기 위한 클래스
@@ -38,12 +40,10 @@ public:
 
 protected:
 	virtual void OnResize(const INT32 screenWidth, const INT32 screenHeight);
-	virtual void Tick(float deltaTime);
+	virtual void Tick(float deltaTime) { }
 	virtual void Render() { };
 
 public:
-	void Update();
-	
 	float GetAspectRatio() const;
 	HINSTANCE GetAppInst() const;
 	INT32 GetScreenWidth() const;

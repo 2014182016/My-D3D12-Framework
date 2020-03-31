@@ -1,6 +1,7 @@
-#include <Framework/D3DDebug.h>
-#include <Framework/D3DStructure.h>
-#include <Component/Mesh.h>
+#include "../PrecompiledHeader/pch.h"
+#include "D3DDebug.h"
+#include "D3DStructure.h"
+#include "../Component/Mesh.h"
 
 using namespace std::literals;
 

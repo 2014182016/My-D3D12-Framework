@@ -1,7 +1,7 @@
-#include <Framework/Physics.h>
-#include <Component/Mesh.h>
-#include <Object/GameObject.h>
-#include <algorithm>
+#include "../PrecompiledHeader/pch.h"
+#include "Physics.h"
+#include "../Component/Mesh.h"
+#include "../Object/GameObject.h"
 
 /*
 해당 객체가 AABB 혹은 OBB일 경우 

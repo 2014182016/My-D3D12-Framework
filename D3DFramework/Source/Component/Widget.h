@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Component/Component.h>
-#include <Framework/Renderable.h>
+#include "Component.h"
+#include "../Framework/Renderable.h"
 
 class Material;
 class Mesh;

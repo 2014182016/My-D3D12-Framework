@@ -1,4 +1,5 @@
-#include <Framework/Random.h>
+#include "../PrecompiledHeader/pch.h"
+#include "Random.h"
 #include <random>
 
 float Random::GetRandomFloat(float min, float max)

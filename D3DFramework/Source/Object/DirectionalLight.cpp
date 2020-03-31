@@ -1,5 +1,6 @@
-#include <Object/DirectionalLight.h>
-#include <Framework/SimpleShadowMap.h>
+#include "../PrecompiledHeader/pch.h"
+#include "DirectionalLight.h"
+#include "../Framework/SimpleShadowMap.h"
 
 DirectionalLight::DirectionalLight(std::string&& name, ID3D12Device* device) : Light(std::move(name))
 {

@@ -1,8 +1,11 @@
 #pragma once
 
-#include <Component/Component.h>
+#include "Component.h"
 
 struct WaveHeaderType;
+struct IDirectSound8;
+struct IDirectSoundBuffer8;
+struct IDirectSound3DBuffer;
 
 /*
 소리에 관한 정보를 관리하는 클래스

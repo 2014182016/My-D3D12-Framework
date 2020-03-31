@@ -1,6 +1,7 @@
 #pragma once
 
-#include <Component/Component.h>
+#include "Component.h"
+#include "../Framework/Vector.h"
 
 /*
 물체의 재질을 표현하는 클래스

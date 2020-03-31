@@ -1,6 +1,6 @@
-#include <Component/Sound.h>
-#include <Framework/AssetLoader.h>
-#include <algorithm>
+#include "../PrecompiledHeader/pch.h"
+#include "Sound.h"
+#include "../Framework/AssetLoader.h"
 
 Sound::Sound(std::string&& name) : Component(std::move(name)){ }
 

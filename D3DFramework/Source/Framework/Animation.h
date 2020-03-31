@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Framework/D3DUtil.h>
+#include "Vector.h"
 #include <vector>
 #include <unordered_map>
 
@@ -14,9 +14,9 @@ struct Keyframe
 	float timePos = 0.0f;
 
 	// 해당 프레임에서의 정보이다.
-	XMFLOAT3 translation = XMFLOAT3(0.0f, 0.0f, 0.0f);
-	XMFLOAT3 scale = XMFLOAT3(1.0f, 1.0f, 1.0f);
-	XMFLOAT4 rotationQuat = XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);
+	XMFLOAT3 translation = { 0.0f, 0.0f, 0.0f };
+	XMFLOAT3 scale = { 1.0f, 1.0f, 1.0f };
+	XMFLOAT4 rotationQuat = { 0.0f, 0.0f, 0.0f, 1.0f };
 };
 
 /*

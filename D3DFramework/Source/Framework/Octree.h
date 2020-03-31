@@ -1,10 +1,8 @@
 #pragma once
 
-#include <DirectXCollision.h>
-#include <list>
 #include <memory>
-#include <basetsd.h>
-#include <vector>
+#include <list>
+#include <DirectXCollision.h>
 
 class GameObject;
 

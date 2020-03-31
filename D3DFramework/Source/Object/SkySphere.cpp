@@ -1,4 +1,5 @@
-#include <Object/SkySphere.h>
+#include "../PrecompiledHeader/pch.h"
+#include "SkySphere.h"
 
 SkySphere::SkySphere(std::string&& name) : GameObject(std::move(name)) { }
 

@@ -2,9 +2,10 @@
 // BlurFilter.cpp by Frank Luna (C) 2011 All Rights Reserved.
 //***************************************************************************************
 
-#include <Framework/BlurFilter.h>
-#include <Framework/Enumeration.h>
-#include <Framework/D3DInfo.h>
+#include "../PrecompiledHeader/pch.h"
+#include "BlurFilter.h"
+#include "Enumeration.h"
+#include "D3DInfo.h"
 
 BlurFilter::BlurFilter(ID3D12Device* device, const UINT32 newWidth, const UINT32 newHeight, const DXGI_FORMAT newFormat)
 {

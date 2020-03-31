@@ -1,4 +1,5 @@
-#include <Object/PointLight.h>
+#include "../PrecompiledHeader/pch.h"
+#include "PointLight.h"
 
 PointLight::PointLight(std::string&& name, ID3D12Device* device) : Light(std::move(name))
 {

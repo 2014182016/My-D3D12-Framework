@@ -2,11 +2,11 @@
 // Ssao.cpp by Frank Luna (C) 2011 All Rights Reserved.
 //***************************************************************************************
 
-#include <Framework/Ssao.h>
-#include <Framework/D3DInfo.h>
-#include <Framework/Random.h>
-#include <Framework/Enumeration.h>
-#include <vector>
+#include "../PrecompiledHeader/pch.h"
+#include "Ssao.h"
+#include "D3DInfo.h"
+#include "Random.h"
+#include "Enumeration.h"
 
 Ssao::Ssao(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, const UINT32 width, const UINT32 height)
 {

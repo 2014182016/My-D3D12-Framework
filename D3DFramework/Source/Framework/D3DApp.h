@@ -6,15 +6,19 @@
 #pragma comment(linker, "/entry:WinMainCRTStartup /subsystem:console")
 #endif
 
-#include <Framework/WinApp.h>
-#include <Framework/D3DUtil.h>
-#include <Framework/D3DInfo.h>
-#include <Framework/D3DStructure.h>
-#include <Framework/Defines.h>
-#include <Framework/Enumeration.h>
-#include <unordered_map>
+#include "WinApp.h"
+#include "D3DInfo.h"
+#include "D3DStructure.h"
+#include "Defines.h"
+#include "Enumeration.h"
+#include "d3dx12.h"
+#include <dxgi1_4.h>
+#include <dsound.h>
 #include <bitset>
 #include <array>
+#include <wrl.h>
+#include <vector>
+#include <unordered_map>
 
 class D3DApp : public WinApp
 {

@@ -1,6 +1,10 @@
 #pragma once
 
-#include <Framework/D3DUtil.h>
+#include "d3dx12.h"
+#include "Vector.h"
+#include <basetsd.h>
+#include <vector>
+#include <wrl.h>
 
 /*
 지연 렌더링의 G버퍼를 사용하여 객체의 반사된

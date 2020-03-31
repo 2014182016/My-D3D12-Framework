@@ -1,7 +1,8 @@
-#include <Component/Widget.h>
-#include <Component/Mesh.h>
-#include <Framework/D3DInfo.h>
-#include <vector>
+#include "../PrecompiledHeader/pch.h"
+#include "Widget.h"
+#include "Mesh.h"
+#include "../Framework/D3DInfo.h"
+
 
 Widget::Widget(std::string&& name, ID3D12Device* device, ID3D12GraphicsCommandList* commandList) : Component(std::move(name))
 {

@@ -1,10 +1,9 @@
-#include <Framework/AssetLoader.h>
-#include <Component/Mesh.h>
-#include <fstream>
-#include <iostream>
+#include "../PrecompiledHeader/pch.h"
+#include "AssetLoader.h"
+#include "../Component/Mesh.h"
 
 bool AssetLoader::LoadH3d(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, const std::wstring fileName,
-	std::vector<Vertex>& vertices, std::vector<std::uint16_t>& indices)
+	std::vector<Vertex>& vertices, std::vector<UINT16>& indices)
 {
 	std::fstream fin;
 	char input;
@@ -224,7 +223,7 @@ bool AssetLoader::ConvertObj(const std::wstring fileName)
 	return true;
 }
 
-void AssetLoader::ObjToH3d(const std::vector<Vertex>& vertices, const std::vector<std::uint16_t>& indices, std::wstring fileName)
+void AssetLoader::ObjToH3d(const std::vector<Vertex>& vertices, const std::vector<UINT16>& indices, std::wstring fileName)
 {
 	static const std::wstring fileFormat = L".h3d";
 	fileName.erase(fileName.size() - 4, 4); // fileName에서 obj 포맷 string을 지운다.

@@ -1,7 +1,8 @@
-#include <Object/GameObject.h>
-#include <Component/Mesh.h>
-#include <Framework/Physics.h>
-#include <Framework/D3DInfo.h>
+#include "../PrecompiledHeader/pch.h"
+#include "GameObject.h"
+#include "../Component/Mesh.h"
+#include "../Framework/Physics.h"
+#include "../Framework/D3DInfo.h"
 
 GameObject::GameObject(std::string&& name) : Object(std::move(name)) { }
 

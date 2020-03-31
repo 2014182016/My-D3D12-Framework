@@ -1,4 +1,5 @@
-#include <Component/Material.h>
+#include "../PrecompiledHeader/pch.h"
+#include "Material.h"
 
 Material::Material(std::string&& name) : Component(std::move(name))
 {

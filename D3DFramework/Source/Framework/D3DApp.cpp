@@ -1,9 +1,12 @@
-#include <Framework/D3DApp.h>
-#include <Framework/Ssao.h>
-#include <Framework/Ssr.h>
-#include <Framework/AssetManager.h>
+#include "../PrecompiledHeader/pch.h"
+#include "D3DApp.h"
+#include "Ssao.h"
+#include "Ssr.h"
+#include "AssetManager.h"
 
 using Microsoft::WRL::ComPtr;
+
+static const std::wstring shaderPath = L"Shaders\\";
 
 D3DApp::D3DApp(HINSTANCE hInstance, const INT32 screenWidth, const INT32 screenHeight, 
 	const std::wstring applicationName, const bool useWinApi)
@@ -1153,72 +1156,74 @@ void D3DApp::CreateShadersAndInputLayout()
 	};
 #endif
 
-	shaders["ForwardVS"] = D3DUtil::CompileShader(L"Shaders\\Forward.hlsl", nullptr, "VS", "vs_5_1");
-	shaders["ForwardPS"] = D3DUtil::CompileShader(L"Shaders\\Forward.hlsl", defines, "PS", "ps_5_1");
+	shaders["ForwardVS"] = D3DUtil::CompileShader(shaderPath + L"Forward.hlsl", nullptr, "VS", "vs_5_1");
+	shaders["ForwardPS"] = D3DUtil::CompileShader(shaderPath + L"Forward.hlsl", defines, "PS", "ps_5_1");
 
-	shaders["OpaqueVS"] = D3DUtil::CompileShader(L"Shaders\\Opaque.hlsl", nullptr, "VS", "vs_5_1");
-	shaders["OpaquePS"] = D3DUtil::CompileShader(L"Shaders\\Opaque.hlsl", nullptr, "PS", "ps_5_1");
+	shaders["OpaqueVS"] = D3DUtil::CompileShader(shaderPath + L"Opaque.hlsl", nullptr, "VS", "vs_5_1");
+	shaders["OpaquePS"] = D3DUtil::CompileShader(shaderPath + L"Opaque.hlsl", nullptr, "PS", "ps_5_1");
 
-	shaders["WireframeVS"] = D3DUtil::CompileShader(L"Shaders\\Wireframe.hlsl", nullptr, "VS", "vs_5_1");
-	shaders["WireframePS"] = D3DUtil::CompileShader(L"Shaders\\Wireframe.hlsl", nullptr, "PS", "ps_5_1");
+	shaders["WireframeVS"] = D3DUtil::CompileShader(shaderPath + L"Wireframe.hlsl", nullptr, "VS", "vs_5_1");
+	shaders["WireframePS"] = D3DUtil::CompileShader(shaderPath + L"Wireframe.hlsl", nullptr, "PS", "ps_5_1");
 
-	shaders["SkyVS"] = D3DUtil::CompileShader(L"Shaders\\Sky.hlsl", nullptr, "VS", "vs_5_1");
-	shaders["SkyPS"] = D3DUtil::CompileShader(L"Shaders\\Sky.hlsl", nullptr, "PS", "ps_5_1");
+	shaders["SkyVS"] = D3DUtil::CompileShader(shaderPath + L"Sky.hlsl", nullptr, "VS", "vs_5_1");
+	shaders["SkyPS"] = D3DUtil::CompileShader(shaderPath + L"Sky.hlsl", nullptr, "PS", "ps_5_1");
 
-	shaders["ShadowMapVS"] = D3DUtil::CompileShader(L"Shaders\\ShadowMap.hlsl", nullptr, "VS", "vs_5_1");
-	shaders["ShadowMapPS"] = D3DUtil::CompileShader(L"Shaders\\ShadowMap.hlsl", nullptr, "PS", "ps_5_1");
+	shaders["ShadowMapVS"] = D3DUtil::CompileShader(shaderPath + L"ShadowMap.hlsl", nullptr, "VS", "vs_5_1");
+	shaders["ShadowMapPS"] = D3DUtil::CompileShader(shaderPath + L"ShadowMap.hlsl", nullptr, "PS", "ps_5_1");
 
-	shaders["WidgetVS"] = D3DUtil::CompileShader(L"Shaders\\Widget.hlsl", nullptr, "VS", "vs_5_1");
-	shaders["WidgetPS"] = D3DUtil::CompileShader(L"Shaders\\Widget.hlsl", nullptr, "PS", "ps_5_1");
+	shaders["WidgetVS"] = D3DUtil::CompileShader(shaderPath + L"Widget.hlsl", nullptr, "VS", "vs_5_1");
+	shaders["WidgetPS"] = D3DUtil::CompileShader(shaderPath + L"Widget.hlsl", nullptr, "PS", "ps_5_1");
 
-	shaders["ParticleRenderVS"] = D3DUtil::CompileShader(L"Shaders\\ParticleRender.hlsl", nullptr, "VS", "vs_5_1");
-	shaders["ParticleRenderGS"] = D3DUtil::CompileShader(L"Shaders\\ParticleRender.hlsl", nullptr, "GS", "gs_5_1");
-	shaders["ParticleRenderPS"] = D3DUtil::CompileShader(L"Shaders\\ParticleRender.hlsl", nullptr, "PS", "ps_5_1");
+	shaders["ParticleRenderVS"] = D3DUtil::CompileShader(shaderPath + L"ParticleRender.hlsl", nullptr, "VS", "vs_5_1");
+	shaders["ParticleRenderGS"] = D3DUtil::CompileShader(shaderPath + L"ParticleRender.hlsl", nullptr, "GS", "gs_5_1");
+	shaders["ParticleRenderPS"] = D3DUtil::CompileShader(shaderPath + L"ParticleRender.hlsl", nullptr, "PS", "ps_5_1");
 
-	shaders["ParticleUpdateCS"] = D3DUtil::CompileShader(L"Shaders\\ParticleCompute.hlsl", nullptr, "CS_Update", "cs_5_1");
-	shaders["ParticleEmitCS"] = D3DUtil::CompileShader(L"Shaders\\ParticleCompute.hlsl", nullptr, "CS_Emit", "cs_5_1");
+	shaders["ParticleUpdateCS"] = D3DUtil::CompileShader(shaderPath + L"ParticleCompute.hlsl", nullptr, "CS_Update", "cs_5_1");
+	shaders["ParticleEmitCS"] = D3DUtil::CompileShader(shaderPath + L"ParticleCompute.hlsl", nullptr, "CS_Emit", "cs_5_1");
 
-	shaders["BillboardVS"] = D3DUtil::CompileShader(L"Shaders\\Billboard.hlsl", nullptr, "VS", "vs_5_1");
-	shaders["BillboardGS"] = D3DUtil::CompileShader(L"Shaders\\Billboard.hlsl", nullptr, "GS", "gs_5_1");
-	shaders["BillboardPS"] = D3DUtil::CompileShader(L"Shaders\\Billboard.hlsl", nullptr, "PS", "ps_5_1");
+	shaders["BillboardVS"] = D3DUtil::CompileShader(shaderPath + L"Billboard.hlsl", nullptr, "VS", "vs_5_1");
+	shaders["BillboardGS"] = D3DUtil::CompileShader(shaderPath + L"Billboard.hlsl", nullptr, "GS", "gs_5_1");
+	shaders["BillboardPS"] = D3DUtil::CompileShader(shaderPath + L"Billboard.hlsl", nullptr, "PS", "ps_5_1");
 
-	shaders["DebugVS"] = D3DUtil::CompileShader(L"Shaders\\Debug.hlsl", nullptr, "VS", "vs_5_1");
-	shaders["DebugPS"] = D3DUtil::CompileShader(L"Shaders\\Debug.hlsl", nullptr, "PS", "ps_5_1");
+#if defined(DEBUG) || defined(_DEBUG)
+	shaders["DebugVS"] = D3DUtil::CompileShader(shaderPath + L"Debug.hlsl", nullptr, "VS", "vs_5_1");
+	shaders["DebugPS"] = D3DUtil::CompileShader(shaderPath + L"Debug.hlsl", nullptr, "PS", "ps_5_1");
 
-	shaders["DiffuseMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "DiffuseMapDebugPS", "ps_5_1");
-	shaders["SpecularMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "SpecularMapDebugPS", "ps_5_1");
-	shaders["RoughnessMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "RoughnessMapDebugPS", "ps_5_1");
-	shaders["NormalMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "NormalMapDebugPS", "ps_5_1");
-	shaders["DepthMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "DepthMapDebugPS", "ps_5_1");
-	shaders["PositionMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "PositionMapDebugPS", "ps_5_1");
-	shaders["ShadowMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "ShadowMapDebugPS", "ps_5_1");
-	shaders["SsaoMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "SsaoMapDebugPS", "ps_5_1");
-	shaders["SsrMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "SsrMapDebugPS", "ps_5_1");
-	shaders["BluredSsrMapDebugPS"] = D3DUtil::CompileShader(L"Shaders\\MapDebug.hlsl", nullptr, "BluredSsrMapDebugPS", "ps_5_1");
+	shaders["DiffuseMapDebugPS"] = D3DUtil::CompileShader(shaderPath + L"MapDebug.hlsl", nullptr, "DiffuseMapDebugPS", "ps_5_1");
+	shaders["SpecularMapDebugPS"] = D3DUtil::CompileShader(shaderPath + L"MapDebug.hlsl", nullptr, "SpecularMapDebugPS", "ps_5_1");
+	shaders["RoughnessMapDebugPS"] = D3DUtil::CompileShader(shaderPath + L"MapDebug.hlsl", nullptr, "RoughnessMapDebugPS", "ps_5_1");
+	shaders["NormalMapDebugPS"] = D3DUtil::CompileShader(shaderPath + L"MapDebug.hlsl", nullptr, "NormalMapDebugPS", "ps_5_1");
+	shaders["DepthMapDebugPS"] = D3DUtil::CompileShader(shaderPath + L"MapDebug.hlsl", nullptr, "DepthMapDebugPS", "ps_5_1");
+	shaders["PositionMapDebugPS"] = D3DUtil::CompileShader(shaderPath + L"MapDebug.hlsl", nullptr, "PositionMapDebugPS", "ps_5_1");
+	shaders["ShadowMapDebugPS"] = D3DUtil::CompileShader(shaderPath + L"MapDebug.hlsl", nullptr, "ShadowMapDebugPS", "ps_5_1");
+	shaders["SsaoMapDebugPS"] = D3DUtil::CompileShader(shaderPath + L"MapDebug.hlsl", nullptr, "SsaoMapDebugPS", "ps_5_1");
+	shaders["SsrMapDebugPS"] = D3DUtil::CompileShader(shaderPath + L"MapDebug.hlsl", nullptr, "SsrMapDebugPS", "ps_5_1");
+	shaders["BluredSsrMapDebugPS"] = D3DUtil::CompileShader(shaderPath + L"MapDebug.hlsl", nullptr, "BluredSsrMapDebugPS", "ps_5_1");
+#endif
 
-	shaders["LightingPassVS"] = D3DUtil::CompileShader(L"Shaders\\LightingPass.hlsl", nullptr, "VS", "vs_5_1");
-	shaders["LightingPassPS"] = D3DUtil::CompileShader(L"Shaders\\LightingPass.hlsl", defines, "PS", "ps_5_1");
+	shaders["LightingPassVS"] = D3DUtil::CompileShader(shaderPath + L"LightingPass.hlsl", nullptr, "VS", "vs_5_1");
+	shaders["LightingPassPS"] = D3DUtil::CompileShader(shaderPath + L"LightingPass.hlsl", defines, "PS", "ps_5_1");
 
-	shaders["SsaoComputeVS"] = D3DUtil::CompileShader(L"Shaders\\SsaoCompute.hlsl", nullptr, "VS", "vs_5_1");
-	shaders["SsaoComputePS"] = D3DUtil::CompileShader(L"Shaders\\SsaoCompute.hlsl", nullptr, "PS", "ps_5_1");
-	shaders["SsaoBlurVS"] = D3DUtil::CompileShader(L"Shaders\\SsaoBlur.hlsl", nullptr, "VS", "vs_5_1");
-	shaders["SsaoBlurPS"] = D3DUtil::CompileShader(L"Shaders\\SsaoBlur.hlsl", nullptr, "PS", "ps_5_1");
+	shaders["SsaoComputeVS"] = D3DUtil::CompileShader(shaderPath + L"SsaoCompute.hlsl", nullptr, "VS", "vs_5_1");
+	shaders["SsaoComputePS"] = D3DUtil::CompileShader(shaderPath + L"SsaoCompute.hlsl", nullptr, "PS", "ps_5_1");
+	shaders["SsaoBlurVS"] = D3DUtil::CompileShader(shaderPath + L"SsaoBlur.hlsl", nullptr, "VS", "vs_5_1");
+	shaders["SsaoBlurPS"] = D3DUtil::CompileShader(shaderPath + L"SsaoBlur.hlsl", nullptr, "PS", "ps_5_1");
 
-	shaders["TerrainVS"] = D3DUtil::CompileShader(L"Shaders\\TerrainRender.hlsl", nullptr, "VS", "vs_5_1");
-	shaders["TerrainHS"] = D3DUtil::CompileShader(L"Shaders\\TerrainRender.hlsl", nullptr, "HS", "hs_5_1");
-	shaders["TerrainDS"] = D3DUtil::CompileShader(L"Shaders\\TerrainRender.hlsl", nullptr, "DS", "ds_5_1");
-	shaders["TerrainPS"] = D3DUtil::CompileShader(L"Shaders\\TerrainRender.hlsl", nullptr, "PS", "ps_5_1");
-	shaders["TerrainWireframePS"] = D3DUtil::CompileShader(L"Shaders\\TerrainRender.hlsl", nullptr, "PS_Wireframe", "ps_5_1");
-	shaders["TerrainStdDevCS"] = D3DUtil::CompileShader(L"Shaders\\TerrainCompute.hlsl", nullptr, "CS_StdDev", "cs_5_1");
-	shaders["TerrainNormalCS"] = D3DUtil::CompileShader(L"Shaders\\TerrainCompute.hlsl", nullptr, "CS_Normal", "cs_5_1");
+	shaders["TerrainVS"] = D3DUtil::CompileShader(shaderPath + L"TerrainRender.hlsl", nullptr, "VS", "vs_5_1");
+	shaders["TerrainHS"] = D3DUtil::CompileShader(shaderPath + L"TerrainRender.hlsl", nullptr, "HS", "hs_5_1");
+	shaders["TerrainDS"] = D3DUtil::CompileShader(shaderPath + L"TerrainRender.hlsl", nullptr, "DS", "ds_5_1");
+	shaders["TerrainPS"] = D3DUtil::CompileShader(shaderPath + L"TerrainRender.hlsl", nullptr, "PS", "ps_5_1");
+	shaders["TerrainWireframePS"] = D3DUtil::CompileShader(shaderPath + L"TerrainRender.hlsl", nullptr, "PS_Wireframe", "ps_5_1");
+	shaders["TerrainStdDevCS"] = D3DUtil::CompileShader(shaderPath + L"TerrainCompute.hlsl", nullptr, "CS_StdDev", "cs_5_1");
+	shaders["TerrainNormalCS"] = D3DUtil::CompileShader(shaderPath + L"TerrainCompute.hlsl", nullptr, "CS_Normal", "cs_5_1");
 
-	shaders["SsrVS"] = D3DUtil::CompileShader(L"Shaders\\Ssr.hlsl", nullptr, "VS", "vs_5_1");
-	shaders["SsrPS"] = D3DUtil::CompileShader(L"Shaders\\Ssr.hlsl", nullptr, "PS", "ps_5_1");
-	shaders["ReflectionVS"] = D3DUtil::CompileShader(L"Shaders\\Reflection.hlsl", nullptr, "VS", "vs_5_1");
-	shaders["ReflectionPS"] = D3DUtil::CompileShader(L"Shaders\\Reflection.hlsl", nullptr, "PS", "ps_5_1");
+	shaders["SsrVS"] = D3DUtil::CompileShader(shaderPath + L"Ssr.hlsl", nullptr, "VS", "vs_5_1");
+	shaders["SsrPS"] = D3DUtil::CompileShader(shaderPath + L"Ssr.hlsl", nullptr, "PS", "ps_5_1");
+	shaders["ReflectionVS"] = D3DUtil::CompileShader(shaderPath + L"Reflection.hlsl", nullptr, "VS", "vs_5_1");
+	shaders["ReflectionPS"] = D3DUtil::CompileShader(shaderPath + L"Reflection.hlsl", nullptr, "PS", "ps_5_1");
 
-	shaders["BlurHorzCS"] = D3DUtil::CompileShader(L"Shaders\\Blur.hlsl", nullptr, "CS_BlurHorz", "cs_5_1");
-	shaders["BlurVertCS"] = D3DUtil::CompileShader(L"Shaders\\Blur.hlsl", nullptr, "CS_BlurVert", "cs_5_1");
+	shaders["BlurHorzCS"] = D3DUtil::CompileShader(shaderPath + L"Blur.hlsl", nullptr, "CS_BlurHorz", "cs_5_1");
+	shaders["BlurVertCS"] = D3DUtil::CompileShader(shaderPath + L"Blur.hlsl", nullptr, "CS_BlurVert", "cs_5_1");
 
 	defaultLayout =
 	{
@@ -1360,25 +1365,6 @@ void D3DApp::CreatePSOs()
 	opaqueWireframePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
 	opaqueWireframePsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	ThrowIfFailed(d3dDevice->CreateGraphicsPipelineState(&opaqueWireframePsoDesc, IID_PPV_ARGS(&pipelineStateObjects["Wireframe"])));
-
-
-	// PSO for Debug
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC debugPsoDesc = opaqueWireframePsoDesc;
-	debugPsoDesc.pRootSignature = rootSignatures["Debug"].Get();
-	debugPsoDesc.InputLayout = { lineLayout.data(), (UINT)lineLayout.size() };
-	debugPsoDesc.VS =
-	{
-		reinterpret_cast<BYTE*>(shaders["DebugVS"]->GetBufferPointer()),
-		shaders["DebugVS"]->GetBufferSize()
-	};
-	debugPsoDesc.PS =
-	{
-		reinterpret_cast<BYTE*>(shaders["DebugPS"]->GetBufferPointer()),
-		shaders["DebugPS"]->GetBufferSize()
-	};
-	debugPsoDesc.DepthStencilState.DepthEnable = true;
-	debugPsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
-	ThrowIfFailed(d3dDevice->CreateGraphicsPipelineState(&debugPsoDesc, IID_PPV_ARGS(&pipelineStateObjects["Debug"])));
 
 
 	// PSO for Transparent
@@ -1553,6 +1539,27 @@ void D3DApp::CreatePSOs()
 	widgetPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	ThrowIfFailed(d3dDevice->CreateGraphicsPipelineState(&widgetPsoDesc, IID_PPV_ARGS(&pipelineStateObjects["Widget"])));
 
+#if defined(DEBUG) || defined(_DEBUG)
+
+	// PSO for Debug
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC debugPsoDesc = opaqueWireframePsoDesc;
+	debugPsoDesc.pRootSignature = rootSignatures["Debug"].Get();
+	debugPsoDesc.InputLayout = { lineLayout.data(), (UINT)lineLayout.size() };
+	debugPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(shaders["DebugVS"]->GetBufferPointer()),
+		shaders["DebugVS"]->GetBufferSize()
+	};
+	debugPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(shaders["DebugPS"]->GetBufferPointer()),
+		shaders["DebugPS"]->GetBufferSize()
+	};
+	debugPsoDesc.DepthStencilState.DepthEnable = true;
+	debugPsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+	ThrowIfFailed(d3dDevice->CreateGraphicsPipelineState(&debugPsoDesc, IID_PPV_ARGS(&pipelineStateObjects["Debug"])));
+
+
 	// PSO for DiffuseMapDebug
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC diffuseMapDebugPsoDesc = widgetPsoDesc;
 	diffuseMapDebugPsoDesc.PS =
@@ -1641,7 +1648,7 @@ void D3DApp::CreatePSOs()
 		shaders["BluredSsrMapDebugPS"]->GetBufferSize()
 	};
 	ThrowIfFailed(d3dDevice->CreateGraphicsPipelineState(&bluredSsrMapDebugPsoDesc, IID_PPV_ARGS(&pipelineStateObjects["BluredSsrMapDebug"])));
-
+#endif
 
 	// PSO for LightingPass
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC lightingPassPsoDesc = widgetPsoDesc;

@@ -1,5 +1,6 @@
-#include <Framework/FrameResource.h>
-#include <Framework/Defines.h>
+#include "../PrecompiledHeader/pch.h"
+#include "FrameResource.h"
+#include "Defines.h"
 
 FrameResource::FrameResource(ID3D12Device* device, bool isMultiThread,
 	const UINT32 passCount, const UINT32 objectCount, const UINT32 lightCount,

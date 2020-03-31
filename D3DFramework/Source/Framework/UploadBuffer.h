@@ -1,6 +1,7 @@
 #pragma once
 
-#include <Framework/D3DUtil.h>
+#include "d3dx12.h"
+#include <basetsd.h>
 
 /*
 gpu 상에 올릴 데이터를 업로드 버퍼에 복사하여 메모리에 올린다. 

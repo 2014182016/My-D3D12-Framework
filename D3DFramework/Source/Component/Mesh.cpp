@@ -1,5 +1,5 @@
-#include <Component/Mesh.h>
-#include <iostream>
+#include "../PrecompiledHeader/pch.h"
+#include "Mesh.h"
 
 Mesh::Mesh(std::string&& name) : Component(std::move(name)) { }
 

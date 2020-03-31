@@ -1,6 +1,8 @@
 #pragma once
 
-#include <Framework/D3DApp.h>
+#include "D3DApp.h"
+#include <DirectXCollision.h>
+#include <array>
 #include <thread>
 
 struct FrameResource;
@@ -42,14 +44,14 @@ public:
 public:
 	// Renderable 오브젝트를 렌더링한다.
 	void RenderObject(ID3D12GraphicsCommandList* cmdList, Renderable* obj,
-		D3D12_GPU_VIRTUAL_ADDRESS startAddress, BoundingFrustum* frustum = nullptr) const;
+		D3D12_GPU_VIRTUAL_ADDRESS startAddress, DirectX::BoundingFrustum* frustum = nullptr) const;
 	// Renderabel 오브젝트를 가진 리스트를 이용하여 렌더링한다.
 	// 해당 함수를 멀티 스레드 렌더링을 고려하여 스레드 인덱스와 전체 스레드 개수를 인자로 받는다.
 	void RenderObjects(ID3D12GraphicsCommandList* cmdList, const std::list<std::shared_ptr<Renderable>>& list,
-		D3D12_GPU_VIRTUAL_ADDRESS startAddress, BoundingFrustum* frustum = nullptr, 
+		D3D12_GPU_VIRTUAL_ADDRESS startAddress, DirectX::BoundingFrustum* frustum = nullptr, 
 		const UINT32 threadIndex = 0, const UINT32  threadNum = 1) const;
 	// 화면상에서 실제로 보일 객체들만 그린다.
-	void RenderActualObjects(ID3D12GraphicsCommandList* cmdList, BoundingFrustum* frustum = nullptr);
+	void RenderActualObjects(ID3D12GraphicsCommandList* cmdList, DirectX::BoundingFrustum* frustum = nullptr);
 	// 각 스레드마다 지연 렌더링을 수행한다.
 	void WorkerThread(const UINT32 threadIndex);
 
@@ -137,7 +139,7 @@ private:
 	
 	// 매 프레임마다 카메라 로컬 프러스텀을 월드 좌표계로
 	// 변환하여 저장한다. 그 후 프러스텀 컬링할 때, 사용된다.
-	BoundingFrustum worldCamFrustum;
+	DirectX::BoundingFrustum worldCamFrustum;
 
 private:
 	static inline D3DFramework* instance = nullptr;

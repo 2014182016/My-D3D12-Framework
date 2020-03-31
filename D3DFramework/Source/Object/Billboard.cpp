@@ -1,6 +1,7 @@
-#include <Object/Billboard.h>
-#include <Component/Mesh.h>
-#include <vector>
+#include "../PrecompiledHeader/pch.h"
+#include "Billboard.h"
+#include "../Component/Mesh.h"
+
 
 Billboard::Billboard(std::string&& name) : GameObject(std::move(name)) 
 {

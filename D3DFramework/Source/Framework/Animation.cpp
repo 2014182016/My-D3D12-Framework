@@ -1,5 +1,5 @@
-#include <Framework/Animation.h>
-#include <algorithm>
+#include "../PrecompiledHeader/pch.h"
+#include "Animation.h"
 
 float BoneAnimation::GetStartTime()const
 {

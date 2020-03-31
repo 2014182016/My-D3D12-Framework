@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Framework/Vector.h>
+#include "Vector.h"
 #include <DirectXCollision.h>
 
 class GameObject;
@@ -44,7 +44,7 @@ public:
 	// 물체와 물체 사이의 충돌을 확인한다.
 	static bool IsCollision(GameObject* obj1, GameObject* obj2);
 	// 물체와 광선 사이의 충돌을 확인한다.
-	static bool IsCollision(GameObject* obj, const DirectX::XMVECTOR& rayOrigin, const DirectX::XMVECTOR& rayDir,
+	static bool IsCollision(GameObject* obj, const XMVECTOR& rayOrigin, const XMVECTOR& rayDir,
 		float& dist, bool isMeshCollision = false);
 
 	// 물체 사이의 충돌 시 필요한 물리 정보들을 반환한다.

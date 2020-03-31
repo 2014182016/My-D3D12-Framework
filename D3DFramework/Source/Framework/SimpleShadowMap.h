@@ -4,7 +4,8 @@
 
 #pragma once
 
-#include <Framework/ShadowMap.h>
+#include "ShadowMap.h"
+#include <wrl.h>
 
 /*
 기본적인 쉐도우 맵

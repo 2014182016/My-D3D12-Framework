@@ -1,8 +1,8 @@
+#include "../PrecompiledHeader/pch.h"
 #include "WinApp.h"
 #include "InputManager.h"
 #include "GameTimer.h"
 #include <WindowsX.h>
-#include <Windows.h>
 
 LRESULT CALLBACK
 MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -52,7 +52,20 @@ int WinApp::Run()
 		// 아니면 게임을 진행한다.
 		else
 		{
-			Update();
+			gameTimer->Tick();
+			float deltaTime = gameTimer->GetDeltaTime();
+
+			if (!appPaused)
+			{
+				CalculateFrameStats();
+				InputManager::GetInstance()->Tick(deltaTime);
+				Tick(deltaTime);
+				Render();
+			}
+			else
+			{
+				Sleep(100);
+			}
 		}
 	}
 
@@ -250,11 +263,6 @@ void WinApp::OnResize(const INT32 screenWidth, const INT32 screenHeight)
 	}
 }
 
-void WinApp::Tick(float deltaTime)
-{
-
-}
-
 float WinApp::GetAspectRatio() const
 {
 	return static_cast<float>(screenWidth) / screenHeight; 
@@ -282,26 +290,6 @@ INT32 WinApp::GetScreenWidth() const
 INT32 WinApp::GetScreenHeight() const
 {
 	return screenHeight; 
-}
-
-void WinApp::Update()
-{
-	gameTimer->Tick();
-	float deltaTime = gameTimer->GetDeltaTime();
-
-	if (!appPaused)
-	{
-		if(useWinApi)
-			CalculateFrameStats();
-
-		InputManager::GetInstance()->Tick(deltaTime);
-		Tick(deltaTime);
-		Render();
-	}
-	else
-	{
-		Sleep(100);
-	}
 }
 
 GameTimer* WinApp::GetGameTimer()

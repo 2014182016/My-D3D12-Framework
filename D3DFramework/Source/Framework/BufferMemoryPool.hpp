@@ -1,6 +1,7 @@
 #pragma once
 
-#include <Framework/UploadBuffer.h>
+#include "UploadBuffer.h"
+#include <memory>
 
 /*
 업로드 버퍼의 메모리 공간을 동적으로 변환하기 위한 클래스.

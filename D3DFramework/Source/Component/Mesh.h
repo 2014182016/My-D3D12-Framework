@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Component/Component.h>
+#include "Component.h"
 #include <any>
 
 /*
@@ -21,7 +21,7 @@ public:
 	void BuildIndices(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, UINT16* indices,
 		const UINT32 indexCount, const UINT32 indexStride);
 	// 충돌 타입에 따라 바운드를 생성한다.
-	void BuildCollisionBound(DirectX::XMFLOAT3* posPtr, const UINT32 vertexCount, const UINT32 stride, 
+	void BuildCollisionBound(XMFLOAT3* posPtr, const UINT32 vertexCount, const UINT32 stride, 
 		const CollisionType type);
 	// 동적 정점 버퍼를 사용할 때, 호출한다. 여기에는 동점 정점 버퍼로
 	// 사용할 서술자 뷰만을 정의하고, 실제 정점 버퍼는 프레임 자원에 선언한다.

@@ -1,5 +1,6 @@
-#include <Object/SpotLight.h>
-#include <Framework/SimpleShadowMap.h>
+#include "../PrecompiledHeader/pch.h"
+#include "SpotLight.h"
+#include "../Framework/SimpleShadowMap.h"
 
 SpotLight::SpotLight(std::string&& name, ID3D12Device* device) : Light(std::move(name))
 {

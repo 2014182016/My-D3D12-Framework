@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Object/GameObject.h>
+#include "GameObject.h"
 
 /*
 커다란 하늘로 주위를 도는 하늘 배경

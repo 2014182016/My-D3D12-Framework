@@ -1,4 +1,5 @@
-#include <Object/Object.h>
+#include "../PrecompiledHeader/pch.h"
+#include "Object.h"
 
 Object::Object(std::string&& name) : Component(std::move(name)) { }
 

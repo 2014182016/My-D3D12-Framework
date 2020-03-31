@@ -1,8 +1,9 @@
 #pragma once
 
-#include <Framework/D3DUtil.h>
-#include <Framework/Defines.h>
-#include <list>
+#include "Defines.h"
+#include "Vector.h"
+#include "d3dx12.h"
+#include <DirectXCollision.h>
 #include <vector>
 
 struct LineVertex;

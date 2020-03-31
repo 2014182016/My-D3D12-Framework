@@ -3,8 +3,11 @@
 // Ssao.h by Frank Luna (C) 2015 All Rights Reserved.
 //***************************************************************************************
 
-#include <Framework/D3DUtil.h>
+#include "d3dx12.h"
+#include "Vector.h"
+#include <basetsd.h>
 #include <vector>
+#include <wrl.h>
 
 #define SAMPLE_COUNT 14
 #define RANDOM_VECTORMAP_SIZE 256

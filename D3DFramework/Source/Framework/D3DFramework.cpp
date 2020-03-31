@@ -1,35 +1,35 @@
-#include <Framework/D3DFramework.h>
-#include <Framework/AssetManager.h>
-#include <Framework/FrameResource.h>
-#include <Framework/UploadBuffer.h>
-#include <Framework/GameTimer.h>
-#include <Framework/Camera.h>
-#include <Framework/InputManager.h>
-#include <Framework/Octree.h>
-#include <Framework/Ssao.h>
-#include <Framework/Ssr.h>
-#include <Framework/StopWatch.h>
-#include <Framework/Random.h>
-#include <Framework/BlurFilter.h>
-#include <Framework/D3DDebug.h>
-#include <Framework/ShadowMap.h>
-#include <Framework/Physics.h>
+#include "../PrecompiledHeader/pch.h"
+#include "D3DFramework.h"
+#include "AssetManager.h"
+#include "FrameResource.h"
+#include "UploadBuffer.h"
+#include "GameTimer.h"
+#include "Camera.h"
+#include "InputManager.h"
+#include "Octree.h"
+#include "Ssao.h"
+#include "Ssr.h"
+#include "StopWatch.h"
+#include "Random.h"
+#include "BlurFilter.h"
+#include "D3DDebug.h"
+#include "ShadowMap.h"
+#include "Physics.h"
 
-#include <Component/Material.h>
-#include <Component/Mesh.h>
-#include <Component/Widget.h>
+#include "../Component/Material.h"
+#include "../Component/Mesh.h"
+#include "../Component/Widget.h"
 
-#include <Object/GameObject.h>
-#include <Object/DirectionalLight.h>
-#include <Object/PointLight.h>
-#include <Object/SpotLight.h>
-#include <Object/Particle.h>
-#include <Object/Billboard.h>
-#include <Object/SkySphere.h>
-#include <Object/Terrain.h>
+#include "../Object/GameObject.h"
+#include "../Object/DirectionalLight.h"
+#include "../Object/PointLight.h"
+#include "../Object/SpotLight.h"
+#include "../Object/Particle.h"
+#include "../Object/Billboard.h"
+#include "../Object/SkySphere.h"
+#include "../Object/Terrain.h"
 
 #include <functional>
-#include <iostream>
 
 #ifdef PIX
 #include <pix3.h>
@@ -913,9 +913,9 @@ void D3DFramework::CreateParticles()
 	particle->emitNum = 200;
 	particle->isInfinite = true;
 	particle->enabledGravity = true;
-	particle->SetPosition(0.0f, 25.0f, 0.0f);
+	particle->SetPosition(0.0f, 40.0f, 0.0f);
 	particle->SetMaterial(AssetManager::GetInstance()->FindMaterial("Radial_Gradient"s));
-	//particles.push_back(std::move(particle));
+	particles.push_back(std::move(particle));
 }
 
 void D3DFramework::CreateFrameResources(ID3D12Device* device)

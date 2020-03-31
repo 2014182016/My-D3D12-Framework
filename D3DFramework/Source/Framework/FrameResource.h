@@ -1,7 +1,8 @@
 #pragma once
 
-#include <Framework/BufferMemoryPool.hpp>
-#include <Framework/D3DStructure.h>
+#include "BufferMemoryPool.hpp"
+#include "D3DStructure.h"
+#include <wrl.h>
 #include <vector>
 
 /*

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Object/Light.h>
+#include "Light.h"
 
 class SpotLight : public Light
 {

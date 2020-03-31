@@ -16,7 +16,7 @@ float4 PS(VertexOut pin) : SV_Target
 		return currentColor;
 
 	// 각 픽셀에 적용할 속성을 가져온다.
-	float4 roughness = gSpecularRoughnessMap.Load(texcoord).a;
+	float roughness = gSpecularRoughnessMap.Load(texcoord).a;
 	float shininess = 1.0f - roughness;
 	float4 bluredSsr = gBluredSsrMap.Load(texcoord);
 

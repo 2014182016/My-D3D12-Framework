@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Windows.h>
-#include <basetsd.h>
 
 /*
 플레이어의 입력에 관한 행동들을 관리한다.
