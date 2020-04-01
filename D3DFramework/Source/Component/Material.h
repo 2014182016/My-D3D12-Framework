@@ -25,7 +25,6 @@ public:
 	XMMATRIX GetMaterialTransform() const;
 	XMFLOAT4X4 GetMaterialTransform4x4f() const;
 	UINT32 GetMaterialIndex() const;
-	void SetOpacity(float opacity);
 
 public:
 	// 디퓨즈맵 텍스처를 위한 SRV 힙에서의 인덱스

@@ -76,10 +76,9 @@ void AssetManager::BuildMaterial()
 	mat = std::make_unique<Material>("Mirror0"s);
 	mat->diffuseMapIndex = FindTexture("Ice"s)->textureIndex;
 	mat->normalMapIndex = FindTexture("Default_nmap"s)->textureIndex;
-	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
+	mat->diffuse = { 1.0f, 1.0f, 1.0f, 0.5f };
 	mat->specular = { 0.98f, 0.97f, 0.95f };
 	mat->roughness = 0.1f;
-	mat->SetOpacity(0.5f);
 	materials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Wirefence"s);

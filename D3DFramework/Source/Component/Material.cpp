@@ -23,11 +23,6 @@ UINT32 Material::GetMaterialIndex() const
 	return materialIndex;
 }
 
-void Material::SetOpacity(float opacity)
-{
-	diffuse.w = opacity;
-}
-
 void Material::SetUV(float u, float v)
 {
 	matTransform(3, 0) = u;
