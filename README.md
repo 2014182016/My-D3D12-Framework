@@ -3,7 +3,7 @@
 한국산업기술대학교 박세준 학생이 DirectX12로 제작한 포트폴리오 프로젝트입니다.  
 기본적으로 Directx12 학습 목적으로 제작하였고, 렌더링 부분에 집중하여 개발하였습니다.  
 프랭크 D.루나의『DirectX 12를 이용한 3D 게임 프로그래밍 입문』에서 사용된 코드를 기반으로 프로젝트를 진행하였습니다.  
-실행파일은 D3DFramework/D3DFramework.exe입니다.
+실행파일은 D3DFramework/D3DFramework.exe입니다.  
 다른 관련사항은 D3DFramework/DirectX12_my_portfolio.pptx를 확인해주십시요.  
 
 # 2. 조작
