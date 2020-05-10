@@ -24,10 +24,10 @@ void Billboard::BuildBillboardMesh(ID3D12Device* device, ID3D12GraphicsCommandLi
 	SetMesh(billboardMesh.get());
 }
 
-void Billboard::Render(ID3D12GraphicsCommandList* commandList)
+void Billboard::Render(ID3D12GraphicsCommandList* cmdList, BoundingFrustum* frustum) const
 {
 	if (isVisible)
 	{
-		GetMesh()->Render(commandList, 1, false);
+		GetMesh()->Render(cmdList, 1, false);
 	}
 }

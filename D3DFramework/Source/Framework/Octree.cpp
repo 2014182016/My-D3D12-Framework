@@ -175,9 +175,6 @@ void Octree::Update(float deltaTime)
 {
 	if (treeBuilt == false || treeReady == false)
 	{
-#if defined(DEBUG) || defined(_DEBUG)
-		std::cout << "Octree isn't built or ready" << std::endl;
-#endif
 		return;
 	}
 

@@ -5,13 +5,13 @@
 
 #define DISABLED -1
 
-#define TEX_NUM 12
+#define TEX_NUM 15
 #define LIGHT_NUM 1
 
 #define DEFERRED_BUFFER_COUNT 5
 #define FRAME_COUNT 2
 
-#define SSAO
+//#define SSAO
 #define SSR
 #define MULTITHREAD_RENDERING
-#define PIX
+//#define PIX

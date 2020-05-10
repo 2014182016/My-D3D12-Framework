@@ -1,5 +1,6 @@
 #include "../PrecompiledHeader/pch.h"
 #include "D3DFramework.h"
+#include "InputManager.h"
 #include "AssetManager.h"
 #include "FrameResource.h"
 #include "UploadBuffer.h"
@@ -19,6 +20,7 @@
 #include "../Component/Material.h"
 #include "../Component/Mesh.h"
 #include "../Component/Widget.h"
+#include "../Component/Sound.h"
 
 #include "../Object/GameObject.h"
 #include "../Object/DirectionalLight.h"
@@ -113,7 +115,7 @@ void D3DFramework::OnResize(const INT32 screenWidth, const INT32 screenHeight)
 	__super::OnResize(screenWidth, screenHeight);
 
 	// 카메라 뷰 행렬을 다시 계산한다.
-	camera->SetLens(60.0f, GetAspectRatio(), 1.0f, 1000.0f);
+	camera->SetLens(60.0f, GetAspectRatio(), 0.1f, 1000.0f);
 
 	// 화면 해상도가 바뀌면 위젯의 크기도 바뀌어야 한다.
 	for (auto& widget : widgets)
@@ -140,18 +142,20 @@ void D3DFramework::InitFramework()
 	// 플레이어 카메라가 3D 사운드의 기준이 되도록 
 	// 리스너를 설정하고 시작 위치를 지정한다.
 	camera->SetListener(listener.Get());
-	camera->SetPosition(0.0f, 2.0f, -15.0f);
+	camera->SetPosition(25.8f, -30.5f, 0.74f);
+	camera->RotateY(-15.0f);
+	camera->Pitch(-3.0f);
 
 	// 필요한 애셋들을 로드한다.
 	AssetManager::GetInstance()->Initialize(d3dDevice.Get(), mainCommandList.Get(), d3dSound.Get());
 
 #ifdef SSAO
-	ssao = std::make_unique<Ssao>(d3dDevice.Get(), mainCommandList.Get(), screenWidth, screenHeight);
+	ssao = std::make_unique<Ssao>(d3dDevice.Get(), mainCommandList.Get(), screenWidth / 2, screenHeight / 2);
 #endif
 
 #ifdef SSR
-	ssr = std::make_unique<Ssr>(d3dDevice.Get(), screenWidth, screenHeight);
-	blurFilter = std::make_unique<BlurFilter>(d3dDevice.Get(), screenWidth, screenHeight, Ssr::ssrMapFormat);
+	ssr = std::make_unique<Ssr>(d3dDevice.Get(), screenWidth / 2, screenHeight / 2);
+	blurFilter = std::make_unique<BlurFilter>(d3dDevice.Get(), screenWidth / 2, screenHeight / 2, Ssr::ssrMapFormat);
 #endif
 
 	// 프레임워크에 사용되는 모든 객체를 미리 만든다.
@@ -193,9 +197,12 @@ void D3DFramework::InitFramework()
 	}
 
 	// 충돌을 최적화하기 위한 팔진트리를 생성한다.
-	BoundingBox octreeAABB = BoundingBox(XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(100.0f, 100.0f, 100.0f));
+	BoundingBox octreeAABB = BoundingBox(XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(500.0f, 500.0f, 500.0f));
 	octreeRoot = std::make_unique<Octree>(octreeAABB, gameObjects);
 	octreeRoot->BuildTree();
+
+	AssetManager::GetInstance()->sounds["WinterWind"]->SetPosition(10.0f, -35.0f, 30.0f);
+	AssetManager::GetInstance()->sounds["WinterWind"]->Play(true);
 }
 
 void D3DFramework::CreateDescriptorHeaps(const UINT32 textureNum, const UINT32 shadowMapNum, const UINT32 particleNum)
@@ -291,6 +298,8 @@ void D3DFramework::SetDefaultState(ID3D12GraphicsCommandList* cmdList)
 
 void D3DFramework::Render()
 {
+	__super::Render();
+
 	// 와이퍼 프레임 형식으로 렌더링한다.
 	if (GetOptionEnabled(Option::Wireframe))
 	{
@@ -363,7 +372,6 @@ void D3DFramework::Render()
 #endif
 	}
 
-
 	// 전면 버퍼와 후면 버퍼를 바꾼다.
 	ThrowIfFailed(swapChain->Present(0, 0));
 	currentBackBuffer = (currentBackBuffer + 1) % SWAP_CHAIN_BUFFER_COUNT;
@@ -393,6 +401,20 @@ void D3DFramework::Tick(float deltaTime)
 		WaitForSingleObject(eventHandle, INFINITE);
 		CloseHandle(eventHandle);
 	}
+
+	if (InputManager::keys['w'] || InputManager::keys['W'])
+		camera->Walk(deltaTime);
+
+	if (InputManager::keys['s'] || InputManager::keys['S'])
+		camera->Walk(-deltaTime);
+
+	if (InputManager::keys['a'] || InputManager::keys['A'])
+		camera->Strafe(-deltaTime);
+
+	if (InputManager::keys['d'] || InputManager::keys['D'])
+		camera->Strafe(deltaTime);
+
+	camera->UpdateViewMatrix();
 
 	// 카메라 로컬 프러스텀을 월드 좌표계로 변환한다.
 	worldCamFrustum = camera->GetWorldCameraBounding();
@@ -715,13 +737,13 @@ void D3DFramework::UpdateSsrBuffer(float deltaTime)
 	if (isSsrCBUpdate > 0)
 	{
 		SsrConstants ssrConstants;
-		ssrConstants.maxDistance = 20.0f;
+		ssrConstants.maxDistance = 40.0f;
 		ssrConstants.thickness = 1.0f;
 		ssrConstants.rayTraceStep = 20;
 		ssrConstants.binaryStep = 5;
 		ssrConstants.screenEdgeFadeStart = XMFLOAT2(100.0f, 50.0f);
 		ssrConstants.strideCutoff = 2.0f;
-		ssrConstants.resolutuon = 0.1f;
+		ssrConstants.resolutuon = 0.2f;
 		currSsrCB->CopyData(0, ssrConstants);
 
 		--isSsrCBUpdate;
@@ -743,9 +765,11 @@ void D3DFramework::UpdateObjectBufferPool()
 void D3DFramework::CreateObjects()
 {
 	std::shared_ptr<GameObject> object;
-	
+	std::shared_ptr<Billboard> tree;
+
 	object = std::make_shared<SkySphere>("Sky"s);
 	object->SetScale(5000.0f, 5000.0f, 5000.0f);
+	object->SetRotation(0.0f, 90.0f, 0.0f);
 	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Sky"s));
 	object->SetMesh(AssetManager::GetInstance()->FindMesh("SkySphere"s));
 	object->SetCollisionEnabled(false);
@@ -753,55 +777,147 @@ void D3DFramework::CreateObjects()
 	gameObjects.push_back(object);
 
 	object = std::make_shared<GameObject>("Floor"s);
-	object->SetScale(20.0f, 1.5f, 30.0f);
-	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tile0"s));
+	object->SetPosition(50.0f, -40.0f, 60.0f);
+	object->SetScale(200.0f, 2.5f, 200.0f);
+	object->SetRotation(0.0f, 60.0f, 0.0f);
+	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Ice"s));
 	object->SetMesh(AssetManager::GetInstance()->FindMesh("Cube_AABB"s));
 	object->SetCollisionEnabled(true);
 	renderableObjects[(int)RenderLayer::Opaque].push_back(object);
 	gameObjects.push_back(object);
 
-	object = std::make_shared<GameObject>("Skull"s);
-	object->Move(0.0f, 1.5f, 0.0f);
-	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Skull"s));
-	object->SetMesh(AssetManager::GetInstance()->FindMesh("Skull"s));
+	object = std::make_shared<GameObject>("Sword"s);
+	object->SetPosition(10.0f, -35.0f, 30.0f);
+	object->SetScale(0.1f, 0.1f, 0.1f);
+	object->SetRotation(30.0f, 5.0f, 0.0f);
+	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Sword"s));
+	object->SetMesh(AssetManager::GetInstance()->FindMesh("Sword"s));
 	object->SetCollisionEnabled(true);
 	renderableObjects[(int)RenderLayer::Opaque].push_back(object);
 	gameObjects.push_back(object);
 
-	for (int i = 0; i < 5; ++i)
-	{
-		object = std::make_shared<GameObject>("ColumnLeft"s + std::to_string(i));
-		object->SetPosition(-5.0f, 1.5f, -10.0f + i * 5.0f);
-		object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Brick0"s));
-		object->SetMesh(AssetManager::GetInstance()->FindMesh("Cylinder"s));
-		object->SetCollisionEnabled(true);
-		renderableObjects[(int)RenderLayer::Opaque].push_back(object);
-		gameObjects.push_back(object);
+	tree = std::make_shared<Billboard>("Tree1"s);
+	tree->SetPosition(0.0f, 0.0f, 200.0f);
+	tree->mSize = XMFLOAT2(40.0f, 40.0f);
+	tree->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tree1"s));
+	tree->BuildBillboardMesh(d3dDevice.Get(), mainCommandList.Get());
+	renderableObjects[(int)RenderLayer::Billborad].push_back(tree);
+	gameObjects.push_back(tree);
 
-		object = std::make_shared<GameObject>("ColumnRight"s + std::to_string(i));
-		object->SetPosition(5.0f, 1.5f, -10.0f + i * 5.0f);
-		object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Brick0"s));
-		object->SetMesh(AssetManager::GetInstance()->FindMesh("Cylinder"s));
-		object->SetCollisionEnabled(true);
-		renderableObjects[(int)RenderLayer::Opaque].push_back(object);
-		gameObjects.push_back(object);
+	tree = std::make_shared<Billboard>("Tree1"s);
+	tree->SetPosition(90.0f, -10.0f, 170.0f);
+	tree->mSize = XMFLOAT2(40.0f, 40.0f);
+	tree->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tree1"s));
+	tree->BuildBillboardMesh(d3dDevice.Get(), mainCommandList.Get());
+	renderableObjects[(int)RenderLayer::Billborad].push_back(tree);
+	gameObjects.push_back(tree);
 
-		object = std::make_shared<GameObject>("SphereLeft"s + std::to_string(i));
-		object->SetPosition(-5.0f, 3.5f, -10.0f + i * 5.0f);
-		object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Mirror0"s));
-		object->SetMesh(AssetManager::GetInstance()->FindMesh("Sphere"s));
-		object->SetCollisionEnabled(true);
-		renderableObjects[(int)RenderLayer::Opaque].push_back(object);
-		gameObjects.push_back(object);
+	tree = std::make_shared<Billboard>("Tree1"s);
+	tree->SetPosition(-180.0f, 30.0f, 230.0f);
+	tree->mSize = XMFLOAT2(60.0f, 60.0f);
+	tree->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tree1"s));
+	tree->BuildBillboardMesh(d3dDevice.Get(), mainCommandList.Get());
+	renderableObjects[(int)RenderLayer::Billborad].push_back(tree);
+	gameObjects.push_back(tree);
 
-		object = std::make_shared<GameObject>("SphereRight"s + std::to_string(i));
-		object->SetPosition(5.0f, 3.5f, -10.0f + i * 5.0f);
-		object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Mirror0"s));
-		object->SetMesh(AssetManager::GetInstance()->FindMesh("Sphere"s));
-		object->SetCollisionEnabled(true);
-		renderableObjects[(int)RenderLayer::Opaque].push_back(object);
-		gameObjects.push_back(object);
-	}
+	tree = std::make_shared<Billboard>("Tree2"s);
+	tree->SetPosition(-50.0f, 5.0f, 200.0f);
+	tree->mSize = XMFLOAT2(40.0f, 40.0f);
+	tree->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tree2"s));
+	tree->BuildBillboardMesh(d3dDevice.Get(), mainCommandList.Get());
+	renderableObjects[(int)RenderLayer::Billborad].push_back(tree);
+	gameObjects.push_back(tree);
+
+	tree = std::make_shared<Billboard>("Tree2"s);
+	tree->SetPosition(30.0f, -10.0f, 150.0f);
+	tree->mSize = XMFLOAT2(60.0f, 60.0f);
+	tree->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tree2"s));
+	tree->BuildBillboardMesh(d3dDevice.Get(), mainCommandList.Get());
+	renderableObjects[(int)RenderLayer::Billborad].push_back(tree);
+	gameObjects.push_back(tree);
+
+	tree = std::make_shared<Billboard>("Tree2"s);
+	tree->SetPosition(-60.0f, -10.0f, 100.0f);
+	tree->mSize = XMFLOAT2(30.0f, 30.0f);
+	tree->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tree2"s));
+	tree->BuildBillboardMesh(d3dDevice.Get(), mainCommandList.Get());
+	renderableObjects[(int)RenderLayer::Billborad].push_back(tree);
+	gameObjects.push_back(tree);
+
+	tree = std::make_shared<Billboard>("Tree3"s);
+	tree->SetPosition(80.0f, 10.0f, 210.0f);
+	tree->mSize = XMFLOAT2(30.0f, 30.0f);
+	tree->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tree3"s));
+	tree->BuildBillboardMesh(d3dDevice.Get(), mainCommandList.Get());
+	renderableObjects[(int)RenderLayer::Billborad].push_back(tree);
+	gameObjects.push_back(tree);
+
+	tree = std::make_shared<Billboard>("Tree3"s);
+	tree->SetPosition(-100.0f, 20.0f, 100.0f);
+	tree->mSize = XMFLOAT2(50.0f, 50.0f);
+	tree->SetMaterial(AssetManager::GetInstance()->FindMaterial("Tree3"s));
+	tree->BuildBillboardMesh(d3dDevice.Get(), mainCommandList.Get());
+	renderableObjects[(int)RenderLayer::Billborad].push_back(tree);
+	gameObjects.push_back(tree);
+
+	object = std::make_shared<GameObject>("Rock1"s);
+	object->SetPosition(30.0f, -39.0f, 30.0f);
+	object->SetScale(3.0f, 3.0f, 3.0f);
+	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Rock1"s));
+	object->SetMesh(AssetManager::GetInstance()->FindMesh("Rock1"s));
+	object->SetCollisionEnabled(true);
+	renderableObjects[(int)RenderLayer::Opaque].push_back(object);
+	gameObjects.push_back(object);
+
+	object = std::make_shared<GameObject>("Rock1"s);
+	object->SetPosition(26.0f, -39.5f, 42.0f);
+	object->SetScale(2.5f, 2.5f, 2.5f);
+	object->SetRotation(2.0f, 10.0f, 0.0f);
+	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Rock1"s));
+	object->SetMesh(AssetManager::GetInstance()->FindMesh("Rock1"s));
+	object->SetCollisionEnabled(true);
+	renderableObjects[(int)RenderLayer::Opaque].push_back(object);
+	gameObjects.push_back(object);
+
+	object = std::make_shared<GameObject>("Rock1"s);
+	object->SetPosition(27.5f, -40.0f, 56.0f);
+	object->SetScale(2.8f, 2.8f, 2.8f);
+	object->SetRotation(8.0f, 30.0f, 6.0f);
+	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Rock1"s));
+	object->SetMesh(AssetManager::GetInstance()->FindMesh("Rock1"s));
+	object->SetCollisionEnabled(true);
+	renderableObjects[(int)RenderLayer::Opaque].push_back(object);
+	gameObjects.push_back(object);
+
+	object = std::make_shared<GameObject>("Rock1"s);
+	object->SetPosition(32.0f, -40.0f, 75.0f);
+	object->SetScale(3.8f, 3.8f, 3.8f);
+	object->SetRotation(43.0f, 60.0f, 15.0f);
+	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Rock1"s));
+	object->SetMesh(AssetManager::GetInstance()->FindMesh("Rock1"s));
+	object->SetCollisionEnabled(true);
+	renderableObjects[(int)RenderLayer::Opaque].push_back(object);
+	gameObjects.push_back(object);
+
+	object = std::make_shared<GameObject>("Rock1"s);
+	object->SetPosition(20.0f, -39.0f, 86.0f);
+	object->SetScale(2.6f, 2.6f, 2.6f);
+	object->SetRotation(0.0f, 78.0f, 0.0f);
+	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Rock1"s));
+	object->SetMesh(AssetManager::GetInstance()->FindMesh("Rock1"s));
+	object->SetCollisionEnabled(true);
+	renderableObjects[(int)RenderLayer::Opaque].push_back(object);
+	gameObjects.push_back(object);
+
+	object = std::make_shared<GameObject>("Rock1"s);
+	object->SetPosition(9.0f, -40.0f, 100.0f);
+	object->SetScale(2.9f, 2.9f, 2.9f);
+	object->SetRotation(2.0f, 60.0f, 0.2f);
+	object->SetMaterial(AssetManager::GetInstance()->FindMaterial("Rock1"s));
+	object->SetMesh(AssetManager::GetInstance()->FindMesh("Rock1"s));
+	object->SetCollisionEnabled(true);
+	renderableObjects[(int)RenderLayer::Opaque].push_back(object);
+	gameObjects.push_back(object);
 }
 
 void D3DFramework::CreateTerrain()
@@ -820,11 +936,11 @@ void D3DFramework::CreateLights()
 	std::shared_ptr<Light> light;
 
 	light = std::make_shared<DirectionalLight>("DirectionalLight"s, d3dDevice.Get());
-	light->SetPosition(15.0f, 15.0f, -15.0f);
+	light->SetPosition(50.0f, 10.0f, 30.0f);
+	light->Rotate(45.0f, -90.0f, 0.0f);
 	light->strength = { 0.8f, 0.8f, 0.8f };
-	light->Rotate(45.0f, -45.0f, 0.0f);
 	light->falloffStart = 0.5f;
-	light->falloffEnd = 50.0f;
+	light->falloffEnd = 75.0f;
 	light->shadowMapSize = { 50.0f, 50.0f };
 	light->spotAngle = 45.0f;
 	lights.push_back(std::move(light));
@@ -896,24 +1012,24 @@ void D3DFramework::CreateParticles()
 	std::shared_ptr<Particle> particle;
 
 	ParticleData start;
-	start.lifeTime = 5.0f;
+	start.lifeTime = 7.5f;
 	start.color = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.5f);
 	start.size = XMFLOAT2(1.0f, 1.0f);
-	start.speed = 25.0f;
+	start.speed = 30.0f;
 
 	ParticleData end;
-	end.color = XMFLOAT4(0.9f, 0.1f, 0.1f, 0.1f);
+	end.color = XMFLOAT4(0.6f, 0.6f, 0.8f, 0.1f);
 	end.size = XMFLOAT2(0.25f, 0.25f);
-	end.speed = 1.0f;
+	end.speed = 10.0f;
 
-	particle = std::make_unique<Particle>("Particle0"s, 10000);
+	particle = std::make_unique<Particle>("Snow"s, 50000);
 	particle->start = start;
 	particle->end = end;
 	particle->spawnTimeRange = std::make_pair<float, float>(0.2f, 0.2f);
-	particle->emitNum = 200;
+	particle->emitNum = 500;
 	particle->isInfinite = true;
 	particle->enabledGravity = true;
-	particle->SetPosition(0.0f, 40.0f, 0.0f);
+	particle->SetPosition(10.0f, 40.0f, 20.0f);
 	particle->SetMaterial(AssetManager::GetInstance()->FindMaterial("Radial_Gradient"s));
 	particles.push_back(std::move(particle));
 }
@@ -1054,12 +1170,10 @@ bool D3DFramework::Picking(HitInfo& hitInfo, const INT32 screenX, const INT32 sc
 	if (!nearestHit)
 		return false;
 
-#if defined(DEBUG) || defined(_DEBUG)
 	if (nearestHit)
 	{
 		std::cout << "Picking : " << hitObj->ToString() << std::endl;
 	}
-#endif
 
 	if (nearestDist < distance)
 	{
@@ -1190,7 +1304,7 @@ void D3DFramework::LightingPass(ID3D12GraphicsCommandList* cmdList)
 	cmdList->SetGraphicsRootSignature(rootSignatures["Ssao"].Get());
 	ssao->ComputeSsao(cmdList, pipelineStateObjects["SsaoCompute"].Get(),
 		currentFrameResource->GetSsaoVirtualAddress(), currentFrameResource->GetPassVirtualAddress());
-	ssao->BlurAmbientMap(cmdList, pipelineStateObjects["SsaoBlur"].Get(), 3);
+	ssao->BlurAmbientMap(cmdList, pipelineStateObjects["SsaoBlur"].Get(), 2);
 
 #ifdef PIX
 	PIXEndEvent(cmdList);
@@ -1638,5 +1752,7 @@ void D3DFramework::DrawDebugLight()
 	for (const auto& light : lights)
 	{
 		D3DDebug::GetInstance()->DrawSphere(light->GetPosition(), lightRadius, FLT_MAX, (XMFLOAT4)Colors::Yellow);
+		D3DDebug::GetInstance()->DrawLine(light->GetPosition(), 
+			Vector3::Add(light->GetPosition(), Vector3::Multiply(light->GetLook(), 5.0f)), FLT_MAX, (XMFLOAT4)Colors::Yellow);
 	}
 }

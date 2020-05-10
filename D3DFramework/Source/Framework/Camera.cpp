@@ -179,8 +179,10 @@ XMFLOAT4X4 Camera::GetProj4x4f()const
 
 void Camera::Strafe(const float d)
 {
-	// position += d*right
-	XMVECTOR s = XMVectorReplicate(d);
+	float dist = d * cameraWalkSpeed;
+
+	// position += dist * right
+	XMVECTOR s = XMVectorReplicate(dist);
 	XMVECTOR r = XMLoadFloat3(&right);
 	XMVECTOR p = XMLoadFloat3(&position);
 	XMStoreFloat3(&position, XMVectorMultiplyAdd(s, r, p));
@@ -190,8 +192,10 @@ void Camera::Strafe(const float d)
 
 void Camera::Walk(const float d)
 {
-	// position += d*look
-	XMVECTOR s = XMVectorReplicate(d);
+	float dist = d * cameraWalkSpeed;
+
+	// position += dist * look
+	XMVECTOR s = XMVectorReplicate(dist);
 	XMVECTOR l = XMLoadFloat3(&look);
 	XMVECTOR p = XMLoadFloat3(&position);
 	XMStoreFloat3(&position, XMVectorMultiplyAdd(s, l, p));
@@ -201,7 +205,8 @@ void Camera::Walk(const float d)
 
 void Camera::Pitch(const float angle)
 {
-	XMMATRIX R = XMMatrixRotationAxis(XMLoadFloat3(&right), angle);
+	float radians = DirectX::XMConvertToRadians(cameraRotateSpeed * angle);
+	XMMATRIX R = XMMatrixRotationAxis(XMLoadFloat3(&right), radians);
 
 	up = Vector3::TransformNormal(up, R);
 	look = Vector3::TransformNormal(look, R);
@@ -211,7 +216,8 @@ void Camera::Pitch(const float angle)
 
 void Camera::RotateY(const float angle)
 {
-	XMMATRIX R = XMMatrixRotationY(angle);
+	float radians = DirectX::XMConvertToRadians(cameraRotateSpeed * angle);
+	XMMATRIX R = XMMatrixRotationY(radians);
 
 	right = Vector3::TransformNormal(right, R);
 	up = Vector3::TransformNormal(up, R);

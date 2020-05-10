@@ -9,6 +9,8 @@ InputManager::InputManager()
 {
 	for (int i = 0; i < 256; ++i)
 		keys[i] = false;
+
+	lastMousePos = POINT();
 }
 
 InputManager::~InputManager() { }
@@ -53,8 +55,8 @@ void InputManager::OnMouseMove(WPARAM btnState, int x, int y)
 	if ((btnState & MK_LBUTTON) != 0)
 	{
 		// 1픽셀 움직임에 cameraRotateSpeed만큼 회전한다.
-		float dx = DirectX::XMConvertToRadians(cameraRotateSpeed * static_cast<float>(x - lastMousePos.x));
-		float dy = DirectX::XMConvertToRadians(cameraRotateSpeed * static_cast<float>(y - lastMousePos.y));
+		float dx =  static_cast<float>(x - lastMousePos.x);
+		float dy =  static_cast<float>(y - lastMousePos.y);
 
 		// 회전의 단위는 라디안이다.
 		camera->RotateY(dx);
@@ -91,23 +93,4 @@ void InputManager::OnKeyUp(unsigned int input)
 	else if (input == VK_F8)
 		D3DDebug::GetInstance()->Clear();
 #endif
-}
-
-void InputManager::Tick(float deltaTime) 
-{
-	Camera* camera = D3DFramework::GetInstance()->GetCamera();
-
-	if (keys['w'] || keys['W'])
-		camera->Walk(cameraWalkSpeed * deltaTime);
-
-	if (keys['s'] || keys['S'])
-		camera->Walk(-cameraWalkSpeed * deltaTime);
-
-	if (keys['a'] || keys['A'])
-		camera->Strafe(-cameraWalkSpeed * deltaTime);
-
-	if (keys['d'] || keys['D'])
-		camera->Strafe(cameraWalkSpeed * deltaTime);
-
-	camera->UpdateViewMatrix();
 }

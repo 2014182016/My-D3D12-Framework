@@ -985,8 +985,18 @@ void D3DApp::CreateRootSignatures(const UINT32 textureNum, const UINT32 shadowMa
 		slotRootParameter[(int)RpReflection::BufferMap].InitAsDescriptorTable(1, &texTables[1]);
 		slotRootParameter[(int)RpReflection::SsrMap].InitAsDescriptorTable(1, &texTables[2]);
 
+		// 선형 필터링, 순환 좌표 지정 모드
+		const CD3DX12_STATIC_SAMPLER_DESC linearWrap(
+			0, // shaderRegister
+			D3D12_FILTER_MIN_MAG_MIP_LINEAR, // filter
+			D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
+			D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
+			D3D12_TEXTURE_ADDRESS_MODE_CLAMP); // addressW
+
+		std::array<CD3DX12_STATIC_SAMPLER_DESC, 1> staticSamplers = { linearWrap };
+
 		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc((UINT)slotRootParameter.size(), slotRootParameter.data(),
-			0, nullptr,
+			(UINT)staticSamplers.size(), staticSamplers.data(),
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 		// Root Signature를 직렬화한 후 객체를 생성한다.

@@ -82,6 +82,9 @@ private:
 
 	bool viewDirty = true;
 
+	float cameraWalkSpeed = 200.0f;
+	float cameraRotateSpeed = 0.25f;
+
 	BoundingFrustum camFrustum;
 	IDirectSound3DListener8* listener = nullptr;
 };

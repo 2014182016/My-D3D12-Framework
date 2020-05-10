@@ -69,18 +69,21 @@ private:
 	// 텍스처 이름, 파일 이름 순으로 정의된다.
 	const std::vector<TextureInfo> mTexInfos =
 	{
-		{"Bricks2", L"Bricks2.dds" },
-		{"Bricks2_nmap", L"Bricks2_nmap.dds" },
-		{"Tile", L"Tile.dds" },
-		{"Tile_nmap", L"Tile_nmap.dds"},
-		{"Ice", L"Ice.dds"},
-		{"Default_nmap", L"Default_nmap.dds"},
-		{"WireFence", L"WireFence.dds"},
-		{"Tree01S", L"Tree01S.dds"},
+		{"Ice_D", L"Ice_D.dds"},
+		{"Ice_N", L"Ice_N.dds"},
 		{"Clouds", L"Clouds.dds"},
 		{"Radial_Gradient", L"Radial_Gradient.dds"},
 		{"HeightMap", L"HeightMap.dds"},
-		{"Grass", L"Grass.dds"},
+		{"Snow", L"Snow.dds"},
+		{"Sword_D", L"Sword_D.dds"},
+		{"Sword_N", L"Sword_N.dds"},
+		{"Tree1", L"Tree1.dds"},
+		{"Tree2", L"Tree2.dds"},
+		{"Tree3", L"Tree3.dds"},
+		{"Rock1_D", L"Rock1_D.dds"},
+		{"Rock1_N", L"Rock1_N.dds"},
+		{"Rock2_D", L"Rock2_D.dds"},
+		{"Rock2_N", L"Rock2_N.dds"},
 	};
 
 	// 메쉬 이름, 파일 이름, 충돌 타입 순으로 정의된다.
@@ -90,14 +93,15 @@ private:
 		{ "Cube_OBB",  L"Cube.h3d", CollisionType::OBB },
 		{ "Sphere",  L"Sphere.h3d", CollisionType::Sphere },
 		{ "SkySphere",  L"Sphere.h3d", CollisionType::None },
-		{ "Cylinder",  L"Cylinder.h3d", CollisionType::AABB },
 		{ "Skull",  L"Skull.h3d", CollisionType::Sphere },
+		{ "Sword",  L"Sword.h3d", CollisionType::AABB },
+		{ "Rock1",  L"Rock1.h3d", CollisionType::AABB },
+		{ "Rock2",  L"Rock2.h3d", CollisionType::AABB },
 	};
 
 	// 사운드 이름, 파일 이름, 사운드 타입 순으로 정의된다.
 	const std::vector<SoundInfo> mSoundInfos =
 	{
-		{"Sound01", "sound01.wav", SoundType::Sound2D},
-		{"Sound02", "sound02.wav", SoundType::Sound3D},
+		{"WinterWind", "wind-sand.wav", SoundType::Sound3D},
 	};
 };

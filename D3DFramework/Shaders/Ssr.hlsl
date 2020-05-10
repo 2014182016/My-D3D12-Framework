@@ -28,7 +28,7 @@ float4 GetViewPosition(float2 uv)
 float4 PS(VertexOut pin) : SV_Target
 {
 	uint2 texcoord = pin.posH.xy;
-	float4 currPosV = gPositionMap.Load(uint3(texcoord, 0));
+	float4 currPosV = gPositionMap.Sample(gsamLinearClamp, pin.texC, 0.0f);
 
 	// Position의 알파 값은 SSAO 및 SSR 체크 여부를 다룬다.
 	if (currPosV.a <= 0.0f)
@@ -37,7 +37,7 @@ float4 PS(VertexOut pin) : SV_Target
 	// 현재 픽셀의 월드 좌표계 위치 및 노멀을 뷰 공간으로 변환한다.
 		   currPosV = mul(float4(currPosV.xyz, 1.0f), gView);
 	float3 toPosition = normalize(currPosV.xyz);
-	float3 normal = gNormalMap.Load(int3(texcoord, 0)).xyz;
+	float3 normal = gNormalMap.Sample(gsamLinearClamp, pin.texC, 0.0f).xyz;
 		   normal = mul(normal, (float3x3)gView);
 
 	// 진행할 광선의 방향을 계산한다.

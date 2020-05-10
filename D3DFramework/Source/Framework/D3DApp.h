@@ -3,8 +3,9 @@
 #if defined(DEBUG) || defined(_DEBUG)
 #define _CRTDBG_MAP_ALLOC
 #include <crtdbg.h>
-#pragma comment(linker, "/entry:WinMainCRTStartup /subsystem:console")
 #endif
+
+#pragma comment(linker, "/entry:WinMainCRTStartup /subsystem:console")
 
 #include "WinApp.h"
 #include "D3DInfo.h"

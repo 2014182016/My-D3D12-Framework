@@ -56,45 +56,13 @@ void AssetManager::BuildMaterial()
 	mat->roughness = 0.25f;
 	materials[mat->GetName()] = std::move(mat);
 
-	mat = std::make_unique<Material>("Brick0"s);
-	mat->diffuseMapIndex = FindTexture("Bricks2"s)->textureIndex;
-	mat->normalMapIndex = FindTexture("Bricks2_nmap"s)->textureIndex;
-	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
-	mat->specular = { 0.1f, 0.1f, 0.1f };
-	mat->roughness = 0.9f;
-	materials[mat->GetName()] = std::move(mat);
-
-	mat = std::make_unique<Material>("Tile0"s);
-	mat->diffuseMapIndex = FindTexture("Tile"s)->textureIndex;
-	mat->normalMapIndex = FindTexture("Tile_nmap"s)->textureIndex;
-	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
-	mat->specular = { 0.2f, 0.2f, 0.2f };
-	mat->roughness = 0.1f;
-	mat->SetScale(5.0f, 5.0f);
-	materials[mat->GetName()] = std::move(mat);
-
-	mat = std::make_unique<Material>("Mirror0"s);
-	mat->diffuseMapIndex = FindTexture("Ice"s)->textureIndex;
-	mat->normalMapIndex = FindTexture("Default_nmap"s)->textureIndex;
+	mat = std::make_unique<Material>("Ice"s);
+	mat->diffuseMapIndex = FindTexture("Ice_D"s)->textureIndex;
+	mat->normalMapIndex = FindTexture("Ice_N"s)->textureIndex;
 	mat->diffuse = { 1.0f, 1.0f, 1.0f, 0.5f };
 	mat->specular = { 0.98f, 0.97f, 0.95f };
 	mat->roughness = 0.1f;
-	materials[mat->GetName()] = std::move(mat);
-
-	mat = std::make_unique<Material>("Wirefence"s);
-	mat->diffuseMapIndex = FindTexture("WireFence"s)->textureIndex;
-	mat->normalMapIndex = DISABLED;
-	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
-	mat->specular = { 0.1f, 0.1f, 0.1f };
-	mat->roughness = 0.25f;
-	materials[mat->GetName()] = std::move(mat);
-
-	mat = std::make_unique<Material>("Tree0"s);
-	mat->diffuseMapIndex = FindTexture("Tree01S"s)->textureIndex;
-	mat->normalMapIndex = DISABLED;
-	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
-	mat->specular = { 0.1f, 0.1f, 0.1f };
-	mat->roughness = 0.125f;
+	mat->SetScale(3.0f, 3.0f);
 	materials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Sky"s);
@@ -115,20 +83,68 @@ void AssetManager::BuildMaterial()
 	materials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Terrain"s);
-	mat->diffuseMapIndex = FindTexture("Grass"s)->textureIndex;
+	mat->diffuseMapIndex = FindTexture("Snow"s)->textureIndex;
 	mat->normalMapIndex = DISABLED;
 	mat->heightMapIndex = FindTexture("HeightMap"s)->textureIndex;
 	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
 	mat->specular = { 0.1f, 0.1f, 0.1f };
-	mat->roughness = 0.9f;
+	mat->roughness = 0.1f;
 	materials[mat->GetName()] = std::move(mat);
 
 	mat = std::make_unique<Material>("Skull"s);
 	mat->diffuseMapIndex = DISABLED;
 	mat->normalMapIndex = DISABLED;
 	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
+	mat->specular = { 1.0f, 1.0f, 1.0f };
+	mat->roughness = 0.9f;
+	materials[mat->GetName()] = std::move(mat);
+
+	mat = std::make_unique<Material>("Sword"s);
+	mat->diffuseMapIndex = FindTexture("Sword_D"s)->textureIndex;
+	mat->normalMapIndex = FindTexture("Sword_N"s)->textureIndex;
+	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
+	mat->specular = { 1.0f, 1.0f, 1.0f };
+	mat->roughness = 0.3f;
+	materials[mat->GetName()] = std::move(mat);
+
+	mat = std::make_unique<Material>("Tree1"s);
+	mat->diffuseMapIndex = FindTexture("Tree1"s)->textureIndex;
+	mat->normalMapIndex = DISABLED;
+	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
 	mat->specular = { 0.1f, 0.1f, 0.1f };
-	mat->roughness = 0.99f;
+	mat->roughness = 0.9f;
+	materials[mat->GetName()] = std::move(mat);
+
+	mat = std::make_unique<Material>("Tree2"s);
+	mat->diffuseMapIndex = FindTexture("Tree2"s)->textureIndex;
+	mat->normalMapIndex = DISABLED;
+	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
+	mat->specular = { 0.1f, 0.1f, 0.1f };
+	mat->roughness = 0.9f;
+	materials[mat->GetName()] = std::move(mat);
+
+	mat = std::make_unique<Material>("Tree3"s);
+	mat->diffuseMapIndex = FindTexture("Tree3"s)->textureIndex;
+	mat->normalMapIndex = DISABLED;
+	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
+	mat->specular = { 0.1f, 0.1f, 0.1f };
+	mat->roughness = 0.9f;
+	materials[mat->GetName()] = std::move(mat);
+
+	mat = std::make_unique<Material>("Rock1"s);
+	mat->diffuseMapIndex = FindTexture("Rock1_D"s)->textureIndex;
+	mat->normalMapIndex = FindTexture("Rock1_N"s)->textureIndex;;
+	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
+	mat->specular = { 0.1f, 0.1f, 0.1f };
+	mat->roughness = 0.6f;
+	materials[mat->GetName()] = std::move(mat);
+
+	mat = std::make_unique<Material>("Rock2"s);
+	mat->diffuseMapIndex = FindTexture("Rock2_D"s)->textureIndex;
+	mat->normalMapIndex = FindTexture("Rock2_N"s)->textureIndex;;
+	mat->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
+	mat->specular = { 0.1f, 0.1f, 0.1f };
+	mat->roughness = 0.6f;
 	materials[mat->GetName()] = std::move(mat);
 }
 

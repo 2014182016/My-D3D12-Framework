@@ -101,9 +101,8 @@ void Ssao::OnResize(ID3D12Device* device, const UINT32 newWidth, const UINT32 ne
 {
 	if (renderTargetWidth != newWidth || renderTargetHeight != newHeight)
 	{
-		// 앰비언트 맵은 해상도의 절반만을 사용한다.
-		renderTargetWidth = newWidth / 2;
-		renderTargetHeight = newHeight / 2;
+		renderTargetWidth = newWidth;
+		renderTargetHeight = newHeight;
 
 		viewportRect.TopLeftX = 0.0f;
 		viewportRect.TopLeftY = 0.0f;

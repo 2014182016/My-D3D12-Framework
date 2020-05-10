@@ -15,14 +15,14 @@ public:
 	virtual ~Billboard();
 
 public:
-	virtual void Render(ID3D12GraphicsCommandList* commandList);
+	virtual void Render(ID3D12GraphicsCommandList* cmdList, BoundingFrustum* frustum = nullptr) const override;
 
 public:
 	// 빌보드 전용 메쉬를 생성한다.
 	void BuildBillboardMesh(ID3D12Device* device, ID3D12GraphicsCommandList* commandList);
 
 public:
-	XMFLOAT2 mSize = { 0.0f, 0.0f };
+	XMFLOAT2 mSize = { 1.0f, 1.0f };
 
 private:
 	std::unique_ptr<Mesh> billboardMesh = nullptr;

@@ -58,7 +58,6 @@ int WinApp::Run()
 			if (!appPaused)
 			{
 				CalculateFrameStats();
-				InputManager::GetInstance()->Tick(deltaTime);
 				Tick(deltaTime);
 				Render();
 			}

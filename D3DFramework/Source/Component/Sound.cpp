@@ -4,7 +4,11 @@
 
 Sound::Sound(std::string&& name) : Component(std::move(name)){ }
 
-Sound::~Sound() { }
+Sound::~Sound() 
+{ 
+	soundBuffer->Release();
+	sound3dBuffer->Release();
+}
 
 void Sound::CreateSoundBuffer2D(IDirectSound8* d3dSound, FILE* waveFile, const WaveHeaderType& waveFileHeader)
 {
